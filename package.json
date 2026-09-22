@@ -1,0 +1,17 @@
+{
+  "name": "navasetu-assessment-platform",
+  "version": "1.0.0",
+  "description": "NavaSetu Teacher Assessment Platform - Full Stack",
+  "private": true,
+  "engines": {
+    "node": "18.x || 20.x"
+  },
+  "scripts": {
+    "install-all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "start": "node backend/src/server.js",
+    "migrate": "node backend/src/migrations/run.js",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build:frontend": "cd frontend && npm run build"
+  }
+}
