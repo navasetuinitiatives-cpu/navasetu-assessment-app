@@ -8,6 +8,7 @@
   },
   "scripts": {
     "install-all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "postinstall": "cd backend && npm install && cd ../frontend && npm install || true",
     "start": "node backend/src/server.js",
     "migrate": "node backend/src/migrations/run.js",
     "dev:backend": "cd backend && npm run dev",

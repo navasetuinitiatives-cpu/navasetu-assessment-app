@@ -393,3 +393,114 @@ Your application is now live at: `https://backend-production-5f670.up.railway.ap
 
 Share your Vercel frontend URL with users!
 
+
+---
+
+## Phase 4: Deploy Frontend to Vercel
+
+### Prerequisites
+- Vercel account with appropriate project setup
+- Vercel CLI (npx vercel) for deployment
+- Backend API already deployed and running
+
+### Step 1: Navigate to Frontend Directory
+
+```bash
+cd frontend
+```
+
+### Step 2: Link to Vercel Project (First Time Only)
+
+```bash
+# This will prompt you to:
+# 1. Log in to Vercel (if not already authenticated)
+# 2. Select "Create a new project"
+# 3. Project name: navasetu-assessment
+# 4. Framework: Vite
+# 5. Root directory: ./
+
+npx vercel link
+```
+
+After linking, verify the project is created by checking the `.vercel/project.json` file.
+
+### Step 3: Configure Environment Variables
+
+Set the API URL environment variable in Vercel dashboard or via CLI:
+
+```bash
+npx vercel env add VITE_API_URL
+# Enter: https://backend-production-5f670.up.railway.app
+```
+
+Or manually in Vercel Dashboard:
+- Navigate to Project Settings → Environment Variables
+- Add: `VITE_API_URL = https://backend-production-5f670.up.railway.app`
+
+### Step 4: Deploy to Vercel
+
+```bash
+# For production deployment
+npx vercel --prod
+
+# For preview/staging deployment (without --prod flag)
+npx vercel
+```
+
+### Step 5: Verify Deployment
+
+1. Check the deployment URL in the Vercel dashboard
+2. Test the frontend health endpoint:
+   ```bash
+   curl https://navasetu-assessment.vercel.app/api/health
+   ```
+3. Verify the frontend connects to the backend
+
+---
+
+## Phase 5: End-to-End Testing
+
+### Backend Testing
+
+```bash
+# Health check
+curl https://backend-production-5f670.up.railway.app/api/health
+
+# System status (database connection)
+curl https://backend-production-5f670.up.railway.app/api/system
+```
+
+### Frontend Testing
+
+1. Visit: `https://navasetu-assessment.vercel.app`
+2. Test API connectivity through the frontend
+3. Verify all forms and assessments load correctly
+4. Test authentication flow (login/signup)
+
+### Performance Monitoring
+
+- Backend: Monitor Railway dashboard for logs and metrics
+- Frontend: Monitor Vercel Analytics for deployment and performance
+- Database: Monitor Neon PostgreSQL for query performance
+
+---
+
+## Deployment Troubleshooting
+
+### Common Issues
+
+1. **Frontend shows 502 error connecting to backend**
+   - Verify `VITE_API_URL` environment variable is set correctly
+   - Check backend is running and accessible from the public internet
+   - Verify CORS settings in backend (`CORS_ORIGIN` environment variable)
+
+2. **Vercel deployment fails**
+   - Check `npm run build` succeeds locally
+   - Verify all dependencies are listed in `package.json`
+   - Check the Vercel build logs for detailed errors
+
+3. **Database connection timeout**
+   - Verify Neon database is not paused
+   - Check `DATABASE_URL` is correctly set in Railway
+   - Verify network access rules allow Railway to Neon connection
+
