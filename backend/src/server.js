@@ -87,11 +87,27 @@ app.use((err, req, res, next) => {
   });
 });
 
+// Helper function to parse DATABASE_URL and display connection info
+const getDatabaseDisplay = () => {
+  const dbUrl = process.env.DATABASE_URL;
+  if (dbUrl) {
+    try {
+      const url = new URL(dbUrl);
+      const host = url.hostname;
+      const database = url.pathname.replace('/', '');
+      return `${database}@${host}`;
+    } catch (e) {
+      return 'DATABASE_URL (connected)';
+    }
+  }
+  return `${process.env.DB_NAME || 'unknown'}@${process.env.DB_HOST || 'localhost'}`;
+};
+
 // Start server
 app.listen(PORT, () => {
   console.log(`✅ Backend API running on http://localhost:${PORT}`);
   console.log(`📡 Environment: ${process.env.NODE_ENV}`);
-  console.log(`🗄️  Database: ${process.env.DB_NAME}@${process.env.DB_HOST}`);
+  console.log(`🗄️  Database: ${getDatabaseDisplay()}`);
 });
 
 export default app;
