@@ -30,7 +30,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // Serve static files from public folder (HTML assessment)
-app.use(express.static('public'));
+app.use(express.static('backend/public'));
 
 // Rate limiting
 const limiter = rateLimit({
