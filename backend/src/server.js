@@ -1,4 +1,7 @@
 import express from 'express';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import path from 'path';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
@@ -10,6 +13,9 @@ import paymentRoutes from './routes/payments.js';
 import consultationRoutes from './routes/consultations.js';
 import schoolRoutes from './routes/schools.js';
 import adminRoutes from './routes/admin.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 dotenv.config();
 
@@ -30,7 +36,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // Serve static files from public folder (HTML assessment)
-app.use(express.static('backend/public'));
+app.use(express.static(path.join(__dirname, '../public')));
 
 // Rate limiting
 const limiter = rateLimit({
