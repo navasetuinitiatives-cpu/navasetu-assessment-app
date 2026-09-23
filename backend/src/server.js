@@ -29,6 +29,9 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
+// Serve static files from public folder (HTML assessment)
+app.use(express.static('public'));
+
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
