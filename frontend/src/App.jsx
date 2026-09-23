@@ -1,50 +1,39 @@
 import { useState } from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import './App.css'
+
+// Pages
+import HomePage from './pages/HomePage'
+import RegisterPage from './pages/RegisterPage'
+import LoginPage from './pages/LoginPage'
+import SchoolSelectionPage from './pages/SchoolSelectionPage'
+import AssessmentPage from './pages/AssessmentPage'
+import ReportPage from './pages/ReportPage'
+import DashboardPage from './pages/DashboardPage'
+import ConsultationPage from './pages/ConsultationPage'
+
+// Context for auth state
+import { AuthProvider } from './context/AuthContext'
 
 function App() {
   return (
-    <Router>
-      <div className="app">
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/assessment/:assessmentId" element={<AssessmentPage />} />
-          <Route path="/report/:reportId" element={<ReportPage />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
-        </Routes>
-      </div>
-    </Router>
+    <AuthProvider>
+      <Router>
+        <div className="app">
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/select-school" element={<SchoolSelectionPage />} />
+            <Route path="/assessment" element={<AssessmentPage />} />
+            <Route path="/report/:reportId" element={<ReportPage />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/consultation/:reportId" element={<ConsultationPage />} />
+          </Routes>
+        </div>
+      </Router>
+    </AuthProvider>
   )
-}
-
-function HomePage() {
-  return (
-    <div>
-      <h1>NavaSetu - Teacher Assessment Platform</h1>
-      <p>Welcome to the teacher wellness and professional competence assessment platform.</p>
-    </div>
-  )
-}
-
-function RegisterPage() {
-  return <div><h2>Register</h2></div>
-}
-
-function LoginPage() {
-  return <div><h2>Login</h2></div>
-}
-
-function AssessmentPage() {
-  return <div><h2>Assessment</h2></div>
-}
-
-function ReportPage() {
-  return <div><h2>Report</h2></div>
-}
-
-function DashboardPage() {
-  return <div><h2>Dashboard</h2></div>
 }
 
 export default App
