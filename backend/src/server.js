@@ -12,6 +12,7 @@ import reportRoutes from './routes/reports.js';
 import paymentRoutes from './routes/payments.js';
 import consultationRoutes from './routes/consultations.js';
 import schoolRoutes from './routes/schools.js';
+import wellnessRoutes from './routes/wellness.js';
 import adminRoutes from './routes/admin.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -81,6 +82,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/consultations', consultationRoutes);
 app.use('/api/schools', schoolRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/wellness', wellnessRoutes);
 
 // 404 handler
 app.use((req, res) => {
