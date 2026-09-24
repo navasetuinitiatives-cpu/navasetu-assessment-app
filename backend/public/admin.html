@@ -265,17 +265,29 @@ async function sendInvites() {
       method: 'POST',
       body: JSON.stringify({ message: document.getElementById('inviteMessage').value, assessmentUrl: link })
     });
+    const code = document.getElementById('schoolDetailCode').textContent;
     document.getElementById('inviteResult').textContent = result.configured
       ? `Sent ${result.sentCount} of ${result.total} invites.`
-      : `Email isn't configured yet — ${result.drafts.length} invites were drafted instead of sent. Share this link manually for now: ${link}`;
+      : `Email isn't configured yet — ${result.drafts.length} invites were drafted instead of sent. Share this link manually, or just the school code (${code}): ${link}`;
   } catch (e) { alert(e.message); }
 }
 
 async function loadProjectReport() {
   try {
     const data = await api(`/schools/${currentSchoolId}/project-report`);
-    document.getElementById('projectReport').innerHTML = data.html;
+    document.getElementById('projectReport').innerHTML = `
+      <div style="margin: 1rem 0;"><button class="btn secondary" onclick="printProjectReport()">🖨️ Print / Save as PDF</button></div>
+      <div id="projectReportBody">${data.html}</div>
+    `;
   } catch (e) { alert(e.message); }
+}
+
+function printProjectReport() {
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><title>Project Report</title>
+    <style>body{font-family:Inter,Arial,sans-serif;padding:2rem;} @media print { body{padding:1cm;} } @page{size:auto;margin:0;}</style>
+    </head><body>${document.getElementById('projectReportBody').innerHTML}<script>window.onload=function(){window.print();};<\/script></body></html>`);
+  win.document.close();
 }
 
 async function loadOrders() {

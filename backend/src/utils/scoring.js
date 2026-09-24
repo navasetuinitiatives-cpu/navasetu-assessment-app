@@ -13,6 +13,11 @@
 // simulation on 2026-09-24 after fixing the reverse-flag polarity bug
 // (46 of 53 questions had it backwards).
 
+// Response options for the Big Five (Mini-IPIP) personality items below —
+// a standard 5-point self-rating scale, distinct from the wellness items'
+// varied Likert wordings.
+const PERSONALITY_OPTIONS = ['Very Inaccurate', 'Moderately Inaccurate', 'Neither Accurate nor Inaccurate', 'Moderately Accurate', 'Very Accurate'];
+
 export const questionBank = [
                 // GHQ-12 SECTION (12 items)
                 { id: 'q1', text: 'How often have you been able to concentrate on what you\'re doing?', category: 'Emotional Well-being', options: ['Better than usual', 'Same as usual', 'Less than usual', 'Much less than usual'], reverse: true },
@@ -76,22 +81,59 @@ export const questionBank = [
                 // Work-Life Boundary - Additional Items (q51, q52, q53)
                 { id: 'q51', text: 'I can effectively "switch off" from work thoughts and concerns after school hours.', category: 'Work-Life Balance', options: ['Strongly Disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly Agree'], reverse: false },
                 { id: 'q52', text: 'Work responsibilities do not regularly intrude into my weekends and holidays.', category: 'Work-Life Balance', options: ['Strongly Disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly Agree'], reverse: false },
-                { id: 'q53', text: 'I am able to take time off without guilt or worry about work piling up.', category: 'Work-Life Balance', options: ['Strongly Disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly Agree'], reverse: false }
+                { id: 'q53', text: 'I am able to take time off without guilt or worry about work piling up.', category: 'Work-Life Balance', options: ['Strongly Disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly Agree'], reverse: false },
+
+                // PERSONALITY (Big Five / OCEAN) SECTION — 20 items
+                // Adapted from the Mini-IPIP (Donnellan, Oswald, Baird & Lucas, 2006),
+                // a public-domain, peer-reviewed 20-item short form of the Big Five —
+                // chosen over MBTI for its stronger test-retest reliability, continuous
+                // (not typological) scoring, and open licensing. Category 'Personality'
+                // is deliberately excluded from parameterMapping/dimensionMapping so it
+                // never affects the 5 wellness dimensions; it is scored separately via
+                // personalityMapping/calculatePersonalityScores below. Shown in full only
+                // in the Navigate report tier; Discover/Explore never display these scores.
+                { id: 'q54', text: 'I am the life of the party.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: false },
+                { id: 'q55', text: 'I don\'t talk a lot.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: true },
+                { id: 'q56', text: 'I talk to a lot of different people at parties.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: false },
+                { id: 'q57', text: 'I keep in the background.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: true },
+                { id: 'q58', text: 'I sympathize with others\' feelings.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: false },
+                { id: 'q59', text: 'I am not interested in other people\'s problems.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: true },
+                { id: 'q60', text: 'I feel others\' emotions.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: false },
+                { id: 'q61', text: 'I am not really interested in others.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: true },
+                { id: 'q62', text: 'I get chores done right away.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: false },
+                { id: 'q63', text: 'I like order.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: false },
+                { id: 'q64', text: 'I make a mess of things.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: true },
+                { id: 'q65', text: 'I often forget to put things back in their proper place.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: true },
+                { id: 'q66', text: 'I have frequent mood swings.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: true },
+                { id: 'q67', text: 'I am relaxed most of the time.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: false },
+                { id: 'q68', text: 'I get upset easily.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: true },
+                { id: 'q69', text: 'I seldom feel blue.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: false },
+                { id: 'q70', text: 'I have a vivid imagination.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: false },
+                { id: 'q71', text: 'I have difficulty understanding abstract ideas.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: true },
+                { id: 'q72', text: 'I am not interested in abstract ideas.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: true },
+                { id: 'q73', text: 'I do not have a good imagination.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: true }
 ];
 
 export const parameterMapping = {
-            'Emotional Energy Levels': ['q1', 'q13', 'q14', 'q15'],
+            // ENHANCED (pre-deploy psychometric audit): q10, q11, q12, q16, q20,
+            // q21, q23, q24, q29, q30, q32 were part of the question bank and
+            // answered by every teacher, but were never wired into any parameter —
+            // 11 fully-answered GHQ-12/MBI-ES/PsyCap items were being collected and
+            // silently discarded. Each is now mapped to the existing parameter that
+            // matches its source-instrument content, improving reliability (more
+            // items per construct) without introducing any new parameter names.
+            'Emotional Energy Levels': ['q1', 'q13', 'q14', 'q15', 'q10', 'q12', 'q16', 'q23'],
             'Mental Clarity & Focus': ['q1', 'q7', 'q9'],
             'Rest & Sleep Quality': ['q2', 'q14'],
             'Sense of Impact': ['q3', 'q17', 'q25'],
             'Teaching Effectiveness': ['q43', 'q44', 'q26'],
             'Connection with Students': ['q17', 'q18'],
-            'Sense of Achievement': ['q19', 'q25'],
-            'Problem-Solving Ability': ['q4', 'q8', 'q28'],
-            'Ability to Bounce Back from Setbacks': ['q6', 'q33', 'q34', 'q35'],
-            'Confidence in Handling Difficulties': ['q4', 'q27', 'q28'],
+            'Sense of Achievement': ['q19', 'q25', 'q20', 'q21', 'q24'],
+            'Problem-Solving Ability': ['q4', 'q8', 'q28', 'q30'],
+            'Ability to Bounce Back from Setbacks': ['q6', 'q33', 'q34', 'q35', 'q29'],
+            'Confidence in Handling Difficulties': ['q4', 'q27', 'q28', 'q11'],
             'Adaptability to Change': ['q8', 'q31', 'q35'],
-            'Outlook for the Future': ['q36', 'q37', 'q38'],
+            'Outlook for the Future': ['q36', 'q37', 'q38', 'q32'],
             'Institutional Support': ['q3', 'q40'],
             'Clarity of Roles & Expectations': ['q39', 'q45', 'q46', 'q47'],  // ENHANCED: 4 items (was 1)
             'Adequacy of Resources': ['q40', 'q48', 'q49', 'q50'],  // ENHANCED: 4 items (was 1)
@@ -106,6 +148,19 @@ export const dimensionMapping = {
   'Inner Strength & Resilience': ['Problem-Solving Ability', 'Ability to Bounce Back from Setbacks', 'Confidence in Handling Difficulties', 'Adaptability to Change', 'Outlook for the Future'],
   'Work Environment & Support System': ['Institutional Support', 'Clarity of Roles & Expectations', 'Adequacy of Resources', 'Manageable Workload'],
   'Work-Life Balance': ['Work-Life Boundary', 'Overall Balance Satisfaction']
+};
+
+// Big Five (OCEAN) trait mapping — completely separate from the wellness
+// parameterMapping/dimensionMapping above; these 20 items never feed into
+// the 5 wellness dimensions. 'Emotional Stability' is the standard reverse
+// framing of Neuroticism (higher = more stable), chosen so every trait here
+// reads in a consistently positive-is-"more of the trait" direction.
+export const personalityMapping = {
+  'Extraversion': ['q54', 'q55', 'q56', 'q57'],
+  'Agreeableness': ['q58', 'q59', 'q60', 'q61'],
+  'Conscientiousness': ['q62', 'q63', 'q64', 'q65'],
+  'Emotional Stability': ['q66', 'q67', 'q68', 'q69'],
+  'Openness': ['q70', 'q71', 'q72', 'q73']
 };
 
 /**
@@ -148,6 +203,35 @@ export function calculateDimensionScores(parameterScores) {
       : 3.0;
   });
   return dimensionScores;
+}
+
+/**
+ * Compute the five Big Five trait scores (0-5 scale, same normalization as
+ * calculateScores) from the same responses map. Kept as a separate function
+ * (not folded into calculateScores) so the wellness parameter loop above
+ * never has to know personality traits exist.
+ */
+export function calculatePersonalityScores(responses) {
+  const traits = {};
+  Object.keys(personalityMapping).forEach((trait) => {
+    const values = [];
+    personalityMapping[trait].forEach((qId) => {
+      const question = questionBank.find((q) => q.id === qId);
+      if (question && responses[qId] !== undefined && responses[qId] !== null) {
+        let value = Number(responses[qId]);
+        if (question.reverse) {
+          const maxOptions = question.options.length - 1;
+          value = maxOptions - value;
+        }
+        const normalized = (value / (question.options.length - 1)) * 5;
+        values.push(normalized);
+      }
+    });
+    traits[trait] = values.length > 0
+      ? Number((values.reduce((a, b) => a + b, 0) / values.length).toFixed(2))
+      : 3.0;
+  });
+  return traits;
 }
 
 /** True once every question in the bank has an answer in the responses map. */

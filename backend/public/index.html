@@ -457,7 +457,7 @@
                 <p style="color: var(--text-light); margin-bottom: 1.5rem;">A few things to know before you start the assessment.</p>
 
                 <div style="font-size: 0.95rem; line-height: 1.8; color: var(--text-dark);">
-                    <p style="margin-bottom: 1rem;"><strong>What to expect:</strong> This assessment has 53 short statements and questions about your day-to-day experience as a teacher — your energy, focus, sleep, sense of achievement, relationships at work, and how work and personal life currently fit together. It takes most people 12–15 minutes to complete.</p>
+                    <p style="margin-bottom: 1rem;"><strong>What to expect:</strong> This assessment has 73 short statements and questions — 53 about your day-to-day experience as a teacher (your energy, focus, sleep, sense of achievement, relationships at work, and how work and personal life currently fit together), plus 20 about your natural working style and personality. It takes most people 18–22 minutes to complete.</p>
                     <p style="margin-bottom: 1rem;"><strong>How to answer:</strong> For each question, choose the single option that best reflects how you've genuinely been feeling recently — not how you think you should feel, and not how you'd like things to be. There are no right or wrong answers; the value of this assessment depends entirely on how honestly you answer.</p>
                     <p style="margin-bottom: 1rem;"><strong>Your answers are saved as you go.</strong> You can move through the questions at your own pace, and before you finally submit, you'll get a chance to review everything and change any answer you're not sure about.</p>
                     <p style="margin-bottom: 1rem;"><strong>Once submitted, your responses are locked</strong> and your report is generated from them. If you ever need to retake the assessment after that, please write to us at <a href="mailto:navasetuinitiatives@gmail.com">navasetuinitiatives@gmail.com</a> or call <a href="tel:+918556840001">8556840001</a>, and we'll enable it for you.</p>
@@ -478,7 +478,7 @@
                 <div class="progress-bar">
                     <div class="progress-fill" id="progressFill" style="width: 0%"></div>
                 </div>
-                <p class="progress-text" id="progressText">Question 1 of 53</p>
+                <p class="progress-text" id="progressText">0 of 73 answered</p>
             </div>
 
             <form id="assessmentForm">
@@ -616,6 +616,10 @@
             }
         });
 
+        // Response options for the Big Five (Mini-IPIP) personality items —
+        // a standard 5-point self-rating scale. Must mirror backend/src/utils/scoring.js exactly.
+        const PERSONALITY_OPTIONS = ['Very Inaccurate', 'Moderately Inaccurate', 'Neither Accurate nor Inaccurate', 'Moderately Accurate', 'Very Accurate'];
+
         const assessmentData = {
             questionBank: [
                 // GHQ-12 SECTION (12 items)
@@ -680,23 +684,102 @@
                 // Work-Life Boundary - Additional Items (q51, q52, q53)
                 { id: 'q51', text: 'I can effectively "switch off" from work thoughts and concerns after school hours.', category: 'Work-Life Balance', options: ['Strongly Disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly Agree'], reverse: false },
                 { id: 'q52', text: 'Work responsibilities do not regularly intrude into my weekends and holidays.', category: 'Work-Life Balance', options: ['Strongly Disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly Agree'], reverse: false },
-                { id: 'q53', text: 'I am able to take time off without guilt or worry about work piling up.', category: 'Work-Life Balance', options: ['Strongly Disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly Agree'], reverse: false }
+                { id: 'q53', text: 'I am able to take time off without guilt or worry about work piling up.', category: 'Work-Life Balance', options: ['Strongly Disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly Agree'], reverse: false },
+
+                // PERSONALITY (Big Five / OCEAN) SECTION — 20 items, Mini-IPIP.
+                // Category 'Personality' is excluded from parameterMapping/dimensionMapping
+                // below, so these never touch the 5 wellness dimensions. Scored separately
+                // via personalityMapping. Shown in full only in the Navigate report tier.
+                { id: 'q54', text: 'I am the life of the party.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: false },
+                { id: 'q55', text: 'I don\'t talk a lot.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: true },
+                { id: 'q56', text: 'I talk to a lot of different people at parties.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: false },
+                { id: 'q57', text: 'I keep in the background.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: true },
+                { id: 'q58', text: 'I sympathize with others\' feelings.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: false },
+                { id: 'q59', text: 'I am not interested in other people\'s problems.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: true },
+                { id: 'q60', text: 'I feel others\' emotions.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: false },
+                { id: 'q61', text: 'I am not really interested in others.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: true },
+                { id: 'q62', text: 'I get chores done right away.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: false },
+                { id: 'q63', text: 'I like order.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: false },
+                { id: 'q64', text: 'I make a mess of things.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: true },
+                { id: 'q65', text: 'I often forget to put things back in their proper place.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: true },
+                { id: 'q66', text: 'I have frequent mood swings.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: true },
+                { id: 'q67', text: 'I am relaxed most of the time.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: false },
+                { id: 'q68', text: 'I get upset easily.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: true },
+                { id: 'q69', text: 'I seldom feel blue.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: false },
+                { id: 'q70', text: 'I have a vivid imagination.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: false },
+                { id: 'q71', text: 'I have difficulty understanding abstract ideas.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: true },
+                { id: 'q72', text: 'I am not interested in abstract ideas.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: true },
+                { id: 'q73', text: 'I do not have a good imagination.', category: 'Personality', options: PERSONALITY_OPTIONS, reverse: true }
             ]
         };
 
+        const personalityMapping = {
+            'Extraversion': ['q54', 'q55', 'q56', 'q57'],
+            'Agreeableness': ['q58', 'q59', 'q60', 'q61'],
+            'Conscientiousness': ['q62', 'q63', 'q64', 'q65'],
+            'Emotional Stability': ['q66', 'q67', 'q68', 'q69'],
+            'Openness': ['q70', 'q71', 'q72', 'q73']
+        };
+
+        // Copy for the Navigate-tier "Your Natural Working Style" section. Framed in
+        // strengths-and-trade-offs language throughout — no trait level is "good" or
+        // "bad" — and "lower"/"higher" is always about where this person sits on a
+        // continuum, never a deficiency. Emotional Stability is phrased so a higher
+        // score always means steadier, consistent with the other four traits.
+        const PERSONALITY_TRAIT_INFO = {
+            'Extraversion': {
+                higherLabel: 'More Extraverted', middleLabel: 'Balanced', lowerLabel: 'More Introverted',
+                higher: 'You tend to draw energy from people and activity. In the classroom this often shows up as natural presence and energy that seems to build, rather than drain, during high-interaction days. The trade-off: quieter, low-stimulation parts of the job — solo grading, paperwork, planning in isolation — may feel more draining for you than the classroom itself, simply because they offer little social charge.',
+                middle: 'You sit close to the middle on this trait — able to draw on social energy when a room needs it, without depending on constant interaction to feel fine. Both high-interaction and quieter stretches of the job are manageable for you, in different ways.',
+                lower: 'You tend to recharge through quieter, lower-stimulation time rather than through social contact. A day of back-to-back classes, staff meetings, and parent conversations is more likely to leave you depleted than energized, even when it goes well. This is not a weakness in teaching itself — many highly effective teachers sit here — but it does mean protecting quiet recovery time between high-interaction stretches matters more for you than for a more extraverted colleague.'
+            },
+            'Agreeableness': {
+                higherLabel: 'More Agreeable', middleLabel: 'Balanced', lowerLabel: 'More Direct',
+                higher: 'You tend to be warm, cooperative, and attuned to others\' feelings — a real asset in building rapport with students and colleagues. The trade-off: this can make it harder to set firm boundaries, decline extra asks, or manage conflict directly, both of which matter for protecting your own workload and wellbeing.',
+                middle: 'You balance warmth with a reasonable ability to hold boundaries and disagree when it matters — neither a pushover nor someone who leads with confrontation.',
+                lower: 'You tend to be more direct and less driven by a need for harmony, which often makes boundary-setting and difficult conversations easier for you than for most colleagues. Building the warmer, relational side of student and staff rapport may take more conscious effort, even though it is entirely learnable.'
+            },
+            'Conscientiousness': {
+                higherLabel: 'More Structured', middleLabel: 'Balanced', lowerLabel: 'More Flexible & Spontaneous',
+                higher: 'You tend to be organized, thorough, and reliable about follow-through — lesson plans, grading, deadlines. This is one of the two personality traits most consistently linked to strong performance and lower burnout risk across occupations, teaching included. The risk at this end isn\'t the trait itself — it\'s that a strong internal standard can make it harder to leave something imperfect or unfinished, even when "good enough for now" is the realistic option.',
+                middle: 'You bring a workable, flexible approach to structure and follow-through — organized where it counts, without rigid perfectionism weighing on you.',
+                lower: 'You tend to be more spontaneous than methodical, which can be a real asset in a job that constantly throws curveballs. The structural side of teaching — grading turnaround, documentation, routine admin — may take more deliberate effort to stay on top of, since it doesn\'t come as naturally.'
+            },
+            'Emotional Stability': {
+                higherLabel: 'More Emotionally Steady', middleLabel: 'Typical Range', lowerLabel: 'More Emotionally Reactive',
+                higher: 'You tend to stay emotionally steady under pressure — stress, criticism, or a difficult class period are less likely to derail your mood or functioning for long. This is one of the two personality traits most strongly linked to lower burnout risk in the research literature.',
+                middle: 'Your emotional reactions to stress are fairly typical — noticeable on hard days, but usually not overwhelming or long-lasting.',
+                lower: 'You tend to feel stress, frustration, or low moods more intensely and for longer than most people do. This matters directly for how to read the Emotional Well-being scores elsewhere in this report — a lower score there may partly reflect this underlying sensitivity, not just your current circumstances. This isn\'t something to fix; it\'s something to actively plan around, with more deliberate recovery time and less tolerance for chronic stressors that a more even-tempered colleague might shrug off.'
+            },
+            'Openness': {
+                higherLabel: 'More Open to New Approaches', middleLabel: 'Balanced', lowerLabel: 'More Traditional & Consistent',
+                higher: 'You tend to enjoy new ideas and novel approaches, which often makes experimenting with new teaching methods or creative lesson design feel energizing rather than burdensome. Highly repetitive, rigidly standardized teaching environments may feel more stifling for you than for a colleague lower on this trait.',
+                middle: 'You\'re comfortable with both routine and novelty — able to appreciate a new approach without needing constant change to stay engaged.',
+                lower: 'You tend to prefer proven, familiar approaches over experimentation, which often translates into real consistency and reliability in how you teach — a genuine strength. Rapid curriculum change or open-ended, unstructured tasks may take more adjustment for you than for a colleague higher on this trait.'
+            }
+        };
+
         const parameterMapping = {
-            'Emotional Energy Levels': ['q1', 'q13', 'q14', 'q15'],
+            // ENHANCED (pre-deploy psychometric audit): q10, q11, q12, q16, q20,
+            // q21, q23, q24, q29, q30, q32 were part of the question bank and
+            // answered by every teacher, but were never wired into any parameter —
+            // 11 fully-answered GHQ-12/MBI-ES/PsyCap items were being collected and
+            // silently discarded. Each is now mapped to the existing parameter that
+            // matches its source-instrument content, improving reliability (more
+            // items per construct) without introducing any new parameter names.
+            // Must mirror backend/src/utils/scoring.js exactly.
+            'Emotional Energy Levels': ['q1', 'q13', 'q14', 'q15', 'q10', 'q12', 'q16', 'q23'],
             'Mental Clarity & Focus': ['q1', 'q7', 'q9'],
             'Rest & Sleep Quality': ['q2', 'q14'],
             'Sense of Impact': ['q3', 'q17', 'q25'],
             'Teaching Effectiveness': ['q43', 'q44', 'q26'],
             'Connection with Students': ['q17', 'q18'],
-            'Sense of Achievement': ['q19', 'q25'],
-            'Problem-Solving Ability': ['q4', 'q8', 'q28'],
-            'Ability to Bounce Back from Setbacks': ['q6', 'q33', 'q34', 'q35'],
-            'Confidence in Handling Difficulties': ['q4', 'q27', 'q28'],
+            'Sense of Achievement': ['q19', 'q25', 'q20', 'q21', 'q24'],
+            'Problem-Solving Ability': ['q4', 'q8', 'q28', 'q30'],
+            'Ability to Bounce Back from Setbacks': ['q6', 'q33', 'q34', 'q35', 'q29'],
+            'Confidence in Handling Difficulties': ['q4', 'q27', 'q28', 'q11'],
             'Adaptability to Change': ['q8', 'q31', 'q35'],
-            'Outlook for the Future': ['q36', 'q37', 'q38'],
+            'Outlook for the Future': ['q36', 'q37', 'q38', 'q32'],
             'Institutional Support': ['q3', 'q40'],
             'Clarity of Roles & Expectations': ['q39', 'q45', 'q46', 'q47'],  // ENHANCED: 4 items (was 1)
             'Adequacy of Resources': ['q40', 'q48', 'q49', 'q50'],  // ENHANCED: 4 items (was 1)
@@ -754,6 +837,7 @@
                 this.responses = {};
                 this.selectedPlan = null;
                 this.calculatedScores = {};
+                this.personalityScores = {}; // Big Five (OCEAN) traits — Navigate tier only
                 this.assessmentId = null;
                 this.schoolTeacherId = null;
                 this.clientType = 'b2c';
@@ -1100,6 +1184,23 @@
                 this.updateProgress();
             }
 
+            // Was called in 4 places (renderQuestions, on every answer change, on
+            // resume, on review-edit) but never actually defined — a latent bug
+            // that never crashed the page (the calling code either swallows the
+            // exception or runs after the DOM work it depends on), but silently
+            // left the progress bar/counter frozen at its initial markup value.
+            // Found and fixed during the pre-deploy psychometric audit.
+            updateProgress() {
+                const questions = assessmentData.questionBank;
+                const total = questions.length;
+                const answered = questions.filter(q => document.querySelector(`input[name="q${q.id}"]:checked`)).length;
+                const pct = total > 0 ? Math.round((answered / total) * 100) : 0;
+                const fill = document.getElementById('progressFill');
+                if (fill) fill.style.width = pct + '%';
+                const text = document.getElementById('progressText');
+                if (text) text.textContent = `${answered} of ${total} answered`;
+            }
+
             async beginAssessment() {
                 // The API call and the post-navigation DOM restore are deliberately
                 // in separate try/catch blocks: a hiccup while re-checking previously
@@ -1235,6 +1336,7 @@
                     this.submittedAt = new Date().toISOString();
                     this.calculatedScores = data.parameterScores; // authoritative, server-computed
                     this.dimensionScores = data.dimensionScores;
+                    this.personalityScores = data.personalityScores || {}; // Big Five (OCEAN), Navigate-tier only
 
                     // B2B: every school-sponsored assessment is always the Navigate
                     // tier, and payment happens outside the portal entirely — so
@@ -1387,6 +1489,14 @@
                 return `Difficulty - This needs immediate attention.`;
             }
 
+            getPersonalityBand(trait, score) {
+                const info = PERSONALITY_TRAIT_INFO[trait];
+                if (!info) return { label: '', text: '' };
+                if (score >= 3.5) return { label: info.higherLabel, text: info.higher };
+                if (score >= 2.5) return { label: info.middleLabel, text: info.middle };
+                return { label: info.lowerLabel, text: info.lower };
+            }
+
             renderReport() {
                 const printFooterName = document.getElementById('printFooterName');
                 if (printFooterName) printFooterName.textContent = this.demographics.name || '';
@@ -1478,6 +1588,12 @@
                             This overview intentionally stops at the category level. Behind a score like ${weakest.score.toFixed(1)}/5 in ${weakest.name} sit several distinct, individually-scored parameters — some of which may be fine on their own, and one or two of which are likely driving the number down. Knowing which one is what turns "this area needs work" into an actual plan.
                         </p>
                     </div>
+
+                    <div class="report-section" style="background: #F5F3FF; border-left: 4px solid #8B7FD6; padding: 1.5rem 1.75rem; border-radius: 8px; margin-bottom: 1rem;">
+                        <p style="color: var(--text-dark); font-size: 0.95rem; line-height: 1.7; margin: 0;">
+                            <strong>Something else worth naming:</strong> some of what you're noticing here is shaped by how you're naturally wired to handle people, structure, and stress — not just by your current circumstances. Navigate includes a personality-informed lens on your results that connects your scores to your working style, which often reframes "what's wrong" into "what's just how I'm built, and what to work around."
+                        </p>
+                    </div>
                 `;
 
                 // Footer: keep the Explore upsell here, but also give a genuine,
@@ -1507,6 +1623,7 @@
                             <ul style="margin: 0 0 1rem 1.25rem; padding: 0; color: var(--text-dark); font-size: 0.9rem; line-height: 1.8;">
                                 <li><strong>All 18 individual parameters</strong> analyzed in full depth, across all 5 categories</li>
                                 <li><strong>Personalized suggested actions</strong> for every area that needs support — specific to your actual scores, not generic advice</li>
+                                <li><strong>Your Natural Working Style</strong> — a Big Five personality profile that connects your temperament to why these scores look the way they do</li>
                                 <li><strong>A comprehensive closing summary</strong> that ties your whole profile together — strengths, risk areas, and what to prioritize</li>
                                 <li><strong>One complimentary 1-on-1 counselling session</strong> with a NavaSetu professional to talk through your results and plan next steps</li>
                                 <li>A report thorough enough to bring into that counselling conversation directly</li>
@@ -1634,7 +1751,13 @@
                         </div>
                     </div>
 
-                    <div class="report-section" style="background: #FEF9E7; border-top: 3px solid var(--primary-light); margin-top: 3rem; padding-top: 2rem;">
+                    <div class="report-section" style="background: #F5F3FF; border-left: 4px solid #8B7FD6; padding: 1.5rem 1.75rem; border-radius: 8px; margin-top: 2rem;">
+                        <p style="color: var(--text-dark); font-size: 0.95rem; line-height: 1.7; margin: 0;">
+                            <strong>Worth knowing:</strong> patterns like these are shaped partly by circumstance and partly by temperament — how you're naturally wired to handle people, structure, and stress. This report doesn't separate the two. Navigate does, with a personality-informed lens that connects your scores to your natural working style.
+                        </p>
+                    </div>
+
+                    <div class="report-section" style="background: #FEF9E7; border-top: 3px solid var(--primary-light); margin-top: 2rem; padding-top: 2rem;">
                         <h2 style="color: var(--primary); margin-bottom: 1.5rem;">Unlock Complete Insights</h2>
                         <p style="color: var(--text-dark); font-size: 0.95rem; margin-bottom: 1.5rem;">
                             This report tells you what's going on. The Navigate plan is where you get help deciding what to do about it — including direct access to a professional who can talk it through with you.
@@ -1645,6 +1768,7 @@
                             <ul style="margin: 0 0 1rem 1.25rem; padding: 0; color: var(--text-dark); font-size: 0.9rem; line-height: 1.8;">
                                 <li>Everything in this Explore report, unchanged and included</li>
                                 <li><strong>Personalized suggested actions</strong> for every parameter that needs support — specific to your scores, not generic tips</li>
+                                <li><strong>Your Natural Working Style</strong> — a Big Five personality profile connecting your temperament to your wellness scores</li>
                                 <li><strong>A comprehensive closing summary</strong> tying your full 18-parameter profile together — strengths, risk areas, and where to focus first</li>
                                 <li><strong>One complimentary 1-on-1 counselling session</strong> with a NavaSetu professional — bring this report into that conversation</li>
                             </ul>
@@ -1687,7 +1811,7 @@
                     <h2 style="color: var(--primary); margin-bottom: 1.5rem;">Welcome to Your Comprehensive Wellness Report</h2>
                     <div style="font-size: 0.95rem; line-height: 1.8; color: var(--text-dark); margin-bottom: 1.5rem;">
                         <p style="margin-bottom: 1rem;">
-                            Dear ${name}, thank you for investing time in understanding your wellness. This Navigate report is crafted specifically for you—a ${age}-year-old educator with ${experience} of teaching experience at ${institution} in ${location}. Your responses paint a detailed picture of your current well-being across 19 distinct dimensions that matter most for teachers' health, effectiveness, and satisfaction.
+                            Dear ${name}, thank you for investing time in understanding your wellness. This Navigate report is crafted specifically for you—a ${age}-year-old educator with ${experience} of teaching experience at ${institution} in ${location}. Your responses paint a detailed picture of your current well-being across 18 individual parameters (grouped into 5 core dimensions) that matter most for teachers' health, effectiveness, and satisfaction — plus, further below, a Big Five personality profile unique to Navigate.
                         </p>
                         <p style="margin-bottom: 1rem;">
                             This assessment captures how you're feeling right now—your emotional state, work fulfillment, resilience, support systems, and life balance. It's a moment-in-time snapshot, and your wellness naturally fluctuates with seasons, events, and changes in your institution. Think of this report as a mirror: it reflects where you are today, not where you'll always be. More importantly, it highlights where small, intentional changes can create meaningful improvements in your well-being and effectiveness as an educator.
@@ -1704,6 +1828,7 @@
                             <li><strong>19 Individual Parameters</strong> giving you granular insight into specific aspects of your wellness</li>
                             <li><strong>Personalized Interpretations</strong> tailored to your scores and context, not generic statements</li>
                             <li><strong>Practical Suggestions</strong> for areas where support could make the biggest difference</li>
+                            <li><strong>Your Natural Working Style</strong> — a Big Five (OCEAN) personality profile connecting your temperament to your wellness scores, exclusive to Navigate</li>
                         </ul>
                         <p style="margin-top: 1rem; font-size: 0.9rem; color: var(--text-light); margin-bottom: 0;">
                             <strong>Important Disclaimer:</strong> This is a self-reflection screening tool, not a clinical diagnostic instrument. For serious concerns about mental health, please consult a qualified professional.
@@ -1828,6 +1953,83 @@
 
                     html += `</div>`;
                 });
+
+                // Your Natural Working Style — Big Five (OCEAN) personality profile.
+                // Navigate-tier only: Discover/Explore never render this.calculatedScores
+                // for personality, only an abstract nudge (see renderDiscoverReport /
+                // renderExploreReport). Traits render in a fixed order regardless of score.
+                const personalityTraitOrder = ['Extraversion', 'Agreeableness', 'Conscientiousness', 'Emotional Stability', 'Openness'];
+                html += `
+                    <div class="report-section" style="margin-top: 2rem;">
+                        <h2 style="color: var(--primary); border-bottom: 3px solid var(--primary-light); padding-bottom: 0.75rem; margin-bottom: 1.5rem;">Your Natural Working Style</h2>
+                        <div style="background: #F0F8F4; padding: 1.5rem; border-radius: 6px; border-left: 4px solid var(--accent-wellness); margin-bottom: 2rem;">
+                            <h3 style="color: var(--text-dark); margin-top: 0; font-size: 0.95rem; margin-bottom: 0.75rem;">What This Section Is — and Isn't</h3>
+                            <p style="color: var(--text-dark); font-size: 0.95rem; line-height: 1.7; margin: 0 0 0.75rem 0;">
+                                Everything above measures how you're doing right now — your current wellness. This section is different: it measures your underlying personality, using the Big Five (OCEAN) model, the framework with the strongest scientific support in personality research today. Unlike your wellness scores, these traits are relatively stable and don't reflect a good or bad "type" — every trait here has genuine strengths and genuine trade-offs, and no combination of scores is the "right" one for teaching.
+                            </p>
+                            <p style="color: var(--text-dark); font-size: 0.95rem; line-height: 1.7; margin: 0;">
+                                Why include it: research consistently shows that personality shapes how teaching demands are experienced — the same workload can feel very different to two teachers with different temperaments. Reading this alongside your wellness scores above can help separate "what's genuinely hard about my situation" from "what's hard for me specifically because of how I'm wired" — both are real, and both are worth naming in a counselling conversation.
+                            </p>
+                        </div>`;
+
+                personalityTraitOrder.forEach((trait) => {
+                    const score = this.personalityScores[trait] !== undefined ? this.personalityScores[trait] : 3.0;
+                    const band = this.getPersonalityBand(trait, score);
+                    html += `
+                        <div style="background: white; padding: 1.5rem; border-radius: 6px; border-left: 6px solid var(--primary-light); margin-bottom: 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+                                <div>
+                                    <h3 style="color: var(--primary); margin: 0 0 0.25rem 0; font-size: 1rem;">${trait}</h3>
+                                    <p style="color: var(--text-light); margin: 0; font-size: 0.9rem;">${band.label}</p>
+                                </div>
+                                <div style="text-align: right; background: var(--primary-light); color: white; padding: 0.75rem 1rem; border-radius: 6px; min-width: 70px;">
+                                    <div style="font-size: 1.5rem; font-weight: 700;">${score.toFixed(1)}</div>
+                                    <div style="font-size: 0.8rem;">/5</div>
+                                </div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                                <div style="flex: 1; height: 24px; background: var(--border); border-radius: 12px; overflow: hidden;">
+                                    <div style="width: ${(score/5)*100}%; height: 100%; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; color: white; font-weight: 700; font-size: 0.75rem; background: linear-gradient(90deg, var(--primary-light), var(--accent-wellness));">${score.toFixed(1)}</div>
+                                </div>
+                                <div style="min-width: 60px; text-align: right; font-weight: 600; font-size: 0.9rem; color: var(--text-dark);">${score.toFixed(1)}/5</div>
+                            </div>
+                            <div style="padding: 1rem 0; border-top: 1px solid var(--border);">
+                                <strong style="color: var(--primary); display: block; margin-bottom: 0.75rem;">What This Means for Your Teaching:</strong>
+                                <p style="color: var(--text-dark); font-size: 0.95rem; line-height: 1.7; margin: 0;">${band.text}</p>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                // Tie personality directly to the wellness picture above, using the two
+                // traits with the strongest evidence base for occupational wellbeing:
+                // Emotional Stability (maps most directly onto Emotional Well-being) and
+                // Conscientiousness (maps onto workload/structure-related strain).
+                const esScore = this.personalityScores['Emotional Stability'] !== undefined ? this.personalityScores['Emotional Stability'] : 3.0;
+                const conScore = this.personalityScores['Conscientiousness'] !== undefined ? this.personalityScores['Conscientiousness'] : 3.0;
+                const emotionalWellbeingScore = (
+                    (this.calculatedScores['Emotional Energy Levels'] || 3.0) +
+                    (this.calculatedScores['Mental Clarity & Focus'] || 3.0) +
+                    (this.calculatedScores['Rest & Sleep Quality'] || 3.0)
+                ) / 3;
+                let personalitySynthesis;
+                if (esScore < 2.5 && emotionalWellbeingScore < 3.0) {
+                    personalitySynthesis = `Your Emotional Well-being score above and your Emotional Stability trait here are likely connected: with a more emotionally reactive temperament, the same stressors tend to land harder and linger longer than they would for a more even-tempered colleague facing an identical workload. This is worth naming directly in a counselling session — the goal isn't to become less reactive, which isn't really how personality works, but to build recovery habits sized to your actual reactivity rather than to a generic recommendation.`;
+                } else if (esScore >= 3.5 && emotionalWellbeingScore < 3.0) {
+                    personalitySynthesis = `One notable pattern: your Emotional Stability score suggests a naturally steady temperament, yet your Emotional Well-being score above is still under strain. That combination is worth paying attention to — it suggests the strain is more likely coming from real external pressures (workload, environment, specific incidents) than from an especially reactive baseline, which is useful information for a counselling session to start with the situation, not the person.`;
+                } else {
+                    personalitySynthesis = `Your Emotional Stability score (${esScore.toFixed(1)}/5) is broadly in line with your Emotional Well-being score above, which is the expected pattern — your current wellness and your underlying temperament are telling a consistent story rather than pulling in different directions.`;
+                }
+                const workloadScore = this.calculatedScores['Manageable Workload'] || 3.0;
+                if (conScore >= 3.5 && workloadScore < 3.0) {
+                    personalitySynthesis += ` A second pattern worth flagging: your high Conscientiousness likely means your Manageable Workload score above understates how much this is costing you day to day — a strong internal standard tends to push conscientious people to absorb an unmanageable workload quietly rather than push back on it, which can mask the strain until it shows up elsewhere.`;
+                }
+                html += `
+                    <div class="report-section" style="background: #FEF3E2; border-left: 4px solid var(--accent-wellness); padding: 1.5rem 1.75rem; border-radius: 6px; margin-bottom: 2rem;">
+                        <strong style="color: var(--primary); display: block; margin-bottom: 0.5rem;">Connecting Personality to Your Wellness Picture</strong>
+                        <p style="color: var(--text-dark); font-size: 0.95rem; line-height: 1.7; margin: 0;">${personalitySynthesis}</p>
+                    </div>
+                `;
 
                 // Closing — a data-driven synthesis of the full 18-parameter profile,
                 // written to be comprehensive enough to double as a handoff summary

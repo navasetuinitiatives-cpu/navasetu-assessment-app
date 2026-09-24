@@ -2,7 +2,7 @@ import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { pool } from '../config/database.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
-import { calculateScores, calculateDimensionScores, isComplete, unansweredQuestionIds, questionBank } from '../utils/scoring.js';
+import { calculateScores, calculateDimensionScores, calculatePersonalityScores, isComplete, unansweredQuestionIds, questionBank } from '../utils/scoring.js';
 
 const router = express.Router();
 
@@ -88,13 +88,18 @@ router.post('/:assessmentId/submit', requireAuth, async (req, res) => {
 
     const parameterScores = calculateScores(finalResponses);
     const dimensionScores = calculateDimensionScores(parameterScores);
+    // Big Five (OCEAN) traits — scored and stored for every assessment regardless
+    // of tier, so an upgrade from Discover/Explore to Navigate never needs new
+    // questions (responses are frozen at submit). Only the Navigate report
+    // template actually displays these scores; Discover/Explore just don't render them.
+    const personalityScores = calculatePersonalityScores(finalResponses);
 
     await pool.query(
       `UPDATE assessments
        SET status = 'submitted', submitted = true, submitted_at = CURRENT_TIMESTAMP,
            responses = $1, scores = $2, updated_at = CURRENT_TIMESTAMP
        WHERE id = $3`,
-      [JSON.stringify(finalResponses), JSON.stringify({ parameters: parameterScores, dimensions: dimensionScores }), assessmentId]
+      [JSON.stringify(finalResponses), JSON.stringify({ parameters: parameterScores, dimensions: dimensionScores, personality: personalityScores }), assessmentId]
     );
 
     // B2B: mark the roster row matched/completed so the school dashboard reflects progress
@@ -105,7 +110,7 @@ router.post('/:assessmentId/submit', requireAuth, async (req, res) => {
       );
     }
 
-    res.json({ success: true, parameterScores, dimensionScores });
+    res.json({ success: true, parameterScores, dimensionScores, personalityScores });
   } catch (error) {
     console.error('Submit assessment error:', error);
     res.status(500).json({ error: 'Failed to submit assessment' });

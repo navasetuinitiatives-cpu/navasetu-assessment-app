@@ -203,6 +203,7 @@ router.post('/:schoolId/invite', requireAuth, requireAdmin, async (req, res) => 
       teachers: teachersResult.rows,
       schoolName: school.name,
       link,
+      schoolCode: school.school_code,
       customMessage: message || ''
     });
 
