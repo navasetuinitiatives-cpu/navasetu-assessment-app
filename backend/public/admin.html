@@ -81,12 +81,16 @@
       <div class="card">
         <h2>Schools</h2>
         <table>
-          <thead><tr><th>Name</th><th>Teachers</th><th>Completed</th><th></th></tr></thead>
+          <thead><tr><th>Name</th><th>School Code</th><th>Teachers</th><th>Completed</th><th></th></tr></thead>
           <tbody id="schoolsBody"></tbody>
         </table>
       </div>
       <div class="card" id="schoolDetailCard" style="display:none;">
         <h2 id="schoolDetailName">School</h2>
+        <p class="muted">Give teachers either the shared link below, or just the code — both identify them as part of this school and skip straight to a free Navigate report.</p>
+        <p><strong>School Code:</strong> <span id="schoolDetailCode" style="font-family:monospace; font-size:1.1rem;">—</span>
+          <button class="btn secondary" onclick="regenerateCode()" style="margin-left:0.5rem;">Regenerate Code</button>
+        </p>
         <label>Upload Roster (paste CSV: name,email,designation,subject — header row optional)</label>
         <textarea id="rosterCsv" rows="6" placeholder="Jane Doe,jane@school.edu,Teacher,Maths"></textarea>
         <button class="btn" onclick="uploadRoster()">Upload Roster</button>
@@ -204,9 +208,11 @@ async function createSchool() {
 async function loadSchools() {
   try {
     const data = await api('/schools');
+    window._schoolsCache = data.schools;
     document.getElementById('schoolsBody').innerHTML = data.schools.map(s => `
       <tr>
         <td>${s.name}</td>
+        <td style="font-family:monospace;">${s.school_code || '—'}</td>
         <td>${s.total_teachers}</td>
         <td>${s.completed_teachers}</td>
         <td><button class="btn secondary" onclick="openSchool('${s.id}', '${s.name.replace(/'/g, "\\'")}')">Manage</button></td>
@@ -219,7 +225,18 @@ async function openSchool(id, name) {
   document.getElementById('schoolDetailCard').style.display = 'block';
   document.getElementById('schoolDetailName').textContent = name;
   document.getElementById('projectReport').innerHTML = '';
+  const school = (window._schoolsCache || []).find(s => s.id === id);
+  document.getElementById('schoolDetailCode').textContent = (school && school.school_code) || '—';
   loadTeachers();
+}
+
+async function regenerateCode() {
+  if (!currentSchoolId) return;
+  try {
+    const result = await api(`/schools/${currentSchoolId}/regenerate-code`, { method: 'POST' });
+    document.getElementById('schoolDetailCode').textContent = result.school.school_code;
+    loadSchools();
+  } catch (e) { alert(e.message); }
 }
 
 async function loadTeachers() {

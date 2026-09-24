@@ -35,22 +35,72 @@ function parseRosterCsv(text) {
 
 // --- Admin: school block management -----------------------------------
 
+// Builds a short, human-typeable code from the school name (e.g. "Greenwood
+// Public School" -> "GREENWOOD482"), retrying on the rare collision.
+async function generateUniqueSchoolCode(name) {
+  const base = (name || 'SCHOOL')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .slice(0, 10) || 'SCHOOL';
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const suffix = Math.floor(100 + Math.random() * 900); // 3 digits
+    const code = `${base}${suffix}`;
+    const existing = await pool.query('SELECT id FROM schools WHERE school_code = $1', [code]);
+    if (existing.rows.length === 0) return code;
+  }
+  return `${base}${Date.now().toString().slice(-6)}`; // extremely unlikely fallback
+}
+
 router.post('/', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { name, district, state, country, schoolType, contactName, contactEmail, contactPhone } = req.body;
     if (!name) return res.status(400).json({ error: 'School name is required' });
 
     const id = uuidv4();
+    const schoolCode = await generateUniqueSchoolCode(name);
     const result = await pool.query(
-      `INSERT INTO schools (id, name, district, state, country, school_type, contact_name, contact_email, contact_phone, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
-      [id, name, district || null, state || null, country || 'India', schoolType || null, contactName || null, contactEmail || null, contactPhone || null, req.user.userId]
+      `INSERT INTO schools (id, name, district, state, country, school_type, contact_name, contact_email, contact_phone, created_by, school_code)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+      [id, name, district || null, state || null, country || 'India', schoolType || null, contactName || null, contactEmail || null, contactPhone || null, req.user.userId, schoolCode]
     );
 
     res.status(201).json({ success: true, school: result.rows[0] });
   } catch (error) {
     console.error('Create school error:', error);
     res.status(500).json({ error: 'Failed to create school' });
+  }
+});
+
+// Admin can regenerate a school's code (e.g. if it leaked beyond the intended
+// cohort and needs to be rotated).
+router.post('/:schoolId/regenerate-code', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const school = await pool.query('SELECT name FROM schools WHERE id = $1', [req.params.schoolId]);
+    if (school.rows.length === 0) return res.status(404).json({ error: 'School not found' });
+
+    const newCode = await generateUniqueSchoolCode(school.rows[0].name);
+    const result = await pool.query(
+      'UPDATE schools SET school_code = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+      [newCode, req.params.schoolId]
+    );
+    res.json({ success: true, school: result.rows[0] });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to regenerate code' });
+  }
+});
+
+// Public: resolve a school code to a school id/name, used by the login/register
+// screen's "Have a school code?" field before it calls /join.
+router.get('/by-code/:code', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, name FROM schools WHERE school_code = $1 AND status = 'active'`,
+      [req.params.code.toUpperCase().trim()]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'That school code was not recognized. Please check with your school administrator.' });
+    res.json({ schoolId: result.rows[0].id, schoolName: result.rows[0].name });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to look up school code' });
   }
 });
 
@@ -168,65 +218,87 @@ router.post('/:schoolId/invite', requireAuth, requireAdmin, async (req, res) => 
   }
 });
 
-// --- Public-ish: teacher joins via the shared school link ---------------
+// --- Public-ish: teacher joins a school project (via shared link OR school
+// code — both resolve to the same schoolId and run the same logic) ---------
 // Matches the caller's email against the school's roster (email is the match
 // key), creating her user account if needed, and returns a token so she can
 // proceed straight into the assessment.
+async function joinSchoolByEmail(schoolId, { email, fullName, password }, res) {
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+
+  const rosterResult = await pool.query(
+    'SELECT * FROM school_teachers WHERE school_id = $1 AND email = $2',
+    [schoolId, email.toLowerCase()]
+  );
+  if (rosterResult.rows.length === 0) {
+    return res.status(404).json({ error: 'This email was not found on the school roster. Please check with your school administrator.' });
+  }
+  const rosterEntry = rosterResult.rows[0];
+
+  if (rosterEntry.status === 'completed' && !rosterEntry.retake_enabled) {
+    return res.status(409).json({ error: 'A submission already exists for this email. Contact NavaSetu if you need a retake.' });
+  }
+
+  let userResult = await pool.query('SELECT * FROM users WHERE email = $1', [email.toLowerCase()]);
+  let user;
+  if (userResult.rows.length === 0) {
+    const passwordHash = await bcrypt.hash(password || uuidv4(), 10);
+    const created = await pool.query(
+      `INSERT INTO users (email, password_hash, full_name, role, client_type)
+       VALUES ($1, $2, $3, 'teacher', 'b2b') RETURNING *`,
+      [email.toLowerCase(), passwordHash, fullName || rosterEntry.full_name]
+    );
+    user = created.rows[0];
+  } else {
+    user = userResult.rows[0];
+  }
+
+  await pool.query('UPDATE school_teachers SET user_id = $1 WHERE id = $2', [user.id, rosterEntry.id]);
+
+  const accessToken = jwt.sign(
+    { userId: user.id, email: user.email, role: user.role },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRY || '24h' }
+  );
+
+  // Returned the same way auth.js's /login does, so a teacher returning to an
+  // in-progress school assessment doesn't get asked for her demographics again.
+  const demographicsResult = await pool.query('SELECT * FROM user_demographics WHERE user_id = $1', [user.id]);
+
+  res.json({
+    success: true,
+    accessToken,
+    user: { id: user.id, email: user.email, fullName: user.full_name, role: user.role },
+    demographics: demographicsResult.rows[0] || null,
+    schoolTeacherId: rosterEntry.id,
+    schoolId
+  });
+}
+
 router.post('/:schoolId/join', async (req, res) => {
   try {
-    const { schoolId } = req.params;
-    const { email, fullName, password } = req.body;
-    if (!email) return res.status(400).json({ error: 'Email is required' });
-
-    const rosterResult = await pool.query(
-      'SELECT * FROM school_teachers WHERE school_id = $1 AND email = $2',
-      [schoolId, email.toLowerCase()]
-    );
-    if (rosterResult.rows.length === 0) {
-      return res.status(404).json({ error: 'This email was not found on the school roster. Please check with your school administrator.' });
-    }
-    const rosterEntry = rosterResult.rows[0];
-
-    if (rosterEntry.status === 'completed' && !rosterEntry.retake_enabled) {
-      return res.status(409).json({ error: 'A submission already exists for this email. Contact NavaSetu if you need a retake.' });
-    }
-
-    let userResult = await pool.query('SELECT * FROM users WHERE email = $1', [email.toLowerCase()]);
-    let user;
-    if (userResult.rows.length === 0) {
-      const passwordHash = await bcrypt.hash(password || uuidv4(), 10);
-      const created = await pool.query(
-        `INSERT INTO users (email, password_hash, full_name, role, client_type)
-         VALUES ($1, $2, $3, 'teacher', 'b2b') RETURNING *`,
-        [email.toLowerCase(), passwordHash, fullName || rosterEntry.full_name]
-      );
-      user = created.rows[0];
-    } else {
-      user = userResult.rows[0];
-    }
-
-    await pool.query('UPDATE school_teachers SET user_id = $1 WHERE id = $2', [user.id, rosterEntry.id]);
-
-    const accessToken = jwt.sign(
-      { userId: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRY || '24h' }
-    );
-
-    // Returned the same way auth.js's /login does, so a teacher returning to an
-    // in-progress school assessment doesn't get asked for her demographics again.
-    const demographicsResult = await pool.query('SELECT * FROM user_demographics WHERE user_id = $1', [user.id]);
-
-    res.json({
-      success: true,
-      accessToken,
-      user: { id: user.id, email: user.email, fullName: user.full_name, role: user.role },
-      demographics: demographicsResult.rows[0] || null,
-      schoolTeacherId: rosterEntry.id,
-      schoolId
-    });
+    await joinSchoolByEmail(req.params.schoolId, req.body, res);
   } catch (error) {
     console.error('School join error:', error);
+    res.status(500).json({ error: 'Failed to join school assessment' });
+  }
+});
+
+// Same join flow, but starting from a human-typed school code instead of a
+// pre-filled schoolId from a link — this is what the login/register screen's
+// "Have a school code?" field calls.
+router.post('/by-code/:code/join', async (req, res) => {
+  try {
+    const schoolResult = await pool.query(
+      `SELECT id FROM schools WHERE school_code = $1 AND status = 'active'`,
+      [req.params.code.toUpperCase().trim()]
+    );
+    if (schoolResult.rows.length === 0) {
+      return res.status(404).json({ error: 'That school code was not recognized. Please check with your school administrator.' });
+    }
+    await joinSchoolByEmail(schoolResult.rows[0].id, req.body, res);
+  } catch (error) {
+    console.error('School join-by-code error:', error);
     res.status(500).json({ error: 'Failed to join school assessment' });
   }
 });

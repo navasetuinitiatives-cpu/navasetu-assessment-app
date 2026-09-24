@@ -55,12 +55,24 @@
             opacity: 0.5;
         }
 
-        .header-content { max-width: 900px; margin: 0 auto; padding: 0 1.5rem; display: flex; align-items: center; gap: 1.5rem; }
-        .crest-img { width: 70px; height: 70px; flex-shrink: 0; -webkit-user-drag: none; }
-        .header-info h1 { font-family: 'Crimson Text', serif; font-size: 1.8rem; margin: 0; letter-spacing: 0.5px; }
-        .header-info p { font-size: 0.9rem; opacity: 0.9; margin: 0.25rem 0 0 0; }
-        .header-contacts { display: flex; gap: 1rem; font-size: 0.9rem; opacity: 0.85; flex-wrap: wrap; margin-left: auto; }
-        .contact-item { display: flex; align-items: center; gap: 0.4rem; }
+        .header-content {
+            max-width: 1000px; margin: 0 auto; padding: 0 1.5rem;
+            display: flex; align-items: center; justify-content: space-between;
+            flex-wrap: wrap; row-gap: 1rem; column-gap: 1.5rem;
+        }
+        .header-left { display: flex; align-items: center; gap: 1.25rem; min-width: 0; }
+        .crest-img { width: 140px; height: 140px; flex-shrink: 0; -webkit-user-drag: none; object-fit: contain; }
+        .header-info { min-width: 0; }
+        .header-info h1 { font-family: 'Crimson Text', serif; font-size: 2.1rem; margin: 0; letter-spacing: 0.5px; line-height: 1.15; }
+        .header-info p { font-size: 0.95rem; opacity: 0.9; margin: 0.35rem 0 0 0; }
+        .header-contacts { display: flex; flex-direction: column; align-items: flex-end; gap: 0.45rem; font-size: 0.9rem; opacity: 0.9; }
+        .contact-item { display: flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
+        @media (max-width: 640px) {
+            .header-content { justify-content: center; text-align: center; }
+            .header-left { flex-direction: column; text-align: center; }
+            .header-contacts { align-items: center; }
+            .crest-img { width: 100px; height: 100px; }
+        }
 
         /* Pages */
         .page { display: none; }
@@ -103,6 +115,10 @@
         .btn-success { background: var(--success); color: white; }
         .btn-small { padding: 0.5rem 1rem; font-size: 0.85rem; }
         .button-group { display: flex; gap: 1rem; flex-wrap: wrap; margin: 2rem 0; }
+
+        /* Hero banner (landing/login page only) */
+        .hero-banner { margin-bottom: 1.5rem; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 16px rgba(10,14,39,0.25); }
+        .hero-banner img { display: block; width: 100%; height: auto; }
 
         /* Cards & Sections */
         .card { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 1.5rem; }
@@ -200,6 +216,38 @@
             }
         }
 
+        /* Styled popups — replace native alert(), which can't be styled */
+        .ns-modal-overlay {
+            position: fixed; inset: 0; background: rgba(10,14,39,0.6);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 20000; padding: 1.5rem;
+        }
+        .ns-modal {
+            max-width: 440px; width: 100%; border-radius: 10px; padding: 1.75rem;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.35); font-family: 'Inter', sans-serif;
+        }
+        .ns-modal-title { font-weight: 700; font-size: 1.15rem; margin-bottom: 0.9rem; }
+        .ns-modal-body { font-size: 0.95rem; line-height: 1.7; margin-bottom: 1.5rem; white-space: pre-line; }
+        .ns-modal-ok { border: none; border-radius: 6px; padding: 0.65rem 1.75rem; font-weight: 600; cursor: pointer; float: right; font-size: 0.95rem; }
+        .ns-modal-info, .ns-modal-pricing { background: var(--primary); }
+        .ns-modal-info .ns-modal-title, .ns-modal-pricing .ns-modal-title { color: var(--primary-light); }
+        .ns-modal-info .ns-modal-body, .ns-modal-pricing .ns-modal-body { color: #FFFFFF; }
+        .ns-modal-info .ns-modal-ok, .ns-modal-pricing .ns-modal-ok { background: var(--primary-light); color: var(--primary); }
+        .ns-modal-error { background: #FDECEA; border: 1px solid #F3B8B0; }
+        .ns-modal-error .ns-modal-title { color: #B3261E; }
+        .ns-modal-error .ns-modal-body { color: #111111; }
+        .ns-modal-error .ns-modal-ok { background: #B3261E; color: #FFFFFF; }
+
+        /* Persistent Home button */
+        .home-btn {
+            position: fixed; top: 1rem; right: 1.25rem; z-index: 500;
+            background: var(--primary-light); color: var(--primary); border: none;
+            border-radius: 20px; padding: 0.5rem 1.1rem; font-weight: 600; font-size: 0.85rem;
+            cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+        }
+        .home-btn:hover { opacity: 0.9; }
+        @media print { .home-btn { display: none; } }
+
         .required { color: var(--danger); }
         .success-msg { background: rgba(16, 185, 129, 0.1); color: var(--success); padding: 1rem; border-radius: 6px; margin-bottom: 1rem; border-left: 4px solid var(--success); }
         .error-msg { background: rgba(239, 68, 68, 0.1); color: var(--danger); padding: 1rem; border-radius: 6px; margin-bottom: 1rem; border-left: 4px solid var(--danger); }
@@ -228,14 +276,16 @@
     <!-- HEADER -->
     <div class="header">
         <div class="header-content">
-            <svg class="crest-img" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="50" cy="50" r="48" fill="#D4A017" opacity="0.15"/>
-                <circle cx="50" cy="50" r="45" fill="none" stroke="#D4A017" stroke-width="2"/>
-                <text x="50" y="58" font-family="Crimson Text, serif" font-size="20" font-weight="700" text-anchor="middle" fill="#D4A017">NS</text>
-            </svg>
-            <div class="header-info">
-                <h1>NavaSetu</h1>
-                <p>Teacher Wellness & Professional Growth</p>
+            <div class="header-left">
+                <svg class="crest-img" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="50" cy="50" r="48" fill="#D4A017" opacity="0.15"/>
+                    <circle cx="50" cy="50" r="45" fill="none" stroke="#D4A017" stroke-width="2"/>
+                    <text x="50" y="58" font-family="Crimson Text, serif" font-size="20" font-weight="700" text-anchor="middle" fill="#D4A017">NS</text>
+                </svg>
+                <div class="header-info">
+                    <h1>NavaSetu</h1>
+                    <p>Teacher Wellness & Professional Growth</p>
+                </div>
             </div>
             <div class="header-contacts">
                 <div class="contact-item">📱 8556840001</div>
@@ -251,9 +301,15 @@
         <span>NavaSetu Initiatives · navasetuinitiatives@gmail.com · 8556840001</span>
     </div>
 
+    <!-- Persistent Home button — hidden on login/register, shown everywhere else -->
+    <button class="home-btn" id="homeBtn" style="display:none;" onclick="app.loadDashboard()">🏠 Home</button>
+
     <div class="container">
         <!-- LOGIN PAGE -->
         <div class="page active" id="page-login">
+            <div class="hero-banner">
+                <img src="/hero-banner.jpg" alt="Every journey needs a Setu — NavaSetu">
+            </div>
             <div class="card">
                 <h2>Welcome to NavaSetu</h2>
                 <p style="color: var(--text-light); margin-bottom: 2rem;">Teacher Wellness Assessment Platform</p>
@@ -267,10 +323,23 @@
                         <label>Password <span class="required">*</span></label>
                         <input type="password" id="loginPassword" placeholder="Enter your password" required>
                     </div>
+
+                    <p style="margin-bottom: 1rem;">
+                        <a href="#" onclick="event.preventDefault(); document.getElementById('loginSchoolCodeBox').style.display = document.getElementById('loginSchoolCodeBox').style.display === 'none' ? 'block' : 'none';" style="color: var(--primary-light); font-size: 0.9rem;">Have a school code from NavaSetu?</a>
+                    </p>
+                    <div id="loginSchoolCodeBox" style="display:none; margin-bottom: 1.5rem; background: #F9FAFB; padding: 1rem; border-radius: 6px; border: 1px dashed var(--border);">
+                        <label>School Code</label>
+                        <input type="text" id="loginSchoolCode" placeholder="e.g. GREENWOOD482" style="text-transform: uppercase;">
+                        <p style="font-size: 0.8rem; color: var(--text-light); margin-top: 0.5rem;">Entering your school's code links you to your school's project and skips straight to your Navigate report — no payment needed.</p>
+                    </div>
+
                     <div class="button-group" style="margin-top: 1.5rem;">
                         <button class="btn btn-primary" onclick="app.login()">Login</button>
                         <button class="btn btn-secondary" onclick="app.showPage('register')">New to NavaSetu? Register</button>
                     </div>
+                    <p style="margin-top: 1.5rem; text-align: center;">
+                        <a href="/admin.html" style="color: var(--text-light); font-size: 0.85rem;">🔑 Login as NavaSetu Admin</a>
+                    </p>
                 </div>
             </div>
         </div>
@@ -302,6 +371,15 @@
                             <label>Mobile Number <span class="required">*</span></label>
                             <input type="tel" id="regMobile" required>
                         </div>
+                    </div>
+
+                    <p style="margin-bottom: 1rem;">
+                        <a href="#" onclick="event.preventDefault(); document.getElementById('regSchoolCodeBox').style.display = document.getElementById('regSchoolCodeBox').style.display === 'none' ? 'block' : 'none';" style="color: var(--primary-light); font-size: 0.9rem;">Have a school code from NavaSetu?</a>
+                    </p>
+                    <div id="regSchoolCodeBox" style="display:none; margin-bottom: 1.5rem; background: #F9FAFB; padding: 1rem; border-radius: 6px; border: 1px dashed var(--border);">
+                        <label>School Code</label>
+                        <input type="text" id="regSchoolCode" placeholder="e.g. GREENWOOD482" style="text-transform: uppercase;">
+                        <p style="font-size: 0.8rem; color: var(--text-light); margin-top: 0.5rem;">Entering your school's code links you to your school's project and skips straight to your Navigate report — no payment needed.</p>
                     </div>
 
                     <div class="button-group">
@@ -630,6 +708,29 @@
         // Memory-based storage for file:// protocol compatibility
         const API_BASE = '/api';
 
+        // Styled replacement for the native alert() dialog, which browsers render
+        // with system colors we have no control over. type: 'info' | 'pricing'
+        // (navy background, white text) or 'error' (pastel red background, black
+        // text) per NavaSetu's requested color coding. message may contain simple
+        // HTML (e.g. <strong>) since all call sites build it from trusted strings.
+        function showModal(message, type = 'info', title = null) {
+            const defaultTitles = { info: 'Notice', pricing: 'Confirm Your Upgrade', error: 'Please Check' };
+            const overlay = document.createElement('div');
+            overlay.className = 'ns-modal-overlay';
+            overlay.innerHTML = `
+                <div class="ns-modal ns-modal-${type}">
+                    <div class="ns-modal-title">${title || defaultTitles[type] || 'Notice'}</div>
+                    <div class="ns-modal-body">${message}</div>
+                    <button class="ns-modal-ok">OK</button>
+                    <div style="clear:both;"></div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+            const close = () => { if (overlay.parentNode) document.body.removeChild(overlay); };
+            overlay.querySelector('.ns-modal-ok').addEventListener('click', close);
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+        }
+
         async function apiFetch(path, options = {}) {
             const token = localStorage.getItem('navasetu_token');
             const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
@@ -685,6 +786,11 @@
                 document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
                 document.getElementById(`page-${pageName}`).classList.add('active');
 
+                // The Home button always returns to the post-login dashboard, so it
+                // has no purpose before login/registration or on the dashboard itself.
+                const homeBtn = document.getElementById('homeBtn');
+                if (homeBtn) homeBtn.style.display = (pageName === 'login' || pageName === 'register' || pageName === 'dashboard') ? 'none' : 'block';
+
                 if (pageName === 'assessment') {
                     this.renderQuestions();
                 } else if (pageName === 'demographics') {
@@ -697,18 +803,29 @@
                 const password = document.getElementById('loginPassword').value;
 
                 if (!email || !password) {
-                    alert('Please enter email and password');
+                    showModal('Please enter your email and password.', 'error');
                     return;
                 }
+
+                const schoolCode = (document.getElementById('loginSchoolCode').value || '').trim();
 
                 try {
                     let data;
                     if (this.schoolId) {
-                        // B2B: match against the school's roster instead of a normal password login
+                        // B2B via shared link: match against the school's roster instead of a normal password login
                         data = await apiFetch(`/schools/${this.schoolId}/join`, {
                             method: 'POST',
                             body: JSON.stringify({ email, password })
                         });
+                        this.clientType = 'b2b';
+                    } else if (schoolCode) {
+                        // B2B via typed school code: same roster-match join, resolved by code instead of a link
+                        data = await apiFetch(`/schools/by-code/${encodeURIComponent(schoolCode)}/join`, {
+                            method: 'POST',
+                            body: JSON.stringify({ email, password })
+                        });
+                        this.schoolId = data.schoolId;
+                        this.clientType = 'b2b';
                     } else {
                         data = await apiFetch('/auth/login', {
                             method: 'POST',
@@ -721,7 +838,7 @@
                     // flow — send them to the admin panel instead.
                     if (data.user && data.user.role === 'platform_admin') {
                         localStorage.removeItem('navasetu_token');
-                        alert('This is the teacher assessment portal. Admin accounts should use the Admin Panel.');
+                        showModal('This is the teacher assessment portal. Admin accounts should use the Admin Panel.', 'info', 'Admin Account Detected');
                         window.location.href = '/admin.html';
                         return;
                     }
@@ -744,7 +861,7 @@
 
                     await this.loadDashboard();
                 } catch (e) {
-                    alert(e.message || 'Login failed. Please check your details and try again.');
+                    showModal(e.message || 'Login failed. Please check your details and try again.', 'error');
                 }
             }
 
@@ -755,9 +872,11 @@
                 const mobile = document.getElementById('regMobile').value;
 
                 if (!email || !password || !name || !mobile) {
-                    alert('Please fill all required fields');
+                    showModal('Please fill in all required fields before continuing.', 'error');
                     return;
                 }
+
+                const schoolCode = (document.getElementById('regSchoolCode').value || '').trim();
 
                 try {
                     let data;
@@ -766,6 +885,14 @@
                             method: 'POST',
                             body: JSON.stringify({ email, password, fullName: name })
                         });
+                        this.clientType = 'b2b';
+                    } else if (schoolCode) {
+                        data = await apiFetch(`/schools/by-code/${encodeURIComponent(schoolCode)}/join`, {
+                            method: 'POST',
+                            body: JSON.stringify({ email, password, fullName: name })
+                        });
+                        this.schoolId = data.schoolId;
+                        this.clientType = 'b2b';
                     } else {
                         data = await apiFetch('/auth/register', {
                             method: 'POST',
@@ -778,7 +905,7 @@
                     this.schoolTeacherId = data.schoolTeacherId || null;
                     this.showPage('demographics');
                 } catch (e) {
-                    alert(e.message || 'Registration failed. Please try again.');
+                    showModal(e.message || 'Registration failed. Please try again.', 'error');
                 }
             }
 
@@ -796,7 +923,7 @@
             async saveDemographics() {
                 const form = document.getElementById('demographicsForm');
                 if (!form.checkValidity()) {
-                    alert('Please fill all required fields');
+                    showModal('Please fill in all required fields before continuing.', 'error');
                     return;
                 }
 
@@ -816,7 +943,7 @@
                         body: JSON.stringify(this.demographics)
                     });
                 } catch (e) {
-                    alert('Could not save your details right now — please try again.');
+                    showModal('Could not save your details right now — please try again.', 'error');
                     return;
                 }
 
@@ -899,7 +1026,7 @@
                     this.currentReportId = report.id;
                     this.showPage('report');
                 } catch (e) {
-                    alert(e.message || 'Could not open this report right now.');
+                    showModal(e.message || 'Could not open this report right now.', 'error');
                 }
             }
 
@@ -962,7 +1089,7 @@
                             this.responses = data.assessment.responses;
                         }
                     } catch (e) {
-                        alert('Could not start the assessment right now — please check your connection and try again.');
+                        showModal('Could not start the assessment right now — please check your connection and try again.', 'error');
                         return;
                     }
                 }
@@ -1024,8 +1151,12 @@
                         }
                     });
 
-                    const qNosText = unansweredQues.join(', ');
-                    alert(`Please complete the questionnaire.\n\nUnanswered questions: ${qNosText}\n\nThese questions are highlighted in light red for easy identification.`);
+                    const qNosText = unansweredQues.map(qId => `<strong>Q${qId.replace(/^q/i, '')}</strong>`).join(', ');
+                    showModal(
+                        `Please answer the following before continuing:<br><br>${qNosText}<br><br>These questions are highlighted in the form below for easy identification.`,
+                        'error',
+                        'A Few Questions Are Missing'
+                    );
                     return;
                 }
 
@@ -1084,7 +1215,7 @@
                         this.showPage('plan-selection');
                     }
                 } catch (e) {
-                    alert(e.message || 'Could not submit your assessment — please try again.');
+                    showModal(e.message || 'Could not submit your assessment — please try again.', 'error');
                 }
             }
 
@@ -1135,7 +1266,7 @@
                     win.document.write(docHtml);
                     win.document.close();
                 } else {
-                    alert('Please allow pop-ups to download your responses as a PDF.');
+                    showModal('Please allow pop-ups for this site to download your responses as a PDF.', 'error');
                 }
             }
 
@@ -1180,7 +1311,7 @@
 
             proceedToReport() {
                 if (!this.selectedPlan) {
-                    alert('Please select a plan');
+                    showModal('Please select a report plan before continuing.', 'error');
                     return;
                 }
 
@@ -2145,7 +2276,7 @@
                 // B2B teachers are always on the Navigate tier with no self-service
                 // plan switching or payment — there's nothing to "try another plan" to.
                 if (this.clientType === 'b2b') {
-                    alert('Your school\'s assessment is a single, comprehensive Navigate report. If you need a retake, please ask your school to contact NavaSetu.');
+                    showModal('Your school\'s assessment is a single, comprehensive Navigate report. If you need a retake, please ask your school to contact NavaSetu.', 'info', 'Navigate Report Only');
                     return;
                 }
                 // Reset selected plan and go back to plan selection
@@ -2172,13 +2303,15 @@
                     : upgrades[this.selectedPlan];
 
                 if (upgrade) {
-                    const message = `Upgrade to ${upgrade.next.charAt(0).toUpperCase() + upgrade.next.slice(1)} Plan\n\n` +
-                        `Current Plan Cost: ₹${currentPlanPrice[this.selectedPlan]}\n` +
-                        `New Plan Cost: ₹${upgrade.cost}\n` +
-                        `Differential Amount: ₹${upgrade.differential}\n\n` +
-                        `Process this payment to unlock the full report.`;
+                    const planLabel = upgrade.next.charAt(0).toUpperCase() + upgrade.next.slice(1);
+                    const message = `
+                        <div style="display:flex; justify-content:space-between; padding:0.4rem 0; border-bottom:1px solid rgba(255,255,255,0.2);"><span>Current Plan</span><strong>₹${currentPlanPrice[this.selectedPlan]}</strong></div>
+                        <div style="display:flex; justify-content:space-between; padding:0.4rem 0; border-bottom:1px solid rgba(255,255,255,0.2);"><span>New Plan (${planLabel})</span><strong>₹${upgrade.cost}</strong></div>
+                        <div style="display:flex; justify-content:space-between; padding:0.6rem 0 0.2rem 0; font-size:1.05rem;"><span>Amount Due</span><strong style="color: var(--primary-light);">₹${upgrade.differential}</strong></div>
+                        <p style="margin-top:1rem; font-size:0.85rem; opacity:0.85;">Payment isn't wired up yet for this pilot — your ${planLabel} report will unlock immediately.</p>
+                    `;
 
-                    alert(message);
+                    showModal(message, 'pricing', `Upgrade to ${planLabel} Plan`);
                     // Future: Integrate Razorpay here
                     // For now, just update the plan and regenerate report
                     this.selectedPlan = upgrade.next;
@@ -2194,7 +2327,7 @@
             console.log('✓ NavaSetu app initialized successfully');
         } catch (error) {
             console.error('✗ Error initializing app:', error);
-            alert('Error: App failed to initialize. Check browser console (F12) for details.');
+            showModal('Something went wrong while loading the app. Please refresh the page. If this keeps happening, contact NavaSetu.', 'error', 'App Failed to Load');
         }
 
         // Add global error logging

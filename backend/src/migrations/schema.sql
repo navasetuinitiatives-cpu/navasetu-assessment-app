@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS schools (
   contact_email VARCHAR(255),
   contact_phone VARCHAR(20),
   created_by UUID REFERENCES users(id), -- NavaSetu admin who created the block
+  school_code VARCHAR(20) UNIQUE, -- short code given to teachers so they can self-identify without the shared link
   status VARCHAR(50) DEFAULT 'active', -- active, archived
   archived_at TIMESTAMP,
   archive_path VARCHAR(500), -- where the exported package was written on archive
