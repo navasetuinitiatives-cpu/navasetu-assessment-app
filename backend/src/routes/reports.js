@@ -53,6 +53,23 @@ router.post('/', requireAuth, async (req, res) => {
   }
 });
 
+// All of the caller's own reports, most recent first — used to power her
+// "My Reports" dashboard after logging back in. Declared before /:reportId
+// so "mine" isn't swallowed by the :reportId param route.
+router.get('/mine', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, assessment_id, plan_type, payment_status, created_at, released_at
+       FROM reports WHERE user_id = $1 ORDER BY created_at DESC`,
+      [req.user.userId]
+    );
+    res.json({ reports: result.rows });
+  } catch (error) {
+    console.error('List my reports error:', error);
+    res.status(500).json({ error: 'Failed to fetch your reports' });
+  }
+});
+
 // Fetch a report. Locked (pending payment) reports return 402 with no content
 // for anyone but the owner/admin, who still see the lock rather than the HTML.
 router.get('/:reportId', requireAuth, async (req, res) => {

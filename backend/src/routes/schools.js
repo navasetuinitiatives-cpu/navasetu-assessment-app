@@ -213,10 +213,15 @@ router.post('/:schoolId/join', async (req, res) => {
       { expiresIn: process.env.JWT_EXPIRY || '24h' }
     );
 
+    // Returned the same way auth.js's /login does, so a teacher returning to an
+    // in-progress school assessment doesn't get asked for her demographics again.
+    const demographicsResult = await pool.query('SELECT * FROM user_demographics WHERE user_id = $1', [user.id]);
+
     res.json({
       success: true,
       accessToken,
       user: { id: user.id, email: user.email, fullName: user.full_name, role: user.role },
+      demographics: demographicsResult.rows[0] || null,
       schoolTeacherId: rosterEntry.id,
       schoolId
     });

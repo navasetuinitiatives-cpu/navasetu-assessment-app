@@ -175,10 +175,29 @@
         .footer-brand { font-weight: 700; margin-bottom: 0.5rem; }
         .footer-contacts { opacity: 0.85; margin-top: 0.75rem; }
 
+        /* Repeating branding on every printed/PDF page: the header uses
+           position:fixed so Chromium-based print engines repeat it on each
+           physical page, and the print-footer shows the client's name bottom-left
+           on each page as requested. */
+        .print-footer { display: none; }
+        /* Zeroing the @page margin removes the space Chromium reserves for its own
+           default page header/footer (which otherwise prints the page URL — e.g.
+           the Railway hosting URL — at the bottom of every page). We rebuild the
+           margin ourselves via body padding instead, alongside our own branded
+           fixed header/footer below. */
+        @page { size: auto; margin: 0; }
         @media print {
-            body { padding: 0; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .button-group, .footer, .plan-card { display: none; }
+            body { padding: 110px 0.4in 55px 0.4in; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .button-group, .plan-card { display: none; }
             .card { page-break-inside: avoid; box-shadow: none; border: 1px solid var(--border); }
+            .header { display: flex !important; position: fixed; top: 0; left: 0; right: 0; margin: 0; z-index: 9999; padding: 0.6rem 0.4in; }
+            .header::after { content: '© NavaSetu Initiatives'; }
+            .footer { display: none; }
+            .print-footer {
+                display: flex; position: fixed; bottom: 0; left: 0; right: 0;
+                padding: 0.2cm 0.4in; font-size: 0.7rem; color: #555; background: white;
+                border-top: 1px solid #ddd; justify-content: space-between;
+            }
         }
 
         .required { color: var(--danger); }
@@ -224,6 +243,12 @@
                 <div class="contact-item">🌐 www.navasetu.online</div>
             </div>
         </div>
+    </div>
+
+    <!-- Print/PDF-only footer: client name bottom-left on every printed page -->
+    <div class="print-footer">
+        <span id="printFooterName"></span>
+        <span>NavaSetu Initiatives · navasetuinitiatives@gmail.com · 8556840001</span>
     </div>
 
     <div class="container">
@@ -342,6 +367,11 @@
             </div>
         </div>
 
+        <!-- DASHBOARD PAGE (shown after login, once demographics are on file) -->
+        <div class="page" id="page-dashboard">
+            <div id="dashboardContainer"></div>
+        </div>
+
         <!-- INSTRUCTIONS PAGE -->
         <div class="page" id="page-instructions">
             <div class="card">
@@ -352,12 +382,12 @@
                     <p style="margin-bottom: 1rem;"><strong>What to expect:</strong> This assessment has 53 short statements and questions about your day-to-day experience as a teacher — your energy, focus, sleep, sense of achievement, relationships at work, and how work and personal life currently fit together. It takes most people 12–15 minutes to complete.</p>
                     <p style="margin-bottom: 1rem;"><strong>How to answer:</strong> For each question, choose the single option that best reflects how you've genuinely been feeling recently — not how you think you should feel, and not how you'd like things to be. There are no right or wrong answers; the value of this assessment depends entirely on how honestly you answer.</p>
                     <p style="margin-bottom: 1rem;"><strong>Your answers are saved as you go.</strong> You can move through the questions at your own pace, and before you finally submit, you'll get a chance to review everything and change any answer you're not sure about.</p>
-                    <p style="margin-bottom: 1rem;"><strong>Once submitted, your responses are locked</strong> and your report is generated from them. If you ever need to retake the assessment after that, you can request this from NavaSetu.</p>
+                    <p style="margin-bottom: 1rem;"><strong>Once submitted, your responses are locked</strong> and your report is generated from them. If you ever need to retake the assessment after that, please write to us at <a href="mailto:navasetuinitiatives@gmail.com">navasetuinitiatives@gmail.com</a> or call <a href="tel:+918556840001">8556840001</a>, and we'll enable it for you.</p>
                     <p>This is a self-reflection tool, not a clinical or diagnostic test. If you're going through something difficult right now, please also reach out to someone you trust or a mental health professional — this assessment is a starting point, not a substitute for that support.</p>
                 </div>
 
                 <div class="button-group">
-                    <button type="button" class="btn btn-secondary" onclick="app.showPage('demographics')">Back</button>
+                    <button type="button" class="btn btn-secondary" onclick="app.loadDashboard()">Back</button>
                     <button type="button" class="btn btn-primary" onclick="app.beginAssessment()">I'm Ready — Begin Assessment</button>
                 </div>
             </div>
@@ -382,16 +412,21 @@
             </form>
         </div>
 
-        <!-- REVIEW & SUBMIT PAGE -->
+        <!-- REVIEW & SUBMIT PAGE (also reused, read-only, to view locked responses after submission) -->
         <div class="page" id="page-review">
             <div class="card">
                 <h2>Review Your Answers</h2>
                 <p style="color: var(--text-light); margin-bottom: 1.5rem;">Check your answers below. You can go back and change anything before submitting. Once you submit, your responses are final and your report will be generated from them.</p>
+                <div id="reviewLockedNotice" style="display:none; background:#F0F8F4; padding:1rem; border-radius:6px; border-left:3px solid var(--accent-wellness); margin-bottom:1.5rem;">
+                    Your assessment has been submitted and these responses are locked. To request a retake, contact NavaSetu at
+                    <a href="mailto:navasetuinitiatives@gmail.com">navasetuinitiatives@gmail.com</a> or <a href="tel:+918556840001">8556840001</a>.
+                </div>
                 <div id="reviewContainer"></div>
                 <div class="button-group">
-                    <button type="button" class="btn btn-secondary" onclick="app.reviewResponses()">✏️ Edit My Answers</button>
+                    <button type="button" id="reviewEditBtn" class="btn btn-secondary" onclick="app.reviewResponses()">✏️ Edit My Answers</button>
                     <button type="button" class="btn btn-secondary" onclick="app.downloadResponses()">📥 Download My Responses</button>
-                    <button type="button" class="btn btn-primary" onclick="app.submitAssessment()">Submit Assessment</button>
+                    <button type="button" id="reviewSubmitBtn" class="btn btn-primary" onclick="app.submitAssessment()">Submit Assessment</button>
+                    <button type="button" id="reviewBackBtn" class="btn btn-secondary" style="display:none;" onclick="app.showPage('report')">⬅️ Back to Report</button>
                 </div>
             </div>
         </div>
@@ -681,6 +716,16 @@
                         });
                     }
 
+                    // This page is the teacher/individual assessment portal. A NavaSetu
+                    // admin account should never land in the demographics/assessment
+                    // flow — send them to the admin panel instead.
+                    if (data.user && data.user.role === 'platform_admin') {
+                        localStorage.removeItem('navasetu_token');
+                        alert('This is the teacher assessment portal. Admin accounts should use the Admin Panel.');
+                        window.location.href = '/admin.html';
+                        return;
+                    }
+
                     localStorage.setItem('navasetu_token', data.accessToken);
                     this.currentUser = data.user;
                     this.schoolTeacherId = data.schoolTeacherId || null;
@@ -695,10 +740,9 @@
                             experience: data.demographics.experience_years,
                             subject: data.demographics.subject
                         };
-                        this.showPage('assessment');
-                    } else {
-                        this.showPage('demographics');
                     }
+
+                    await this.loadDashboard();
                 } catch (e) {
                     alert(e.message || 'Login failed. Please check your details and try again.');
                 }
@@ -776,7 +820,92 @@
                     return;
                 }
 
-                this.showPage('instructions');
+                await this.loadDashboard();
+            }
+
+            // Fetches the caller's past assessments/reports and routes her to the
+            // right place: her dashboard (with past reports + resume/start action)
+            // once demographics are on file, or the demographics form if not.
+            async loadDashboard() {
+                if (!this.demographics || Object.keys(this.demographics).length === 0) {
+                    this.showPage('demographics');
+                    return;
+                }
+
+                try {
+                    const [reportsData, assessmentsResp] = await Promise.all([
+                        apiFetch('/reports/mine'),
+                        apiFetch('/assessments/mine')
+                    ]);
+                    this.myReports = reportsData.reports || [];
+                    this.myAssessments = assessmentsResp.assessments || [];
+                } catch (e) {
+                    this.myReports = [];
+                    this.myAssessments = [];
+                }
+
+                this.renderDashboard();
+                this.showPage('dashboard');
+            }
+
+            renderDashboard() {
+                const container = document.getElementById('dashboardContainer');
+                const name = this.demographics.name || (this.currentUser ? this.currentUser.fullName : 'there');
+                const hasInProgress = this.myAssessments.some(a => a.status === 'in_progress');
+                const hasSubmitted = this.myAssessments.some(a => a.status === 'submitted');
+
+                let reportsHtml = '<p style="color: var(--text-light);">You haven\'t generated any reports yet.</p>';
+                if (this.myReports.length > 0) {
+                    reportsHtml = this.myReports.map(r => `
+                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap; gap: 0.5rem; padding:1rem; border:1px solid var(--border); border-radius:6px; margin-bottom:0.75rem;">
+                            <div>
+                                <div style="font-weight:600; text-transform:capitalize;">${r.plan_type} Report</div>
+                                <div style="font-size:0.85rem; color:var(--text-light);">Generated ${new Date(r.created_at).toLocaleDateString()}${r.payment_status === 'pending' ? ' — payment pending' : ''}</div>
+                            </div>
+                            <button class="btn btn-secondary" onclick="app.openStoredReport('${r.id}')" ${r.payment_status === 'pending' ? 'disabled' : ''}>👁️ View</button>
+                        </div>
+                    `).join('');
+                }
+
+                let actionHtml;
+                if (hasInProgress) {
+                    actionHtml = `<button class="btn btn-primary" onclick="app.beginAssessment()">▶️ Resume My Assessment</button>`;
+                } else if (!hasSubmitted) {
+                    actionHtml = `<button class="btn btn-primary" onclick="app.showPage('instructions')">▶️ Start My Assessment</button>`;
+                } else {
+                    actionHtml = `<p style="color: var(--text-dark); font-size:0.9rem; background:#F0F8F4; padding:1rem; border-radius:6px; border-left:3px solid var(--accent-wellness);">Your assessment has already been submitted and your responses are locked. If you'd like to retake it, please contact NavaSetu at <a href="mailto:navasetuinitiatives@gmail.com">navasetuinitiatives@gmail.com</a> or call <a href="tel:+918556840001">8556840001</a>.</p>`;
+                }
+
+                container.innerHTML = `
+                    <div class="card">
+                        <h2>Welcome back, ${name}</h2>
+                        <p style="color: var(--text-light); margin-bottom: 1.5rem;">Your NavaSetu wellness dashboard</p>
+                        <div style="margin-bottom: 2rem;">${actionHtml}</div>
+                        <h3 style="margin-bottom: 1rem; color: var(--primary);">My Reports</h3>
+                        ${reportsHtml}
+                        <div class="button-group" style="margin-top: 2rem;">
+                            <button class="btn btn-secondary" onclick="app.showPage('demographics')">👤 Edit My Profile</button>
+                            <button class="btn btn-secondary" onclick="app.logout()">🚪 Logout</button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            async openStoredReport(reportId) {
+                try {
+                    const report = await apiFetch(`/reports/${reportId}`);
+                    document.getElementById('reportContainer').innerHTML = report.html_content || '<p>This report has no saved content.</p>';
+                    this.selectedPlan = report.plan_type;
+                    this.currentReportId = report.id;
+                    this.showPage('report');
+                } catch (e) {
+                    alert(e.message || 'Could not open this report right now.');
+                }
+            }
+
+            logout() {
+                localStorage.removeItem('navasetu_token');
+                window.location.reload();
             }
 
             renderQuestions() {
@@ -813,8 +942,12 @@
             }
 
             async beginAssessment() {
-                try {
-                    if (!this.assessmentId) {
+                // The API call and the post-navigation DOM restore are deliberately
+                // in separate try/catch blocks: a hiccup while re-checking previously
+                // saved radio buttons should never surface as "could not start the
+                // assessment" when the assessment actually did start successfully.
+                if (!this.assessmentId) {
+                    try {
                         const data = await apiFetch('/assessments', {
                             method: 'POST',
                             body: JSON.stringify({
@@ -828,17 +961,21 @@
                         if (data.resumed && data.assessment.responses) {
                             this.responses = data.assessment.responses;
                         }
+                    } catch (e) {
+                        alert('Could not start the assessment right now — please check your connection and try again.');
+                        return;
                     }
-                    this.showPage('assessment');
+                }
+
+                this.showPage('assessment');
+                try {
                     // Pre-fill any responses restored from a resumed attempt
                     Object.keys(this.responses).forEach((qId) => {
                         const opt = document.querySelector(`input[name="q${qId}"][value="${this.responses[qId]}"]`);
                         if (opt) opt.checked = true;
                     });
                     this.updateProgress();
-                } catch (e) {
-                    alert('Could not start the assessment right now — please try again.');
-                }
+                } catch (e) { /* non-fatal — the assessment has already started */ }
             }
 
             scheduleProgressSave() {
@@ -901,6 +1038,10 @@
 
                 this.saveProgress();
                 this.renderReviewSummary();
+                document.getElementById('reviewLockedNotice').style.display = 'none';
+                document.getElementById('reviewEditBtn').style.display = 'inline-block';
+                document.getElementById('reviewSubmitBtn').style.display = 'inline-block';
+                document.getElementById('reviewBackBtn').style.display = 'none';
                 this.showPage('review');
             }
 
@@ -931,32 +1072,71 @@
                     this.submittedAt = new Date().toISOString();
                     this.calculatedScores = data.parameterScores; // authoritative, server-computed
                     this.dimensionScores = data.dimensionScores;
-                    this.showPage('plan-selection');
+
+                    // B2B: every school-sponsored assessment is always the Navigate
+                    // tier, and payment happens outside the portal entirely — so
+                    // there's no plan/pricing screen for a teacher who came in via a
+                    // school's shared link. Go straight to her report.
+                    if (this.clientType === 'b2b') {
+                        this.selectedPlan = 'navigate';
+                        this.generateReport();
+                    } else {
+                        this.showPage('plan-selection');
+                    }
                 } catch (e) {
                     alert(e.message || 'Could not submit your assessment — please try again.');
                 }
             }
 
             downloadResponses() {
+                // Opens a branded, print-ready document (logo, contact details,
+                // disclaimer) in a new tab and triggers the browser's print dialog,
+                // so the teacher can "Save as PDF" — rather than a raw text file.
                 const questions = assessmentData.questionBank;
-                const name = (this.demographics && this.demographics.name) ? this.demographics.name : (this.currentUser ? this.currentUser.fullName : 'teacher');
-                let text = `NavaSetu Teacher Wellness Assessment — My Responses\n`;
-                text += `Name: ${name}\nDate: ${new Date().toLocaleDateString()}\n\n`;
-                questions.forEach((q, idx) => {
+                const name = (this.demographics && this.demographics.name) ? this.demographics.name : (this.currentUser ? this.currentUser.fullName : 'Teacher');
+                const hasLogo = document.querySelector('.header img.crest-img');
+                const logoHtml = hasLogo
+                    ? `<img src="${hasLogo.src}" style="width:60px;height:60px;">`
+                    : `<svg viewBox="0 0 100 100" style="width:60px;height:60px;"><circle cx="50" cy="50" r="48" fill="#D4A017" opacity="0.15"/><circle cx="50" cy="50" r="45" fill="none" stroke="#D4A017" stroke-width="2"/><text x="50" y="58" font-family="Crimson Text, serif" font-size="20" font-weight="700" text-anchor="middle" fill="#D4A017">NS</text></svg>`;
+
+                const rows = questions.map((q, idx) => {
                     const answerIdx = this.responses[q.id];
                     const answerText = (answerIdx !== undefined) ? q.options[answerIdx] : '(not answered)';
-                    text += `${idx + 1}. ${q.text}\nAnswer: ${answerText}\n\n`;
-                });
+                    return `<div style="padding:0.6rem 0; border-bottom:1px solid #E5E7EB;">
+                        <div style="font-size:0.9rem; color:#1F2937;">${idx + 1}. ${q.text}</div>
+                        <div style="font-size:0.9rem; font-weight:600; color:#D4A017; margin-top:0.2rem;">${answerText}</div>
+                    </div>`;
+                }).join('');
 
-                const blob = new Blob([text], { type: 'text/plain' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `${name.replace(/[^a-z0-9]+/gi, '_')}_NavaSetu_Responses.txt`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
+                const docHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${name} — NavaSetu Responses</title>
+                <style>
+                    body { font-family: 'Inter', Arial, sans-serif; color:#1F2937; margin:0; padding: 2rem 2.5rem; }
+                    .header-row { display:flex; align-items:center; gap:1rem; border-bottom:3px solid #D4A017; padding-bottom:1rem; margin-bottom:1.5rem; }
+                    .header-row h1 { font-size:1.4rem; margin:0; color:#0a0e27; }
+                    .header-row p { margin:0.2rem 0 0 0; color:#6B7280; font-size:0.85rem; }
+                    .meta { margin-bottom:1.5rem; font-size:0.9rem; color:#374151; }
+                    .disclaimer { background:#FFF8DC; border-left:4px solid #FF8C00; padding:1rem; margin-top:2rem; font-size:0.8rem; color:#555; border-radius:4px; }
+                    .footer { margin-top:2rem; padding-top:1rem; border-top:1px solid #E5E7EB; font-size:0.8rem; color:#6B7280; text-align:center; }
+                    @page { size: auto; margin: 0; }
+                    @media print { body { padding: 1.2cm; } }
+                </style></head>
+                <body>
+                    <div class="header-row">${logoHtml}<div><h1>NavaSetu</h1><p>Teacher Wellness & Professional Growth · www.navasetu.online</p></div></div>
+                    <h2 style="margin-bottom:0.25rem;">My Assessment Responses</h2>
+                    <div class="meta"><strong>Name:</strong> ${name} &nbsp;|&nbsp; <strong>Date:</strong> ${new Date().toLocaleDateString()}</div>
+                    ${rows}
+                    <div class="disclaimer"><strong>⚠️ Disclaimer:</strong> This assessment is a self-report screening tool designed to provide initial insights into your wellness dimensions. It is not a diagnostic instrument and should not be used as a substitute for professional mental health assessment or counseling. For any concerns about your mental health or wellbeing, please consult a qualified healthcare professional or counselor.</div>
+                    <div class="footer">NavaSetu Initiatives &nbsp;·&nbsp; navasetuinitiatives@gmail.com &nbsp;·&nbsp; 8556840001 &nbsp;·&nbsp; www.navasetu.online</div>
+                    <script>window.onload = function() { window.print(); };<\/script>
+                </body></html>`;
+
+                const win = window.open('', '_blank');
+                if (win) {
+                    win.document.write(docHtml);
+                    win.document.close();
+                } else {
+                    alert('Please allow pop-ups to download your responses as a PDF.');
+                }
             }
 
             calculateScores() {
@@ -1045,19 +1225,24 @@
             }
 
             renderReport() {
+                const printFooterName = document.getElementById('printFooterName');
+                if (printFooterName) printFooterName.textContent = this.demographics.name || '';
+
                 let html = '';
 
-                // Title Section
+                // Title section — solid NavaSetu navy with white/gold text for
+                // reliable contrast in print/PDF (translucent gradients over near-white
+                // can render washed-out and inconsistent across print engines).
                 html += `
-                    <div class="report-section" style="text-align: center; background: linear-gradient(135deg, rgba(10, 14, 39, 0.05) 0%, rgba(212, 160, 23, 0.05) 100%);">
-                        <h1 style="margin-bottom: 0.5rem;">Teacher Wellness Assessment Report</h1>
-                        <p style="color: var(--text-light); margin: 1rem 0;">A Compassionate Assessment of Your Teaching Life</p>
-                        <div class="teacher-name">${this.demographics.name}</div>
-                        <p style="color: var(--text-light);">Assessment Type: ${this.selectedPlan === 'discover' ? 'Quick Overview (Discover)' : this.selectedPlan === 'explore' ? 'Detailed Analysis (Explore)' : 'Comprehensive Analysis (Navigate)'}</p>
-                        <p style="color: var(--text-light);">Date: ${new Date().toLocaleDateString()}</p>
-                        <p style="margin-top: 1rem; color: var(--text-light);">
-                            <strong>Institution:</strong> ${this.demographics.institution}<br>
-                            <strong>Experience:</strong> ${this.demographics.experience} years
+                    <div class="report-section" style="text-align: center; background: var(--primary); border: 1px solid var(--primary-light);">
+                        <h1 style="margin-bottom: 0.5rem; color: #FFFFFF;">Teacher Wellness Assessment Report</h1>
+                        <p style="color: rgba(255,255,255,0.85); margin: 1rem 0;">A Compassionate Assessment of Your Teaching Life</p>
+                        <div class="teacher-name" style="color: var(--primary-light); font-weight: 700;">${this.demographics.name}</div>
+                        <p style="color: rgba(255,255,255,0.85);">Assessment Type: ${this.selectedPlan === 'discover' ? 'Quick Overview (Discover)' : this.selectedPlan === 'explore' ? 'Detailed Analysis (Explore)' : 'Comprehensive Analysis (Navigate)'}</p>
+                        <p style="color: rgba(255,255,255,0.85);">Date: ${new Date().toLocaleDateString()}</p>
+                        <p style="margin-top: 1rem; color: rgba(255,255,255,0.85);">
+                            <strong style="color: #FFFFFF;">Institution:</strong> ${this.demographics.institution}<br>
+                            <strong style="color: #FFFFFF;">Experience:</strong> ${this.demographics.experience} years
                         </p>
                     </div>
                 `;
@@ -1088,57 +1273,90 @@
                     <p style="color: var(--text-light); margin-bottom: 1.5rem;">Here's a quick snapshot of your current wellness across five key dimensions.</p>
                 </div>`;
 
-                categories.forEach(cat => {
-                    const catScore = cat.params.map(p => this.calculatedScores[p] || 3.0).reduce((a, b) => a + b) / cat.params.length;
+                const scoredCategories = categories.map(cat => ({
+                    name: cat.name,
+                    score: cat.params.map(p => this.calculatedScores[p] || 3.0).reduce((a, b) => a + b) / cat.params.length
+                }));
+
+                scoredCategories.forEach(cat => {
                     html += `
                         <div class="report-section">
                             <h3>${cat.name}</h3>
                             <div class="wellness-meter">
                                 <div class="meter-bar">
-                                    <div class="meter-fill" style="width: ${(catScore/5)*100}%; background: ${this.getColorForScore(catScore)};">${catScore.toFixed(1)}</div>
+                                    <div class="meter-fill" style="width: ${(cat.score/5)*100}%; background: ${this.getColorForScore(cat.score)};">${cat.score.toFixed(1)}</div>
                                 </div>
-                                <div class="meter-label">${catScore.toFixed(1)}/5</div>
+                                <div class="meter-label">${cat.score.toFixed(1)}/5</div>
                             </div>
                             <p style="color: var(--text-dark); font-size: 0.95rem; margin-top: 0.75rem;">
-                                ${this.getScoreInterpretation(catScore)}
+                                ${this.getScoreInterpretation(cat.score)}
                             </p>
                         </div>
                     `;
                 });
 
-                // Add closing summary before upgrade options
+                // Personalized (but still shallow — this is the free tier) closing
+                // summary: names the teacher's actual strongest and weakest category
+                // and overall average rather than a fixed, one-size-fits-all summary.
+                const name = this.demographics.name || 'there';
+                const sorted = [...scoredCategories].sort((a, b) => b.score - a.score);
+                const strongest = sorted[0];
+                const weakest = sorted[sorted.length - 1];
+                const overallAvg = scoredCategories.reduce((sum, c) => sum + c.score, 0) / scoredCategories.length;
+                const overallBand = overallAvg >= 3.75 ? 'holding up well overall' : overallAvg >= 2.75 ? 'a mixed picture, with real strengths alongside areas that could use support' : 'under real strain right now';
+
                 html += `
-                    <div class="report-section" style="background: linear-gradient(135deg, rgba(5, 150, 105, 0.08) 0%, rgba(212, 160, 23, 0.08) 100%); border-left: 4px solid var(--accent-wellness); padding: 2rem; margin: 3rem 0 2rem 0; border-radius: 8px;">
-                        <h2 style="color: var(--primary); margin-top: 0; margin-bottom: 1rem;">Your Wellness at a Glance</h2>
+                    <div class="report-section" style="background: #ECFDF5; border-left: 4px solid var(--accent-wellness); padding: 2rem; margin: 3rem 0 2rem 0; border-radius: 8px;">
+                        <h2 style="color: var(--primary); margin-top: 0; margin-bottom: 1rem;">Your Wellness at a Glance, ${name}</h2>
                         <p style="color: var(--text-dark); font-size: 0.95rem; line-height: 1.7; margin-bottom: 1rem;">
-                            Your current wellness picture shows you're navigating teaching across five key dimensions. These five categories reveal where you're thriving and where focused attention could create meaningful improvements in your effectiveness and satisfaction.
-                        </p>
-                        <p style="color: var(--text-dark); font-size: 0.95rem; line-height: 1.7; margin-bottom: 1rem;">
-                            This overview provides valuable insight into your overall wellness profile. However, behind these category averages lie deeper nuances: individual strengths you may not recognize, specific challenges you could address, and concrete pathways toward building resilience. The difference between knowing you're struggling with work-life balance and understanding exactly which boundaries to strengthen is transformative.
+                            Across the five dimensions above, your overall picture looks ${overallBand}. <strong>${strongest.name}</strong> is where you're currently doing best (${strongest.score.toFixed(1)}/5) — worth recognizing as a genuine strength, not something to take for granted. <strong>${weakest.name}</strong> is where your score is lowest (${weakest.score.toFixed(1)}/5), which is where focused attention is likely to make the most difference right now.
                         </p>
                         <p style="color: var(--text-dark); font-size: 0.95rem; line-height: 1.7; margin: 0;">
-                            When you're ready to explore these deeper dimensions and receive personalized guidance tailored to your specific situation, our Explore and Navigate plans unlock the complete analysis. For now, reflect on these five dimensions and notice which resonate most with your teaching experience.
+                            This overview intentionally stops at the category level. Behind a score like ${weakest.score.toFixed(1)}/5 in ${weakest.name} sit several distinct, individually-scored parameters — some of which may be fine on their own, and one or two of which are likely driving the number down. Knowing which one is what turns "this area needs work" into an actual plan.
                         </p>
                     </div>
                 `;
 
-                // Add footer with upgrade and review options
+                // Footer: keep the Explore upsell here, but also give a genuine,
+                // detailed preview of Navigate's deliverables so the reader can
+                // evaluate the full jump, not just the next step up.
                 html += `
-                    <div class="report-section" style="background: linear-gradient(135deg, rgba(212, 160, 23, 0.05) 0%, rgba(10, 14, 39, 0.05) 100%); border-top: 3px solid var(--primary-light); margin-top: 2rem; padding-top: 2rem;">
+                    <div class="report-section" style="background: #FEF9E7; border-top: 3px solid var(--primary-light); margin-top: 2rem; padding-top: 2rem;">
                         <h2 style="color: var(--primary); margin-bottom: 1.5rem;">Unlock More Insights</h2>
 
                         <div style="background: white; padding: 1.5rem; border-radius: 8px; border: 2px solid var(--primary-light); margin-bottom: 1.5rem;">
                             <h3 style="color: var(--primary); margin-top: 0;">Upgrade to Explore Plan</h3>
-                            <p style="color: var(--text-light); margin-bottom: 1rem;">Get deeper analysis of ~12 individual parameters — what each score means and how it helps or challenges you.</p>
+                            <p style="color: var(--text-light); margin-bottom: 1rem;">Get a deeper analysis of ~12 individual parameters underneath these 5 categories — what each specific score means and how it's helping or challenging you day to day.</p>
+                            <ul style="margin: 0 0 1rem 1.25rem; padding: 0; color: var(--text-dark); font-size: 0.9rem; line-height: 1.8;">
+                                <li>Individual scores for ~12 parameters, not just 5 category averages</li>
+                                <li>A "what this means for your teaching" explanation for each one</li>
+                                <li>Enough detail to know exactly which parameter is driving a low category score</li>
+                            </ul>
                             <div style="display: flex; gap: 1rem; align-items: center; margin-bottom: 0.5rem;">
                                 <span style="font-size: 1.2rem; font-weight: 700; color: var(--primary-light);">₹2,499</span>
-                                <span style="font-size: 0.9rem; color: var(--text-light);">(Pay this amount for Explore Plan)</span>
                             </div>
                             <button class="btn btn-primary" onclick="app.upgradePlan('explore')" style="margin-top: 1rem;">💳 Upgrade to Explore</button>
                         </div>
 
+                        <div style="background: white; padding: 1.5rem; border-radius: 8px; border: 2px solid var(--accent-wellness); margin-bottom: 1.5rem;">
+                            <h3 style="color: var(--primary); margin-top: 0;">Upgrade to Navigate Plan — Full Picture + Support</h3>
+                            <p style="color: var(--text-light); margin-bottom: 1rem;">Navigate includes everything in Explore, plus the two things a report alone can't give you: a concrete plan for what to do next, and a real conversation with a professional.</p>
+                            <ul style="margin: 0 0 1rem 1.25rem; padding: 0; color: var(--text-dark); font-size: 0.9rem; line-height: 1.8;">
+                                <li><strong>All 18 individual parameters</strong> analyzed in full depth, across all 5 categories</li>
+                                <li><strong>Personalized suggested actions</strong> for every area that needs support — specific to your actual scores, not generic advice</li>
+                                <li><strong>A comprehensive closing summary</strong> that ties your whole profile together — strengths, risk areas, and what to prioritize</li>
+                                <li><strong>One complimentary 1-on-1 counselling session</strong> with a NavaSetu professional to talk through your results and plan next steps</li>
+                                <li>A report thorough enough to bring into that counselling conversation directly</li>
+                            </ul>
+                            <div style="display: flex; gap: 1rem; align-items: center; margin-bottom: 0.5rem;">
+                                <span style="font-size: 1.2rem; font-weight: 700; color: var(--primary-light);">₹4,999</span>
+                            </div>
+                            <button class="btn btn-primary" onclick="app.upgradePlan('navigate-direct')" style="margin-top: 1rem;">💳 Upgrade to Navigate</button>
+                        </div>
+
                         <div class="button-group" style="margin-top: 2rem;">
-                            <button class="btn btn-secondary" onclick="app.reviewResponses()">👁️ Review Your Responses</button>
+                            <button class="btn btn-secondary" onclick="app.viewResponses()">👁️ Review Your Responses</button>
+                            <button class="btn btn-primary" onclick="window.print()">💾 Save &amp; Download This Report</button>
                             <button class="btn btn-secondary" onclick="app.retakePlan()">🔄 Try Another Plan</button>
                         </div>
                     </div>
@@ -1237,26 +1455,36 @@
                     html += `</div>`;
                 });
 
-                // Closing summary — analysis-only teaser, no suggestions (those are Navigate-only)
+                // Closing summary — a neutral synthesis of the analysis above, with
+                // no upsell language mixed in. Any mention of Navigate/upgrading
+                // lives exclusively in the dedicated CTA box below, not here.
                 html += `
-                    <div class="report-section" style="background: linear-gradient(135deg, rgba(10, 14, 39, 0.05) 0%, rgba(5, 150, 105, 0.05) 100%);">
+                    <div class="report-section" style="background: #F0F7F4;">
                         <h2>Your Wellness in Detail</h2>
                         <div style="font-size: 0.95rem; line-height: 1.8; color: var(--text-dark);">
                             <p style="margin-bottom: 1rem;">
                                 Taken together, this report gives you a considerably more detailed picture than a quick snapshot could: how your energy, focus, and rest are holding up, how connected and effective you feel in the classroom, how you handle setbacks and change, how supported you are by your institution, and how work and life are currently balancing against each other.
                             </p>
                             <p>
-                                Some of what you've read here will likely feel familiar — confirmation of something you already sensed about yourself. Other parts may be more surprising, pointing to a strength you hadn't fully credited yourself for, or a strain that's been building more quietly than you realized. What this report deliberately does not do is tell you what to do about any of it — that depends on your specific circumstances, priorities, and what's realistically changeable in your current role. If you'd like that next layer — practical, personalized suggestions for the areas that need it most, plus a one-on-one counselling session to talk it through — the Navigate plan builds directly on everything in this report.
+                                Some of what you've read here will likely feel familiar — confirmation of something you already sensed about yourself. Other parts may be more surprising, pointing to a strength you hadn't fully credited yourself for, or a strain that's been building more quietly than you realized. Read together rather than parameter by parameter, these scores describe a specific, individual pattern — not a generic profile — and that pattern is the most useful starting point for deciding where your own attention and energy are best spent right now.
                             </p>
                         </div>
                     </div>
 
-                    <div class="report-section" style="background: linear-gradient(135deg, rgba(212, 160, 23, 0.05) 0%, rgba(10, 14, 39, 0.05) 100%); border-top: 3px solid var(--primary-light); margin-top: 3rem; padding-top: 2rem;">
+                    <div class="report-section" style="background: #FEF9E7; border-top: 3px solid var(--primary-light); margin-top: 3rem; padding-top: 2rem;">
                         <h2 style="color: var(--primary); margin-bottom: 1.5rem;">Unlock Complete Insights</h2>
+                        <p style="color: var(--text-dark); font-size: 0.95rem; margin-bottom: 1.5rem;">
+                            This report tells you what's going on. The Navigate plan is where you get help deciding what to do about it — including direct access to a professional who can talk it through with you.
+                        </p>
 
                         <div style="background: white; padding: 1.5rem; border-radius: 8px; border: 2px solid var(--primary-light); margin-bottom: 1.5rem;">
                             <h3 style="color: var(--primary); margin-top: 0;">Upgrade to Navigate Plan</h3>
-                            <p style="color: var(--text-light); margin-bottom: 1rem;">Get comprehensive analysis of all 18 parameters, personalized suggestions for areas needing support, and a counselling session.</p>
+                            <ul style="margin: 0 0 1rem 1.25rem; padding: 0; color: var(--text-dark); font-size: 0.9rem; line-height: 1.8;">
+                                <li>Everything in this Explore report, unchanged and included</li>
+                                <li><strong>Personalized suggested actions</strong> for every parameter that needs support — specific to your scores, not generic tips</li>
+                                <li><strong>A comprehensive closing summary</strong> tying your full 18-parameter profile together — strengths, risk areas, and where to focus first</li>
+                                <li><strong>One complimentary 1-on-1 counselling session</strong> with a NavaSetu professional — bring this report into that conversation</li>
+                            </ul>
                             <div style="display: flex; gap: 1rem; align-items: center; margin-bottom: 0.5rem;">
                                 <span style="font-size: 1.2rem; font-weight: 700; color: var(--primary-light);">₹2,500</span>
                                 <span style="font-size: 0.9rem; color: var(--text-light);">(Differential amount to upgrade from Explore)</span>
@@ -1265,7 +1493,8 @@
                         </div>
 
                         <div class="button-group" style="margin-top: 2rem;">
-                            <button class="btn btn-secondary" onclick="app.reviewResponses()">👁️ Review Your Responses</button>
+                            <button class="btn btn-secondary" onclick="app.viewResponses()">👁️ Review Your Responses</button>
+                            <button class="btn btn-primary" onclick="window.print()">💾 Save &amp; Download This Report</button>
                             <button class="btn btn-secondary" onclick="app.retakePlan()">🔄 Try Another Plan</button>
                         </div>
                     </div>
@@ -1291,7 +1520,7 @@
                 const experience = this.demographics.experience || 'some years';
                 const age = this.demographics.age || 'adult';
 
-                let html = `<div class="report-section" style="background: linear-gradient(135deg, rgba(212, 160, 23, 0.08) 0%, rgba(5, 150, 105, 0.08) 100%); padding: 2rem; border-radius: 8px; border-left: 4px solid var(--accent-wellness);">
+                let html = `<div class="report-section" style="background: #FEF3E2; padding: 2rem; border-radius: 8px; border-left: 4px solid var(--accent-wellness);">
                     <h2 style="color: var(--primary); margin-bottom: 1.5rem;">Welcome to Your Comprehensive Wellness Report</h2>
                     <div style="font-size: 0.95rem; line-height: 1.8; color: var(--text-dark); margin-bottom: 1.5rem;">
                         <p style="margin-bottom: 1rem;">
@@ -1437,22 +1666,56 @@
                     html += `</div>`;
                 });
 
-                // Closing
+                // Closing — a data-driven synthesis of the full 18-parameter profile,
+                // written to be comprehensive enough to double as a handoff summary
+                // for the counselling session, not a generic paragraph unrelated to
+                // this teacher's actual scores.
+                const allScoredParams = [];
+                allParameters.forEach(cat => cat.params.forEach(p => {
+                    allScoredParams.push({ name: p.name, category: cat.category, score: this.calculatedScores[p.name] || 3.0 });
+                }));
+                const sortedScoredParams = [...allScoredParams].sort((a, b) => b.score - a.score);
+                const topStrengths = sortedScoredParams.slice(0, 3);
+                const topConcerns = [...sortedScoredParams].reverse().slice(0, 3);
+                const overallAvgAll = allScoredParams.reduce((s, p) => s + p.score, 0) / allScoredParams.length;
+                const overallBandAll = overallAvgAll >= 3.75
+                    ? 'generally strong, with real reserves to draw on'
+                    : overallAvgAll >= 2.75
+                        ? 'mixed — genuine strengths sitting alongside areas under real strain'
+                        : 'showing signs of significant strain across multiple dimensions';
+                const concernCategories = [...new Set(topConcerns.map(c => c.category))];
+
                 html += `
-                    <div class="report-section" style="background: linear-gradient(135deg, rgba(10, 14, 39, 0.05) 0%, rgba(5, 150, 105, 0.05) 100%);">
+                    <div class="report-section" style="background: #F0F7F4;">
                         <h2>Your Overall Story</h2>
                         <div style="font-size: 0.95rem; line-height: 1.8; color: var(--text-dark);">
-                            <p style="margin-bottom: 1rem;">
-                                Based on your responses, you present a complex picture of a dedicated teacher navigating real challenges and real strengths. The patterns in your scores show where you're thriving and where you might need additional support or resources. Every teacher's story is unique, and your assessment reflects your particular context, experiences, and current wellness state.
+                            <p style="margin-bottom: 1.5rem;">
+                                <strong>${name}</strong>, across all 18 parameters your overall wellness picture is ${overallBandAll} (overall average ${overallAvgAll.toFixed(1)}/5). The sections below pull together where you're doing best, where the strain is concentrated, and — since this report is designed to support your counselling session — what's likely worth prioritizing in that conversation.
                             </p>
-                            <p style="margin-bottom: 1rem;">
-                                Your areas of strength are genuine assets to build on. Your areas of challenge are not failures—they're valuable information about where intentional effort might make the most difference in your well-being and effectiveness.
-                            </p>
-                            <p style="margin-bottom: 1rem;">
-                                The good news: Many aspects of teacher wellness are within your control. While some challenges require institutional changes (resources, workload, support), others respond directly to personal strategies, boundaries, and connections. You don't need to fix everything at once.
-                            </p>
+
+                            <div style="background: white; padding: 1.25rem 1.5rem; border-radius: 6px; border-left: 4px solid var(--accent-wellness); margin-bottom: 1.5rem;">
+                                <strong style="color: var(--primary); display: block; margin-bottom: 0.5rem;">Key Strengths</strong>
+                                <ul style="margin: 0; padding-left: 1.25rem;">
+                                    ${topStrengths.map(s => `<li><strong>${s.name}</strong> (${s.score.toFixed(1)}/5, ${s.category}) — a genuine asset to build on.</li>`).join('')}
+                                </ul>
+                            </div>
+
+                            <div style="background: white; padding: 1.25rem 1.5rem; border-radius: 6px; border-left: 4px solid var(--accent-caution); margin-bottom: 1.5rem;">
+                                <strong style="color: var(--primary); display: block; margin-bottom: 0.5rem;">Areas Needing Support</strong>
+                                <ul style="margin: 0; padding-left: 1.25rem;">
+                                    ${topConcerns.map(c => `<li><strong>${c.name}</strong> (${c.score.toFixed(1)}/5, ${c.category}) — see the suggested actions in the ${c.category} section above for specifics.</li>`).join('')}
+                                </ul>
+                            </div>
+
+                            <div style="background: white; padding: 1.25rem 1.5rem; border-radius: 6px; border-left: 4px solid var(--primary-light); margin-bottom: 1.5rem;">
+                                <strong style="color: var(--primary); display: block; margin-bottom: 0.5rem;">Suggested Focus for the Counselling Session</strong>
+                                <p style="margin: 0;">
+                                    Given the pattern above, the most useful starting point for your session is likely <strong>${concernCategories.join(' and ')}</strong> — that's where the lowest-scoring parameters are concentrated, and where a short, focused conversation is most likely to produce a concrete next step. Your strengths in ${topStrengths[0].category} are worth naming too — they're often the resource a counsellor will help you draw on while working through the harder areas, rather than something separate from it.
+                                </p>
+                            </div>
+
                             <p>
-                                Your assessment reveals areas of strength to build on and areas where targeted support could make a meaningful difference. Remember that well-being isn't about being perfect in every area—it's about understanding where you are and taking intentional steps toward the balance and fulfillment you deserve.
+                                Many aspects of teacher wellness are within your control, though not all of them — some challenges here require institutional changes (resources, workload, support) rather than personal ones. You don't need to address everything at once. Well-being isn't about a perfect score in every parameter; it's about knowing precisely where you stand and taking one or two intentional, well-targeted steps from here.
                             </p>
                         </div>
                     </div>
@@ -1472,7 +1735,7 @@
                         </p>
                     </div>
 
-                    <div class="report-section" style="background: linear-gradient(135deg, rgba(5, 150, 105, 0.05) 0%, rgba(212, 160, 23, 0.05) 100%); border-top: 3px solid var(--accent-wellness); margin-top: 3rem; padding-top: 2rem;">
+                    <div class="report-section" style="background: #F5FBF7; border-top: 3px solid var(--accent-wellness); margin-top: 3rem; padding-top: 2rem;">
                         <h2 style="color: var(--primary); margin-bottom: 1.5rem;">What's Next?</h2>
 
                         <p style="color: var(--text-dark); font-size: 0.95rem; margin-bottom: 1.5rem;">
@@ -1480,7 +1743,8 @@
                         </p>
 
                         <div class="button-group" style="margin-top: 2rem;">
-                            <button class="btn btn-secondary" onclick="app.reviewResponses()">👁️ Review Your Responses</button>
+                            <button class="btn btn-secondary" onclick="app.viewResponses()">👁️ Review Your Responses</button>
+                            <button class="btn btn-primary" onclick="window.print()">💾 Save &amp; Download This Report</button>
                             <button class="btn btn-secondary" onclick="app.retakePlan()">🔄 Take Assessment Again</button>
                         </div>
                     </div>
@@ -1847,21 +2111,43 @@
             }
 
             reviewResponses() {
-                // Pre-fill all questions with user's previous responses
+                // showPage('assessment') calls renderQuestions(), which rebuilds
+                // #questionsContainer from scratch — so the previous responses have
+                // to be re-checked AFTER that render, not before it (checking them
+                // first was a no-op, since renderQuestions() immediately wiped the
+                // freshly-checked inputs back to blank).
+                this.showPage('assessment');
                 const questions = assessmentData.questionBank;
                 questions.forEach(q => {
                     if (this.responses[q.id] !== undefined) {
                         const option = document.querySelector(`input[name="q${q.id}"][value="${this.responses[q.id]}"]`);
-                        if (option) {
-                            option.checked = true;
-                        }
+                        if (option) option.checked = true;
                     }
                 });
                 this.updateProgress();
-                this.showPage('assessment');
+            }
+
+            // Read-only view of a teacher's own answers, used from the generated
+            // report ("Review Your Responses"). Once an assessment is submitted its
+            // responses are frozen (only a NavaSetu admin can enable a retake), so —
+            // unlike reviewResponses() above, which is for the pre-submit edit flow —
+            // this never routes back into the editable assessment form.
+            viewResponses() {
+                this.renderReviewSummary();
+                document.getElementById('reviewLockedNotice').style.display = 'block';
+                document.getElementById('reviewEditBtn').style.display = 'none';
+                document.getElementById('reviewSubmitBtn').style.display = 'none';
+                document.getElementById('reviewBackBtn').style.display = 'inline-block';
+                this.showPage('review');
             }
 
             retakePlan() {
+                // B2B teachers are always on the Navigate tier with no self-service
+                // plan switching or payment — there's nothing to "try another plan" to.
+                if (this.clientType === 'b2b') {
+                    alert('Your school\'s assessment is a single, comprehensive Navigate report. If you need a retake, please ask your school to contact NavaSetu.');
+                    return;
+                }
                 // Reset selected plan and go back to plan selection
                 this.selectedPlan = null;
                 this.showPage('plan-selection');
@@ -1874,13 +2160,18 @@
                     'navigate': 4999
                 };
 
+                // 'navigate-direct' handles the Discover report's own Navigate upgrade
+                // card, which jumps straight from Discover to Navigate rather than
+                // going through Explore first.
                 const upgrades = {
                     'discover': { next: 'explore', cost: 2499, differential: 2499 },
                     'explore': { next: 'navigate', cost: 4999, differential: 2500 }
                 };
+                const upgrade = (newPlan === 'navigate-direct')
+                    ? { next: 'navigate', cost: 4999, differential: 4999 }
+                    : upgrades[this.selectedPlan];
 
-                if (upgrades[this.selectedPlan]) {
-                    const upgrade = upgrades[this.selectedPlan];
+                if (upgrade) {
                     const message = `Upgrade to ${upgrade.next.charAt(0).toUpperCase() + upgrade.next.slice(1)} Plan\n\n` +
                         `Current Plan Cost: ₹${currentPlanPrice[this.selectedPlan]}\n` +
                         `New Plan Cost: ₹${upgrade.cost}\n` +

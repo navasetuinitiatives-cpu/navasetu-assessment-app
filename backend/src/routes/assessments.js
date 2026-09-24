@@ -145,6 +145,23 @@ router.post('/:assessmentId/enable-retake', requireAuth, requireAdmin, async (re
   }
 });
 
+// All of the caller's own assessments (used to power her "My Reports" dashboard
+// after logging back in). Declared before /:assessmentId so "mine" isn't
+// swallowed by the :assessmentId param route.
+router.get('/mine', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, status, client_type, submitted, submitted_at, created_at, scores
+       FROM assessments WHERE user_id = $1 ORDER BY created_at DESC`,
+      [req.user.userId]
+    );
+    res.json({ assessments: result.rows });
+  } catch (error) {
+    console.error('List my assessments error:', error);
+    res.status(500).json({ error: 'Failed to fetch your assessments' });
+  }
+});
+
 // Fetch an assessment (owner or admin only)
 router.get('/:assessmentId', requireAuth, async (req, res) => {
   try {
