@@ -14,7 +14,11 @@ if (process.env.DATABASE_URL) {
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
     max: 20,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
+    // Neon's compute suspends immediately when idle (suspend_timeout_seconds: 0
+    // on this project) — a cold-start wake can take a few seconds, so 2s was
+    // too aggressive and caused spurious connection timeouts on the first
+    // request after any idle period.
+    connectionTimeoutMillis: 10000,
   });
 } else {
   // Fall back to individual connection parameters

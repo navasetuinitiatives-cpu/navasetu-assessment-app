@@ -10,7 +10,8 @@ router.get('/', async (req, res) => {
     const result = await pool.query('SELECT org_name, (logo_data IS NOT NULL) AS has_logo, updated_at FROM platform_settings WHERE id = 1');
     res.json(result.rows[0] || { org_name: 'NavaSetu Initiatives', has_logo: false });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch settings' });
+    console.error('Fetch settings error:', error);
+    res.status(500).json({ error: 'Failed to fetch settings', detail: error.message });
   }
 });
 
