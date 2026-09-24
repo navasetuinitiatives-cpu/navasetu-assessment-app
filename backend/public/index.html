@@ -63,7 +63,7 @@
         .header-left { display: flex; align-items: center; gap: 1.25rem; min-width: 0; }
         .crest-img { width: 140px; height: 140px; flex-shrink: 0; -webkit-user-drag: none; object-fit: contain; }
         .header-info { min-width: 0; }
-        .header-info h1 { font-family: 'Crimson Text', serif; font-size: 2.1rem; margin: 0; letter-spacing: 0.5px; line-height: 1.15; }
+        .header-info h1 { font-family: 'Crimson Text', serif; font-size: 2.1rem; margin: 0; letter-spacing: 0.5px; line-height: 1.15; color: #FFFFFF; }
         .header-info p { font-size: 0.95rem; opacity: 0.9; margin: 0.35rem 0 0 0; }
         .header-contacts { display: flex; flex-direction: column; align-items: flex-end; gap: 0.45rem; font-size: 0.9rem; opacity: 0.9; }
         .contact-item { display: flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
@@ -438,8 +438,8 @@
                     </div>
 
                     <div class="button-group">
-                        <button type="button" class="btn btn-secondary" onclick="app.showPage('login')">Logout</button>
-                        <button type="button" class="btn btn-primary" onclick="app.saveDemographics()">Continue</button>
+                        <button type="button" class="btn btn-secondary" onclick="app.goBackFromDemographics()">⬅️ Back</button>
+                        <button type="button" class="btn btn-primary" onclick="app.saveDemographics()">Continue ➡️</button>
                     </div>
                 </form>
             </div>
@@ -504,7 +504,7 @@
                     <button type="button" id="reviewEditBtn" class="btn btn-secondary" onclick="app.reviewResponses()">✏️ Edit My Answers</button>
                     <button type="button" class="btn btn-secondary" onclick="app.downloadResponses()">📥 Download My Responses</button>
                     <button type="button" id="reviewSubmitBtn" class="btn btn-primary" onclick="app.submitAssessment()">Submit Assessment</button>
-                    <button type="button" id="reviewBackBtn" class="btn btn-secondary" style="display:none;" onclick="app.showPage('report')">⬅️ Back to Report</button>
+                    <button type="button" id="reviewBackBtn" class="btn btn-secondary" style="display:none;" onclick="app.reviewBack()">⬅️ Back</button>
                 </div>
             </div>
         </div>
@@ -557,8 +557,8 @@
                 </div>
 
                 <div class="button-group">
-                    <button type="button" class="btn btn-secondary" onclick="app.showPage('assessment')">Back</button>
-                    <button type="button" class="btn btn-primary" onclick="app.proceedToReport()" id="proceedBtn" disabled>Generate My Report</button>
+                    <button type="button" class="btn btn-secondary" onclick="app.backFromPlanSelection()">⬅️ Back</button>
+                    <button type="button" class="btn btn-primary" onclick="app.proceedToReport()" id="proceedBtn" disabled>Generate My Report ➡️</button>
                 </div>
             </div>
         </div>
@@ -978,20 +978,29 @@
             renderDashboard() {
                 const container = document.getElementById('dashboardContainer');
                 const name = this.demographics.name || (this.currentUser ? this.currentUser.fullName : 'there');
+                const firstName = name.split(' ')[0];
                 const hasInProgress = this.myAssessments.some(a => a.status === 'in_progress');
                 const hasSubmitted = this.myAssessments.some(a => a.status === 'submitted');
 
-                let reportsHtml = '<p style="color: var(--text-light);">You haven\'t generated any reports yet.</p>';
+                const tierMeta = {
+                    discover: { icon: '🔍', label: 'Discover', color: 'var(--text-light)' },
+                    explore: { icon: '🧭', label: 'Explore', color: 'var(--accent-wellness)' },
+                    navigate: { icon: '🗺️', label: 'Navigate', color: 'var(--primary-light)' }
+                };
+
+                let reportsHtml = `<p style="color: var(--text-light); font-size: 0.95rem;">You haven't generated a report yet — once you do, every version you create (Discover, Explore, or Navigate) will stay right here for you to revisit.</p>`;
                 if (this.myReports.length > 0) {
-                    reportsHtml = this.myReports.map(r => `
-                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap; gap: 0.5rem; padding:1rem; border:1px solid var(--border); border-radius:6px; margin-bottom:0.75rem;">
+                    reportsHtml = `<div style="display:grid; gap:0.75rem;">` + this.myReports.map(r => {
+                        const meta = tierMeta[r.plan_type] || { icon: '📄', label: r.plan_type, color: 'var(--border)' };
+                        return `
+                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap; gap: 0.5rem; padding:1rem 1.25rem; border-left: 4px solid ${meta.color}; background: #FAFAFA; border-radius:6px;">
                             <div>
-                                <div style="font-weight:600; text-transform:capitalize;">${r.plan_type} Report</div>
-                                <div style="font-size:0.85rem; color:var(--text-light);">Generated ${new Date(r.created_at).toLocaleDateString()}${r.payment_status === 'pending' ? ' — payment pending' : ''}</div>
+                                <div style="font-weight:600;">${meta.icon} ${meta.label} Report</div>
+                                <div style="font-size:0.8rem; color:var(--text-light); margin-top:0.15rem;">Generated ${new Date(r.created_at).toLocaleDateString()}${r.payment_status === 'pending' ? ' — payment pending' : ''}</div>
                             </div>
-                            <button class="btn btn-secondary" onclick="app.openStoredReport('${r.id}')" ${r.payment_status === 'pending' ? 'disabled' : ''}>👁️ View</button>
-                        </div>
-                    `).join('');
+                            <button class="btn btn-secondary btn-small" onclick="app.openStoredReport('${r.id}')" ${r.payment_status === 'pending' ? 'disabled' : ''}>👁️ View</button>
+                        </div>`;
+                    }).join('') + `</div>`;
                 }
 
                 let actionHtml;
@@ -1000,20 +1009,43 @@
                 } else if (!hasSubmitted) {
                     actionHtml = `<button class="btn btn-primary" onclick="app.showPage('instructions')">▶️ Start My Assessment</button>`;
                 } else {
-                    actionHtml = `<p style="color: var(--text-dark); font-size:0.9rem; background:#F0F8F4; padding:1rem; border-radius:6px; border-left:3px solid var(--accent-wellness);">Your assessment has already been submitted and your responses are locked. If you'd like to retake it, please contact NavaSetu at <a href="mailto:navasetuinitiatives@gmail.com">navasetuinitiatives@gmail.com</a> or call <a href="tel:+918556840001">8556840001</a>.</p>`;
+                    actionHtml = `<p style="color: var(--text-dark); font-size:0.9rem; background:#F0F8F4; padding:1rem; border-radius:6px; border-left:3px solid var(--accent-wellness); margin:0;">Your assessment has already been submitted and your responses are locked. If you'd like to retake it, please contact NavaSetu at <a href="mailto:navasetuinitiatives@gmail.com">navasetuinitiatives@gmail.com</a> or call <a href="tel:+918556840001">8556840001</a>.</p>`;
                 }
 
                 container.innerHTML = `
+                    <div style="background: var(--primary); border-radius: 8px; padding: 2rem; margin-bottom: 1.5rem; color: white; position: relative; overflow: hidden;">
+                        <div style="position:relative; z-index:1;">
+                            <h2 style="color: #FFFFFF; margin: 0; font-size: 1.6rem;">Welcome back, ${firstName} 👋</h2>
+                            <p style="color: var(--primary-light); margin: 0.5rem 0 0 0; font-size: 0.95rem;">Every journey needs a Setu — glad to have you back on yours.</p>
+                        </div>
+                    </div>
+
                     <div class="card">
-                        <h2>Welcome back, ${name}</h2>
-                        <p style="color: var(--text-light); margin-bottom: 1.5rem;">Your NavaSetu wellness dashboard</p>
-                        <div style="margin-bottom: 2rem;">${actionHtml}</div>
+                        <div style="margin-bottom: 1.5rem;">${actionHtml}</div>
                         <h3 style="margin-bottom: 1rem; color: var(--primary);">My Reports</h3>
                         ${reportsHtml}
-                        <div class="button-group" style="margin-top: 2rem;">
-                            <button class="btn btn-secondary" onclick="app.showPage('demographics')">👤 Edit My Profile</button>
-                            <button class="btn btn-secondary" onclick="app.logout()">🚪 Logout</button>
+                    </div>
+
+                    <div class="card" style="background: #FAFAFA;">
+                        <h3 style="margin-bottom: 0.5rem; color: var(--primary);">Explore More From NavaSetu</h3>
+                        <p style="color: var(--text-light); font-size: 0.9rem; margin-bottom: 1.25rem;">This assessment is one part of what we do — take a look around when you have a moment.</p>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
+                            <a href="https://www.navasetu.online" target="_blank" rel="noopener" style="display:block; text-decoration:none; background:white; border:1px solid var(--border); border-radius:8px; padding:1.25rem; transition: border-color 0.2s;" onmouseover="this.style.borderColor='var(--primary-light)'" onmouseout="this.style.borderColor='var(--border)'">
+                                <div style="font-size:1.4rem; margin-bottom:0.5rem;">🌉</div>
+                                <div style="font-weight:600; color:var(--primary);">Visit Our Website</div>
+                                <div style="font-size:0.85rem; color:var(--text-light); margin-top:0.35rem;">See what else NavaSetu offers educators and institutions.</div>
+                            </a>
+                            <a href="https://navasetu.edumilestone.com" target="_blank" rel="noopener" style="display:block; text-decoration:none; background:white; border:1px solid var(--border); border-radius:8px; padding:1.25rem; transition: border-color 0.2s;" onmouseover="this.style.borderColor='var(--primary-light)'" onmouseout="this.style.borderColor='var(--border)'">
+                                <div style="font-size:1.4rem; margin-bottom:0.5rem;">🧠</div>
+                                <div style="font-weight:600; color:var(--primary);">Try Our Psychometric Tool</div>
+                                <div style="font-size:0.85rem; color:var(--text-light); margin-top:0.35rem;">Curious what else we measure? Explore our full psychometric platform.</div>
+                            </a>
                         </div>
+                    </div>
+
+                    <div class="button-group" style="margin-top: 0.5rem;">
+                        <button class="btn btn-secondary" onclick="app.editProfile()">👤 Edit My Profile</button>
+                        <button class="btn btn-secondary" onclick="app.logout()">🚪 Logout</button>
                     </div>
                 `;
             }
@@ -2263,13 +2295,44 @@
             // responses are frozen (only a NavaSetu admin can enable a retake), so —
             // unlike reviewResponses() above, which is for the pre-submit edit flow —
             // this never routes back into the editable assessment form.
-            viewResponses() {
+            viewResponses(returnPage) {
+                // Remembers where "Back" should return to — the report page normally,
+                // or plan-selection when arriving via backFromPlanSelection() below.
+                this._reviewReturnPage = returnPage || 'report';
                 this.renderReviewSummary();
                 document.getElementById('reviewLockedNotice').style.display = 'block';
                 document.getElementById('reviewEditBtn').style.display = 'none';
                 document.getElementById('reviewSubmitBtn').style.display = 'none';
                 document.getElementById('reviewBackBtn').style.display = 'inline-block';
                 this.showPage('review');
+            }
+
+            reviewBack() {
+                this.showPage(this._reviewReturnPage || 'report');
+            }
+
+            // Once an assessment is submitted, "Back" from plan-selection can't
+            // meaningfully return to the live (now-frozen) assessment form — show
+            // her locked responses read-only instead, with a way back to plans.
+            backFromPlanSelection() {
+                this.viewResponses('plan-selection');
+            }
+
+            // Demographics is reached two ways: first-time (right after register,
+            // before a dashboard exists yet) and editing an existing profile from
+            // the dashboard. "Back" does the right thing for each.
+            editProfile() {
+                this._editingProfile = true;
+                this.showPage('demographics');
+            }
+
+            goBackFromDemographics() {
+                if (this._editingProfile) {
+                    this._editingProfile = false;
+                    this.loadDashboard();
+                } else {
+                    this.logout();
+                }
             }
 
             retakePlan() {
