@@ -358,7 +358,7 @@
 
                 <div class="button-group">
                     <button type="button" class="btn btn-secondary" onclick="app.showPage('demographics')">Back</button>
-                    <button type="button" class="btn btn-primary" onclick="app.beginAssessment()">I'm Ready — Begin Assessment</button>
+                    <button type="button" class="btn btn-primary" onclick="app.showPage('assessment')">I'm Ready — Begin Assessment</button>
                 </div>
             </div>
         </div>
@@ -593,23 +593,11 @@
         };
 
         // Memory-based storage for file:// protocol compatibility
-        const API_BASE = '/api';
-
-        async function apiFetch(path, options = {}) {
-            const token = localStorage.getItem('navasetu_token');
-            const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-            const res = await fetch(`${API_BASE}${path}`, Object.assign({}, options, { headers }));
-            let data = null;
-            try { data = await res.json(); } catch (e) { /* no body */ }
-            if (!res.ok) {
-                const err = new Error((data && data.error) || `Request failed (${res.status})`);
-                err.status = res.status;
-                err.data = data;
-                throw err;
-            }
-            return data;
-        }
+        const MemoryStorage = {
+            data: {},
+            getItem(key) { return this.data[key] || null; },
+            setItem(key, value) { this.data[key] = value; }
+        };
 
         class AssessmentApp {
             constructor() {
@@ -618,32 +606,7 @@
                 this.responses = {};
                 this.selectedPlan = null;
                 this.calculatedScores = {};
-                this.assessmentId = null;
-                this.schoolTeacherId = null;
-                this.clientType = 'b2c';
-
-                // B2B shared-link flow: ?school=<schoolId> in the URL
-                const params = new URLSearchParams(window.location.search);
-                this.schoolId = params.get('school') || null;
-                if (this.schoolId) this.clientType = 'b2b';
-
-                this.applyBranding();
-            }
-
-            async applyBranding() {
-                try {
-                    const settings = await apiFetch('/settings');
-                    if (settings && settings.has_logo) {
-                        const crest = document.querySelector('.crest-img');
-                        if (crest) {
-                            const img = document.createElement('img');
-                            img.src = `${API_BASE}/settings/logo`;
-                            img.className = 'crest-img';
-                            img.alt = settings.org_name || 'NavaSetu';
-                            crest.replaceWith(img);
-                        }
-                    }
-                } catch (e) { /* fall back to the default inline crest */ }
+                this.storage = MemoryStorage;
             }
 
             showPage(pageName) {
@@ -657,7 +620,7 @@
                 }
             }
 
-            async login() {
+            login() {
                 const email = document.getElementById('loginEmail').value;
                 const password = document.getElementById('loginPassword').value;
 
@@ -666,45 +629,20 @@
                     return;
                 }
 
-                try {
-                    let data;
-                    if (this.schoolId) {
-                        // B2B: match against the school's roster instead of a normal password login
-                        data = await apiFetch(`/schools/${this.schoolId}/join`, {
-                            method: 'POST',
-                            body: JSON.stringify({ email, password })
-                        });
-                    } else {
-                        data = await apiFetch('/auth/login', {
-                            method: 'POST',
-                            body: JSON.stringify({ email, password })
-                        });
-                    }
+                // Demo mode: any email/password works
+                this.currentUser = { email, name: email.split('@')[0] };
 
-                    localStorage.setItem('navasetu_token', data.accessToken);
-                    this.currentUser = data.user;
-                    this.schoolTeacherId = data.schoolTeacherId || null;
-
-                    if (data.demographics) {
-                        this.demographics = {
-                            name: this.currentUser.fullName,
-                            age: data.demographics.age,
-                            location: data.demographics.location,
-                            institution: data.demographics.institution,
-                            institutionType: data.demographics.institution_type,
-                            experience: data.demographics.experience_years,
-                            subject: data.demographics.subject
-                        };
-                        this.showPage('assessment');
-                    } else {
-                        this.showPage('demographics');
-                    }
-                } catch (e) {
-                    alert(e.message || 'Login failed. Please check your details and try again.');
+                // Check if demographics already exist for this user
+                const savedDemographics = this.storage.getItem(`navasetu_demographics_${email}`);
+                if (savedDemographics) {
+                    this.demographics = JSON.parse(savedDemographics);
+                    this.showPage('assessment');
+                } else {
+                    this.showPage('demographics');
                 }
             }
 
-            async register() {
+            register() {
                 const email = document.getElementById('regEmail').value;
                 const password = document.getElementById('regPassword').value;
                 const name = document.getElementById('regName').value;
@@ -715,41 +653,26 @@
                     return;
                 }
 
-                try {
-                    let data;
-                    if (this.schoolId) {
-                        data = await apiFetch(`/schools/${this.schoolId}/join`, {
-                            method: 'POST',
-                            body: JSON.stringify({ email, password, fullName: name })
-                        });
-                    } else {
-                        data = await apiFetch('/auth/register', {
-                            method: 'POST',
-                            body: JSON.stringify({ email, password, fullName: name, phoneNumber: mobile })
-                        });
-                    }
-
-                    localStorage.setItem('navasetu_token', data.accessToken);
-                    this.currentUser = data.user;
-                    this.schoolTeacherId = data.schoolTeacherId || null;
-                    this.showPage('demographics');
-                } catch (e) {
-                    alert(e.message || 'Registration failed. Please try again.');
-                }
+                this.currentUser = { email, name, mobile };
+                this.showPage('demographics');
             }
 
             loadDemographicsForm() {
-                if (this.demographics && Object.keys(this.demographics).length > 0) {
-                    document.getElementById('age').value = this.demographics.age || '';
-                    document.getElementById('location').value = this.demographics.location || '';
-                    document.getElementById('institution').value = this.demographics.institution || '';
-                    document.getElementById('institutionType').value = this.demographics.institutionType || '';
-                    document.getElementById('experience').value = this.demographics.experience || '';
-                    document.getElementById('subject').value = this.demographics.subject || '';
+                const email = this.currentUser.email;
+                const savedDemographics = this.storage.getItem(`navasetu_demographics_${email}`);
+
+                if (savedDemographics) {
+                    const demo = JSON.parse(savedDemographics);
+                    document.getElementById('age').value = demo.age || '';
+                    document.getElementById('location').value = demo.location || '';
+                    document.getElementById('institution').value = demo.institution || '';
+                    document.getElementById('institutionType').value = demo.institutionType || '';
+                    document.getElementById('experience').value = demo.experience || '';
+                    document.getElementById('subject').value = demo.subject || '';
                 }
             }
 
-            async saveDemographics() {
+            saveDemographics() {
                 const form = document.getElementById('demographicsForm');
                 if (!form.checkValidity()) {
                     alert('Please fill all required fields');
@@ -757,7 +680,7 @@
                 }
 
                 this.demographics = {
-                    name: this.currentUser.fullName,
+                    name: this.currentUser.name,
                     age: document.getElementById('age').value,
                     location: document.getElementById('location').value,
                     institution: document.getElementById('institution').value,
@@ -766,15 +689,8 @@
                     subject: document.getElementById('subject').value
                 };
 
-                try {
-                    await apiFetch('/auth/demographics', {
-                        method: 'PUT',
-                        body: JSON.stringify(this.demographics)
-                    });
-                } catch (e) {
-                    alert('Could not save your details right now — please try again.');
-                    return;
-                }
+                // Save to memory storage for current session
+                this.storage.setItem(`navasetu_demographics_${this.currentUser.email}`, JSON.stringify(this.demographics));
 
                 this.showPage('instructions');
             }
@@ -802,63 +718,21 @@
                     container.appendChild(div);
 
                     document.querySelectorAll(`input[name="q${q.id}"]`).forEach(input => {
-                        input.addEventListener('change', () => {
-                            this.updateProgress();
-                            this.scheduleProgressSave();
-                        });
+                        input.addEventListener('change', () => this.updateProgress());
                     });
                 });
 
                 this.updateProgress();
             }
 
-            async beginAssessment() {
-                try {
-                    if (!this.assessmentId) {
-                        const data = await apiFetch('/assessments', {
-                            method: 'POST',
-                            body: JSON.stringify({
-                                schoolId: this.schoolId || undefined,
-                                schoolTeacherId: this.schoolTeacherId || undefined,
-                                clientType: this.clientType
-                            })
-                        });
-                        this.assessmentId = data.assessment.id;
-                        // Resuming an in-progress attempt restores any previously saved answers
-                        if (data.resumed && data.assessment.responses) {
-                            this.responses = data.assessment.responses;
-                        }
-                    }
-                    this.showPage('assessment');
-                    // Pre-fill any responses restored from a resumed attempt
-                    Object.keys(this.responses).forEach((qId) => {
-                        const opt = document.querySelector(`input[name="q${qId}"][value="${this.responses[qId]}"]`);
-                        if (opt) opt.checked = true;
-                    });
-                    this.updateProgress();
-                } catch (e) {
-                    alert('Could not start the assessment right now — please try again.');
-                }
-            }
-
-            scheduleProgressSave() {
-                clearTimeout(this._progressSaveTimer);
-                this._progressSaveTimer = setTimeout(() => this.saveProgress(), 1500);
-            }
-
-            async saveProgress() {
-                if (!this.assessmentId) return;
+            updateProgress() {
                 const questions = assessmentData.questionBank;
-                questions.forEach(q => {
-                    const response = document.querySelector(`input[name="q${q.id}"]:checked`);
-                    if (response) this.responses[q.id] = parseInt(response.value);
-                });
-                try {
-                    await apiFetch(`/assessments/${this.assessmentId}`, {
-                        method: 'PUT',
-                        body: JSON.stringify({ responses: this.responses })
-                    });
-                } catch (e) { /* best-effort autosave; final submit is what matters */ }
+                const answered = questions.filter(q => document.querySelector(`input[name="q${q.id}"]:checked`)).length;
+                const total = questions.length;
+                const percentage = (answered / total) * 100;
+
+                document.getElementById('progressFill').style.width = percentage + '%';
+                document.getElementById('progressText').textContent = `${answered} of ${total} questions answered`;
             }
 
             completeAssessment() {
@@ -899,7 +773,6 @@
                     }
                 });
 
-                this.saveProgress();
                 this.renderReviewSummary();
                 this.showPage('review');
             }
@@ -919,27 +792,17 @@
                 }).join('');
             }
 
-            async submitAssessment() {
-                // Responses are frozen server-side from this point on — a real retake
-                // requires a NavaSetu admin override (POST /assessments/:id/enable-retake)
-                try {
-                    const data = await apiFetch(`/assessments/${this.assessmentId}/submit`, {
-                        method: 'POST',
-                        body: JSON.stringify({ responses: this.responses })
-                    });
-                    this.submitted = true;
-                    this.submittedAt = new Date().toISOString();
-                    this.calculatedScores = data.parameterScores; // authoritative, server-computed
-                    this.dimensionScores = data.dimensionScores;
-                    this.showPage('plan-selection');
-                } catch (e) {
-                    alert(e.message || 'Could not submit your assessment — please try again.');
-                }
+            submitAssessment() {
+                // Responses are frozen from this point on — a real retake requires a NavaSetu admin override
+                this.submitted = true;
+                this.submittedAt = new Date().toISOString();
+                this.calculateScores();
+                this.showPage('plan-selection');
             }
 
             downloadResponses() {
                 const questions = assessmentData.questionBank;
-                const name = (this.demographics && this.demographics.name) ? this.demographics.name : (this.currentUser ? this.currentUser.fullName : 'teacher');
+                const name = (this.demographics && this.demographics.name) ? this.demographics.name : (this.currentUser ? this.currentUser.name : 'teacher');
                 let text = `NavaSetu Teacher Wellness Assessment — My Responses\n`;
                 text += `Name: ${name}\nDate: ${new Date().toLocaleDateString()}\n\n`;
                 questions.forEach((q, idx) => {
@@ -1007,26 +870,9 @@
                 this.generateReport();
             }
 
-            async generateReport() {
+            generateReport() {
                 this.renderReport();
                 this.showPage('report');
-
-                // Persist the generated report server-side so NavaSetu admins and the
-                // teacher can reopen it later, and so the payment gate (if PILOT_FREE_ACCESS
-                // is ever turned off) is enforced. Best-effort — a save failure shouldn't
-                // block the teacher from seeing the report she just generated.
-                try {
-                    const container = document.getElementById('reportContainer');
-                    const saved = await apiFetch('/reports', {
-                        method: 'POST',
-                        body: JSON.stringify({
-                            assessmentId: this.assessmentId,
-                            planType: this.selectedPlan,
-                            htmlContent: container ? container.innerHTML : ''
-                        })
-                    });
-                    this.currentReportId = saved.report.id;
-                } catch (e) { /* non-fatal */ }
             }
 
             getColorForScore(score) {

@@ -1,211 +1,244 @@
--- NavaSetu Assessment Platform - Database Schema
+-- NavaSetu Teacher Wellness Assessment Platform - Database Schema (Pilot Rebuild)
 -- PostgreSQL 13+
+-- Source of truth: matches navasetu_report_reference_v2_FIXED.html question bank,
+-- scoring, and report tiers, plus the B2C/B2B business rules agreed for the pilot.
 
--- Users table
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+-- =========================================================================
+-- USERS  (also serves as the central CRM / lead table — never deleted on
+-- school archive; only the school link + assessment/report rows move out)
+-- =========================================================================
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email VARCHAR(255) UNIQUE NOT NULL,
-  password_hash VARCHAR(255) NOT NULL,
+  password_hash VARCHAR(255), -- NULL until a B2B teacher sets a password / registers
   full_name VARCHAR(255) NOT NULL,
   phone_number VARCHAR(20),
-  role VARCHAR(50) DEFAULT 'individual', -- individual, school_admin, consultant, platform_admin
-  status VARCHAR(50) DEFAULT 'active', -- active, inactive, archived
+  role VARCHAR(50) DEFAULT 'individual', -- individual, teacher, platform_admin
+  client_type VARCHAR(20) DEFAULT 'b2c', -- b2c, b2b
+  status VARCHAR(50) DEFAULT 'active', -- active, inactive
   last_login TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT valid_role CHECK (role IN ('individual', 'school_admin', 'consultant', 'platform_admin')),
-  CONSTRAINT valid_status CHECK (status IN ('active', 'inactive', 'archived'))
+  CONSTRAINT valid_role CHECK (role IN ('individual', 'teacher', 'platform_admin')),
+  CONSTRAINT valid_client_type CHECK (client_type IN ('b2c', 'b2b'))
 );
 
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_role ON users(role);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 
--- Schools table
+-- Demographics captured once at first login, reused on every later visit
+CREATE TABLE IF NOT EXISTS user_demographics (
+  user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  age INT,
+  location VARCHAR(255),
+  institution VARCHAR(255),
+  institution_type VARCHAR(100),
+  experience_years INT,
+  subject VARCHAR(255),
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- =========================================================================
+-- SCHOOLS (B2B "school blocks" — NavaSetu admins only, schools never get
+-- portal admin access; payment happens outside the portal entirely)
+-- =========================================================================
 CREATE TABLE IF NOT EXISTS schools (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(255) NOT NULL,
   district VARCHAR(255),
   state VARCHAR(255),
   country VARCHAR(255) DEFAULT 'India',
-  school_type VARCHAR(100), -- government, private, semi-private
-  admin_id UUID REFERENCES users(id),
-  status VARCHAR(50) DEFAULT 'pending', -- pending, approved, rejected, active
+  school_type VARCHAR(100),
+  contact_name VARCHAR(255),
+  contact_email VARCHAR(255),
+  contact_phone VARCHAR(20),
+  created_by UUID REFERENCES users(id), -- NavaSetu admin who created the block
+  status VARCHAR(50) DEFAULT 'active', -- active, archived
+  archived_at TIMESTAMP,
+  archive_path VARCHAR(500), -- where the exported package was written on archive
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_schools_admin_id ON schools(admin_id);
-CREATE INDEX idx_schools_status ON schools(status);
+CREATE INDEX IF NOT EXISTS idx_schools_status ON schools(status);
 
--- School Teachers mapping
+-- Teacher roster per school. Uploaded by admin (CSV/Excel/manual) BEFORE the
+-- teacher necessarily has a user account. Matched to `users` by email when
+-- she takes the assessment (email is the match key). Retakes are disabled
+-- by default for B2B teachers; only a NavaSetu admin can flip retake_enabled.
 CREATE TABLE IF NOT EXISTS school_teachers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  school_id UUID NOT NULL REFERENCES schools(id),
-  user_id UUID NOT NULL REFERENCES users(id),
-  teacher_id VARCHAR(100),
+  school_id UUID NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES users(id), -- NULL until she registers/submits
+  full_name VARCHAR(255) NOT NULL,
+  email VARCHAR(255) NOT NULL,
   designation VARCHAR(255),
   subject VARCHAR(255),
-  status VARCHAR(50) DEFAULT 'active',
+  invited_at TIMESTAMP, -- last bulk-invite email send time
+  matched_at TIMESTAMP, -- when her submission was matched to this roster row
+  retake_enabled BOOLEAN DEFAULT FALSE, -- admin override; default is no retakes
+  status VARCHAR(50) DEFAULT 'invited', -- invited, in_progress, completed
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT unique_school_teacher UNIQUE(school_id, user_id)
+  CONSTRAINT unique_school_teacher_email UNIQUE(school_id, email)
 );
 
-CREATE INDEX idx_school_teachers_school_id ON school_teachers(school_id);
-CREATE INDEX idx_school_teachers_user_id ON school_teachers(user_id);
+CREATE INDEX IF NOT EXISTS idx_school_teachers_school_id ON school_teachers(school_id);
+CREATE INDEX IF NOT EXISTS idx_school_teachers_email ON school_teachers(email);
 
--- Assessments table (core data)
+-- =========================================================================
+-- ASSESSMENTS (one row per attempt; frozen once submitted; a retake is a
+-- brand-new row, only creatable when an admin has enabled it)
+-- =========================================================================
 CREATE TABLE IF NOT EXISTS assessments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id),
-  school_id UUID REFERENCES schools(id),
-  status VARCHAR(50) DEFAULT 'in_progress', -- in_progress, submitted, completed
-  progress_percentage INT DEFAULT 0,
-  responses JSONB, -- Store all assessment responses
-  scores JSONB, -- Calculated scores by dimension
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  school_id UUID REFERENCES schools(id), -- set for B2B attempts
+  school_teacher_id UUID REFERENCES school_teachers(id),
+  client_type VARCHAR(20) NOT NULL DEFAULT 'b2c', -- b2c, b2b
+  status VARCHAR(50) DEFAULT 'in_progress', -- in_progress, submitted
+  responses JSONB DEFAULT '{}'::jsonb, -- draft answers, saved as the teacher progresses
+  scores JSONB, -- computed only on submit, from the server-side scoring engine
+  submitted BOOLEAN DEFAULT FALSE,
   submitted_at TIMESTAMP,
+  retake_of UUID REFERENCES assessments(id), -- points to the prior attempt, if any
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT valid_client_type CHECK (client_type IN ('b2c', 'b2b'))
 );
 
-CREATE INDEX idx_assessments_user_id ON assessments(user_id);
-CREATE INDEX idx_assessments_school_id ON assessments(school_id);
-CREATE INDEX idx_assessments_status ON assessments(status);
+CREATE INDEX IF NOT EXISTS idx_assessments_user_id ON assessments(user_id);
+CREATE INDEX IF NOT EXISTS idx_assessments_school_id ON assessments(school_id);
+CREATE INDEX IF NOT EXISTS idx_assessments_status ON assessments(status);
 
--- Reports table
+-- =========================================================================
+-- REPORTS (one per plan generated for an assessment; B2B is always Navigate)
+-- =========================================================================
 CREATE TABLE IF NOT EXISTS reports (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  assessment_id UUID NOT NULL REFERENCES assessments(id),
+  assessment_id UUID NOT NULL REFERENCES assessments(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES users(id),
-  plan_type VARCHAR(50), -- Discover, Explore, Navigate
-  wellness_score DECIMAL(5,2),
-  burnout_score DECIMAL(5,2),
-  professional_score DECIMAL(5,2),
-  recommendations JSONB,
-  pdf_path VARCHAR(500),
-  pdf_generated_at TIMESTAMP,
-  status VARCHAR(50) DEFAULT 'pending', -- pending, generating, ready, error
+  plan_type VARCHAR(50) NOT NULL, -- discover, explore, navigate
+  html_content TEXT, -- server-rendered report HTML (source of truth for viewing/PDF)
+  payment_status VARCHAR(50) DEFAULT 'not_required', -- not_required, pending, paid, admin_released
+  released_at TIMESTAMP, -- when the report actually became viewable
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  CONSTRAINT valid_plan_type CHECK (plan_type IN ('discover', 'explore', 'navigate')),
+  CONSTRAINT valid_payment_status CHECK (payment_status IN ('not_required', 'pending', 'paid', 'admin_released'))
 );
 
-CREATE INDEX idx_reports_user_id ON reports(user_id);
-CREATE INDEX idx_reports_assessment_id ON reports(assessment_id);
-CREATE INDEX idx_reports_status ON reports(status);
+CREATE INDEX IF NOT EXISTS idx_reports_user_id ON reports(user_id);
+CREATE INDEX IF NOT EXISTS idx_reports_assessment_id ON reports(assessment_id);
 
--- Orders (Payment) table
+-- =========================================================================
+-- ORDERS (skeletal payment tracking for B2C Explore/Navigate. Razorpay
+-- integration is stubbed for the pilot; a NavaSetu admin can also manually
+-- mark an order paid and release the report, which is the pilot's real path.)
+-- =========================================================================
 CREATE TABLE IF NOT EXISTS orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id),
+  report_id UUID REFERENCES reports(id),
   razorpay_order_id VARCHAR(100),
+  razorpay_payment_id VARCHAR(100),
   amount DECIMAL(10,2) NOT NULL,
   currency VARCHAR(10) DEFAULT 'INR',
-  plan_type VARCHAR(50) NOT NULL, -- Discover, Explore, Navigate
-  status VARCHAR(50) DEFAULT 'pending', -- pending, paid, failed, cancelled
-  payment_method VARCHAR(50), -- card, upi, netbanking
+  plan_type VARCHAR(50) NOT NULL,
+  status VARCHAR(50) DEFAULT 'pending', -- pending, paid, admin_released, failed, cancelled
+  payment_method VARCHAR(50), -- razorpay, admin_manual
+  marked_paid_by UUID REFERENCES users(id), -- admin who manually released it, if applicable
+  notes TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_orders_user_id ON orders(user_id);
-CREATE INDEX idx_orders_razorpay_order_id ON orders(razorpay_order_id);
-CREATE INDEX idx_orders_status ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 
--- Payment Logs table
-CREATE TABLE IF NOT EXISTS payment_logs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  order_id UUID NOT NULL REFERENCES orders(id),
-  razorpay_payment_id VARCHAR(100),
-  status VARCHAR(50),
-  response JSONB,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX idx_payment_logs_order_id ON payment_logs(order_id);
-
--- Consultants table
+-- =========================================================================
+-- CONSULTATIONS (Navigate plan's 1 counselling session)
+-- =========================================================================
 CREATE TABLE IF NOT EXISTS consultants (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL UNIQUE REFERENCES users(id),
+  user_id UUID UNIQUE REFERENCES users(id),
+  full_name VARCHAR(255),
   specialization VARCHAR(255),
   bio TEXT,
-  hourly_rate DECIMAL(10,2),
-  max_consultations_per_day INT DEFAULT 5,
   status VARCHAR(50) DEFAULT 'active',
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX idx_consultants_user_id ON consultants(user_id);
-
--- Consultation Availability
-CREATE TABLE IF NOT EXISTS consultant_availability (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  consultant_id UUID NOT NULL REFERENCES consultants(id),
-  day_of_week INT, -- 0-6 (Sunday-Saturday)
-  start_time TIME,
-  end_time TIME,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_consultant_availability_consultant_id ON consultant_availability(consultant_id);
-
--- Consultation Requests (Bookings)
 CREATE TABLE IF NOT EXISTS consultation_requests (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id),
-  consultant_id UUID NOT NULL REFERENCES consultants(id),
   report_id UUID REFERENCES reports(id),
+  consultant_id UUID REFERENCES consultants(id),
+  preferred_slot TIMESTAMP,
   scheduled_at TIMESTAMP,
-  duration_minutes INT DEFAULT 30,
+  status VARCHAR(50) DEFAULT 'requested', -- requested, scheduled, completed, cancelled
   notes TEXT,
-  status VARCHAR(50) DEFAULT 'pending', -- pending, confirmed, completed, cancelled
-  zoom_link VARCHAR(500),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_consultation_requests_user_id ON consultation_requests(user_id);
-CREATE INDEX idx_consultation_requests_consultant_id ON consultation_requests(consultant_id);
+CREATE INDEX IF NOT EXISTS idx_consultation_requests_user_id ON consultation_requests(user_id);
 
--- School Analytics (cached aggregates)
+-- =========================================================================
+-- SCHOOL PROJECT ANALYTICS (aggregate report NavaSetu shows to the school —
+-- the school never sees individual teacher reports)
+-- =========================================================================
 CREATE TABLE IF NOT EXISTS school_analytics (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  school_id UUID NOT NULL REFERENCES schools(id),
+  school_id UUID NOT NULL UNIQUE REFERENCES schools(id) ON DELETE CASCADE,
   total_teachers INT DEFAULT 0,
   completed_assessments INT DEFAULT 0,
-  avg_wellness_score DECIMAL(5,2),
-  avg_burnout_score DECIMAL(5,2),
-  avg_professional_score DECIMAL(5,2),
-  high_burnout_count INT DEFAULT 0,
-  low_wellness_count INT DEFAULT 0,
-  last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT unique_school_analytics UNIQUE(school_id)
+  avg_scores JSONB, -- per-parameter and per-dimension averages
+  at_risk_count INT DEFAULT 0, -- teachers with any dimension below a concern threshold
+  generated_html TEXT, -- the compiled project report shown to NavaSetu admins
+  last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_school_analytics_school_id ON school_analytics(school_id);
-
--- Audit Logs table
+-- =========================================================================
+-- AUDIT LOG (admin actions: retake grants, manual payment releases, exports)
+-- =========================================================================
 CREATE TABLE IF NOT EXISTS audit_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID,
-  action VARCHAR(255),
+  actor_user_id UUID REFERENCES users(id),
+  action VARCHAR(255) NOT NULL,
   entity_type VARCHAR(100),
   entity_id UUID,
-  changes JSONB,
-  ip_address VARCHAR(45),
-  user_agent TEXT,
+  details JSONB,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_audit_logs_user_id ON audit_logs(user_id);
-CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);
 
--- Initial seed data
-INSERT INTO users (email, password_hash, full_name, role, status)
-VALUES ('admin@navasetu.online', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcg7b3XeKeUxWdeS86E36P4/1Pq', 'Admin User', 'platform_admin', 'active')
-ON CONFLICT DO NOTHING;
+-- =========================================================================
+-- PLATFORM SETTINGS (singleton row) — NavaSetu logo/crest, used on the
+-- frontend header, the admin panel, generated reports, and future tax
+-- invoices. Stored as base64 in the DB for the pilot (no object storage
+-- configured yet) and served back out via GET /api/settings/logo.
+-- =========================================================================
+CREATE TABLE IF NOT EXISTS platform_settings (
+  id INT PRIMARY KEY DEFAULT 1,
+  org_name VARCHAR(255) DEFAULT 'NavaSetu Initiatives',
+  logo_data TEXT, -- base64-encoded image data, NULL until an admin uploads one
+  logo_mime VARCHAR(50), -- e.g. image/png
+  updated_by UUID REFERENCES users(id),
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT single_row CHECK (id = 1)
+);
 
-INSERT INTO consultants (user_id, specialization, bio, hourly_rate, max_consultations_per_day)
-SELECT id, 'Mental Health & Wellness', 'Senior Consultant', 500.00, 5
-FROM users WHERE email = 'admin@navasetu.online' AND NOT EXISTS (SELECT 1 FROM consultants LIMIT 1)
-ON CONFLICT DO NOTHING;
+INSERT INTO platform_settings (id, org_name) VALUES (1, 'NavaSetu Initiatives')
+ON CONFLICT (id) DO NOTHING;
+
+-- =========================================================================
+-- SEED: one NavaSetu platform admin
+-- Password below is a bcrypt hash of "NavaSetu@2026" — CHANGE THIS after first login
+-- (there's no self-service password change UI yet; ask to have it added, or
+-- update password_hash directly via SQL with a freshly generated bcrypt hash).
+-- =========================================================================
+INSERT INTO users (email, password_hash, full_name, role, client_type, status)
+VALUES ('navasetuinitiatives@gmail.com', '$2a$10$P0suKczb13U9qOUMRjeocu6yt3m0j6cNPL.isC2pZQRJIWekxZgZC', 'NavaSetu Admin', 'platform_admin', 'b2c', 'active')
+ON CONFLICT (email) DO NOTHING;

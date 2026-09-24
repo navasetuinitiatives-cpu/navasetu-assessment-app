@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NavaSetu Admin</title>
+<style>
+  :root { --primary:#0a0e27; --gold:#D4A017; --bg:#F9FAFB; --border:#E5E7EB; --danger:#EF4444; --ok:#10B981; }
+  * { box-sizing:border-box; }
+  body { font-family: -apple-system, Segoe UI, Inter, sans-serif; background:var(--bg); margin:0; color:#1F2937; }
+  header { background:var(--primary); color:#fff; padding:1rem 1.5rem; display:flex; align-items:center; gap:1rem; }
+  header img { max-height:40px; }
+  header h1 { font-size:1.2rem; margin:0; }
+  nav { display:flex; gap:0.5rem; background:#fff; border-bottom:1px solid var(--border); padding:0 1.5rem; flex-wrap:wrap; }
+  nav button { background:none; border:none; padding:0.9rem 1rem; cursor:pointer; font-size:0.9rem; color:#6B7280; border-bottom:3px solid transparent; }
+  nav button.active { color:var(--primary); border-bottom-color:var(--gold); font-weight:600; }
+  main { padding:1.5rem; max-width:1100px; margin:0 auto; }
+  section { display:none; }
+  section.active { display:block; }
+  .card { background:#fff; border:1px solid var(--border); border-radius:8px; padding:1.5rem; margin-bottom:1.5rem; }
+  .card h2 { margin-top:0; font-size:1.1rem; }
+  label { display:block; font-size:0.85rem; font-weight:600; margin:0.75rem 0 0.25rem; }
+  input, select, textarea { width:100%; padding:0.6rem; border:1px solid var(--border); border-radius:6px; font-size:0.9rem; font-family:inherit; }
+  button.btn { background:var(--primary); color:#fff; border:none; padding:0.6rem 1.2rem; border-radius:6px; cursor:pointer; font-size:0.9rem; margin-top:0.75rem; }
+  button.btn.secondary { background:#fff; color:var(--primary); border:1px solid var(--border); }
+  button.btn.danger { background:var(--danger); }
+  table { width:100%; border-collapse:collapse; margin-top:1rem; font-size:0.85rem; }
+  th, td { text-align:left; padding:0.5rem; border-bottom:1px solid var(--border); }
+  th { color:#6B7280; font-weight:600; }
+  .pill { padding:0.15rem 0.6rem; border-radius:999px; font-size:0.75rem; font-weight:600; }
+  .pill.ok { background:#D1FAE5; color:#065F46; }
+  .pill.pending { background:#FEF3C7; color:#92400E; }
+  .muted { color:#6B7280; font-size:0.85rem; }
+  #loginScreen { max-width:400px; margin:4rem auto; }
+</style>
+</head>
+<body>
+
+<div id="loginScreen" class="card">
+  <h2>NavaSetu Admin Login</h2>
+  <label>Email</label>
+  <input id="adminEmail" type="email" value="navasetuinitiatives@gmail.com">
+  <label>Password</label>
+  <input id="adminPassword" type="password">
+  <button class="btn" onclick="adminLogin()">Login</button>
+  <p class="muted" id="loginError"></p>
+</div>
+
+<div id="app" style="display:none;">
+  <header>
+    <img id="headerLogo" src="/api/settings/logo" onerror="this.style.display='none'" alt="">
+    <h1>NavaSetu Admin</h1>
+  </header>
+  <nav>
+    <button class="active" onclick="showTab('leads')">CRM / Leads</button>
+    <button onclick="showTab('schools')">Schools</button>
+    <button onclick="showTab('orders')">Payments</button>
+    <button onclick="showTab('settings')">Settings</button>
+  </nav>
+  <main>
+
+    <section id="tab-leads" class="active">
+      <div class="card">
+        <h2>Leads &amp; Progress</h2>
+        <input placeholder="Search by name or email" id="leadSearch" oninput="loadLeads()">
+        <table>
+          <thead><tr><th>Name</th><th>Email</th><th>Type</th><th>School</th><th>Status</th><th>Reports</th><th></th></tr></thead>
+          <tbody id="leadsBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="tab-schools">
+      <div class="card">
+        <h2>Create a School Block</h2>
+        <label>School Name</label><input id="schoolName">
+        <label>District / State</label><input id="schoolDistrict" placeholder="e.g. Pune, Maharashtra">
+        <label>Contact Person / Email</label><input id="schoolContact" placeholder="name, email">
+        <button class="btn" onclick="createSchool()">Create School</button>
+      </div>
+      <div class="card">
+        <h2>Schools</h2>
+        <table>
+          <thead><tr><th>Name</th><th>Teachers</th><th>Completed</th><th></th></tr></thead>
+          <tbody id="schoolsBody"></tbody>
+        </table>
+      </div>
+      <div class="card" id="schoolDetailCard" style="display:none;">
+        <h2 id="schoolDetailName">School</h2>
+        <label>Upload Roster (paste CSV: name,email,designation,subject — header row optional)</label>
+        <textarea id="rosterCsv" rows="6" placeholder="Jane Doe,jane@school.edu,Teacher,Maths"></textarea>
+        <button class="btn" onclick="uploadRoster()">Upload Roster</button>
+        <label style="margin-top:1.5rem;">Personal message to include in the invite email</label>
+        <textarea id="inviteMessage" rows="2"></textarea>
+        <button class="btn secondary" onclick="sendInvites()">Send Bulk Invite Emails</button>
+        <p class="muted" id="inviteResult"></p>
+        <button class="btn secondary" onclick="loadProjectReport()">View Project Report</button>
+        <div id="projectReport"></div>
+        <table>
+          <thead><tr><th>Name</th><th>Email</th><th>Status</th></tr></thead>
+          <tbody id="teachersBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="tab-orders">
+      <div class="card">
+        <h2>Orders — Manual Payment Release</h2>
+        <p class="muted">Razorpay isn't connected yet for this pilot. When a payment is received outside the portal, mark the order paid here to release the report.</p>
+        <table>
+          <thead><tr><th>User</th><th>Plan</th><th>Amount</th><th>Status</th><th></th></tr></thead>
+          <tbody id="ordersBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="tab-settings">
+      <div class="card">
+        <h2>Branding</h2>
+        <p class="muted">This logo appears on the assessment site, this admin panel, and every generated report/invoice.</p>
+        <input type="file" id="logoFile" accept="image/*">
+        <button class="btn" onclick="uploadLogo()">Upload Logo</button>
+        <button class="btn secondary danger" onclick="removeLogo()">Remove Logo</button>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+const API = '/api';
+let token = localStorage.getItem('navasetu_admin_token');
+let currentSchoolId = null;
+
+async function api(path, options = {}) {
+  const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(`${API}${path}`, Object.assign({}, options, { headers }));
+  let data = null;
+  try { data = await res.json(); } catch (e) {}
+  if (!res.ok) throw new Error((data && data.error) || `Request failed (${res.status})`);
+  return data;
+}
+
+async function adminLogin() {
+  try {
+    const data = await api('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email: document.getElementById('adminEmail').value, password: document.getElementById('adminPassword').value })
+    });
+    if (data.user.role !== 'platform_admin') throw new Error('This account is not a NavaSetu admin.');
+    token = data.accessToken;
+    localStorage.setItem('navasetu_admin_token', token);
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    loadLeads();
+  } catch (e) {
+    document.getElementById('loginError').textContent = e.message;
+  }
+}
+
+if (token) { document.getElementById('loginScreen').style.display = 'none'; document.getElementById('app').style.display = 'block'; loadLeads(); }
+
+function showTab(name) {
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('main section').forEach(s => s.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  document.getElementById(`tab-${name}`).classList.add('active');
+  if (name === 'schools') loadSchools();
+  if (name === 'orders') loadOrders();
+}
+
+async function loadLeads() {
+  try {
+    const search = document.getElementById('leadSearch').value;
+    const data = await api(`/admin/leads?search=${encodeURIComponent(search)}`);
+    document.getElementById('leadsBody').innerHTML = data.leads.map(l => `
+      <tr>
+        <td>${l.full_name}</td>
+        <td>${l.email}</td>
+        <td>${l.client_type}</td>
+        <td>${l.school_name || '—'}</td>
+        <td>${l.assessment_status || 'not started'}</td>
+        <td>${l.report_count}</td>
+        <td><button class="btn secondary" onclick="alert('Lead ID: ${l.id}')">Details</button></td>
+      </tr>`).join('');
+  } catch (e) { console.error(e); }
+}
+
+async function createSchool() {
+  const [contactName, contactEmail] = (document.getElementById('schoolContact').value || '').split(',').map(s => s.trim());
+  try {
+    await api('/schools', {
+      method: 'POST',
+      body: JSON.stringify({ name: document.getElementById('schoolName').value, district: document.getElementById('schoolDistrict').value, contactName, contactEmail })
+    });
+    document.getElementById('schoolName').value = '';
+    document.getElementById('schoolDistrict').value = '';
+    document.getElementById('schoolContact').value = '';
+    loadSchools();
+  } catch (e) { alert(e.message); }
+}
+
+async function loadSchools() {
+  try {
+    const data = await api('/schools');
+    document.getElementById('schoolsBody').innerHTML = data.schools.map(s => `
+      <tr>
+        <td>${s.name}</td>
+        <td>${s.total_teachers}</td>
+        <td>${s.completed_teachers}</td>
+        <td><button class="btn secondary" onclick="openSchool('${s.id}', '${s.name.replace(/'/g, "\\'")}')">Manage</button></td>
+      </tr>`).join('');
+  } catch (e) { console.error(e); }
+}
+
+async function openSchool(id, name) {
+  currentSchoolId = id;
+  document.getElementById('schoolDetailCard').style.display = 'block';
+  document.getElementById('schoolDetailName').textContent = name;
+  document.getElementById('projectReport').innerHTML = '';
+  loadTeachers();
+}
+
+async function loadTeachers() {
+  const data = await api(`/schools/${currentSchoolId}/teachers`);
+  document.getElementById('teachersBody').innerHTML = data.teachers.map(t => `
+    <tr><td>${t.full_name}</td><td>${t.email}</td><td>${t.status}</td></tr>`).join('');
+}
+
+async function uploadRoster() {
+  try {
+    const result = await api(`/schools/${currentSchoolId}/teachers/upload`, {
+      method: 'POST',
+      body: JSON.stringify({ csvText: document.getElementById('rosterCsv').value })
+    });
+    alert(`Imported ${result.imported} of ${result.total} rows.`);
+    document.getElementById('rosterCsv').value = '';
+    loadTeachers();
+    loadSchools();
+  } catch (e) { alert(e.message); }
+}
+
+async function sendInvites() {
+  try {
+    const link = `${window.location.origin}/?school=${currentSchoolId}`;
+    const result = await api(`/schools/${currentSchoolId}/invite`, {
+      method: 'POST',
+      body: JSON.stringify({ message: document.getElementById('inviteMessage').value, assessmentUrl: link })
+    });
+    document.getElementById('inviteResult').textContent = result.configured
+      ? `Sent ${result.sentCount} of ${result.total} invites.`
+      : `Email isn't configured yet — ${result.drafts.length} invites were drafted instead of sent. Share this link manually for now: ${link}`;
+  } catch (e) { alert(e.message); }
+}
+
+async function loadProjectReport() {
+  try {
+    const data = await api(`/schools/${currentSchoolId}/project-report`);
+    document.getElementById('projectReport').innerHTML = data.html;
+  } catch (e) { alert(e.message); }
+}
+
+async function loadOrders() {
+  const data = await api('/payments/orders');
+  document.getElementById('ordersBody').innerHTML = data.orders.map(o => `
+    <tr>
+      <td>${o.full_name} (${o.email})</td>
+      <td>${o.plan_type}</td>
+      <td>₹${o.amount}</td>
+      <td><span class="pill ${o.status === 'pending' ? 'pending' : 'ok'}">${o.status}</span></td>
+      <td>${o.status === 'pending' ? `<button class="btn secondary" onclick="markPaid('${o.id}')">Mark Paid</button>` : ''}</td>
+    </tr>`).join('');
+}
+
+async function markPaid(orderId) {
+  try {
+    await api(`/payments/orders/${orderId}/mark-paid`, { method: 'POST', body: JSON.stringify({ notes: 'Marked paid via admin panel' }) });
+    loadOrders();
+  } catch (e) { alert(e.message); }
+}
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function uploadLogo() {
+  const file = document.getElementById('logoFile').files[0];
+  if (!file) return alert('Choose an image file first');
+  try {
+    const dataUrl = await fileToDataUrl(file);
+    await api('/settings/logo', { method: 'POST', body: JSON.stringify({ dataUrl }) });
+    alert('Logo updated.');
+    document.getElementById('headerLogo').src = `/api/settings/logo?t=${Date.now()}`;
+  } catch (e) { alert(e.message); }
+}
+
+async function removeLogo() {
+  try {
+    await api('/settings/logo', { method: 'DELETE' });
+    document.getElementById('headerLogo').style.display = 'none';
+  } catch (e) { alert(e.message); }
+}
+</script>
+</body>
+</html>
