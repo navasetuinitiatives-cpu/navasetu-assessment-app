@@ -30,6 +30,8 @@
   .pill { padding:0.15rem 0.6rem; border-radius:999px; font-size:0.75rem; font-weight:600; }
   .pill.ok { background:#D1FAE5; color:#065F46; }
   .pill.pending { background:#FEF3C7; color:#92400E; }
+  .pill.booked { background:#DBEAFE; color:#1E40AF; }
+  select.statusSelect { width:auto; padding:0.35rem 0.5rem; font-size:0.8rem; }
   .muted { color:#6B7280; font-size:0.85rem; }
   #loginScreen { max-width:400px; margin:4rem auto; }
 </style>
@@ -70,9 +72,14 @@
         <h2>Leads &amp; Progress</h2>
         <input placeholder="Search by name or email" id="leadSearch" oninput="loadLeads()">
         <table>
-          <thead><tr><th>Name</th><th>Email</th><th>Type</th><th>School</th><th>Status</th><th>Reports</th><th></th></tr></thead>
+          <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Mobile</th><th>Type</th><th>Institution</th><th>Plan</th><th>Status</th><th></th></tr></thead>
           <tbody id="leadsBody"></tbody>
         </table>
+      </div>
+      <div class="card" id="leadDetailCard" style="display:none;">
+        <button class="btn secondary" onclick="closeLeadDetail()">← Back to Leads</button>
+        <h2 id="leadDetailTitle">Lead</h2>
+        <div id="leadDetailBody"></div>
       </div>
     </section>
 
@@ -259,21 +266,105 @@ function showTab(name) {
   if (name === 'admins') loadAdmins();
 }
 
+const LEAD_STATUSES = [
+  { value: 'submitted', label: 'Submitted' },
+  { value: 'counselling_booked', label: 'Counselling Session Booked' },
+  { value: 'counselled', label: 'Counselled' }
+];
+
+function statusPillClass(status) {
+  if (status === 'counselled') return 'ok';
+  if (status === 'counselling_booked') return 'booked';
+  return 'pending';
+}
+
+function statusOptionsHtml(current) {
+  return LEAD_STATUSES.map(s => `<option value="${s.value}" ${s.value === current ? 'selected' : ''}>${s.label}</option>`).join('');
+}
+
 async function loadLeads() {
   try {
     const search = document.getElementById('leadSearch').value;
     const data = await api(`/admin/leads?search=${encodeURIComponent(search)}`);
+    window._leadsCache = data.leads;
     document.getElementById('leadsBody').innerHTML = data.leads.map(l => `
       <tr>
+        <td>${l.lead_number ?? '—'}</td>
         <td>${l.full_name}</td>
         <td>${l.email}</td>
+        <td>${l.phone_number || '—'}</td>
         <td>${l.client_type}</td>
-        <td>${l.school_name || '—'}</td>
-        <td>${l.assessment_status || 'not started'}</td>
-        <td>${l.report_count}</td>
-        <td><button class="btn secondary" onclick="alert('Lead ID: ${l.id}')">Details</button></td>
+        <td>${l.institution || '—'}</td>
+        <td>${l.plan || '—'}</td>
+        <td>
+          <select class="statusSelect" onchange="updateLeadStatus('${l.id}', this.value)">
+            ${statusOptionsHtml(l.lead_status)}
+          </select>
+        </td>
+        <td><button class="btn secondary" onclick="openLeadDetail('${l.id}')">Details</button></td>
       </tr>`).join('');
   } catch (e) { console.error(e); }
+}
+
+async function updateLeadStatus(userId, status) {
+  try {
+    await api(`/admin/leads/${userId}/status`, { method: 'PUT', body: JSON.stringify({ status }) });
+    const lead = (window._leadsCache || []).find(l => l.id === userId);
+    if (lead) lead.lead_status = status;
+  } catch (e) { alert(e.message); loadLeads(); }
+}
+
+async function openLeadDetail(userId) {
+  try {
+    const data = await api(`/admin/leads/${userId}`);
+    const u = data.user;
+    document.getElementById('tab-leads').querySelector('.card').style.display = 'none';
+    const detailCard = document.getElementById('leadDetailCard');
+    detailCard.style.display = 'block';
+    detailCard.dataset.userId = userId;
+    document.getElementById('leadDetailTitle').textContent = `Lead #${u.lead_number ?? '—'} — ${u.full_name}`;
+
+    const reportsHtml = data.reports.length
+      ? data.reports.map(r => `
+          <tr>
+            <td>${r.plan_type}</td>
+            <td>${new Date(r.created_at).toLocaleDateString()}</td>
+            <td><span class="pill ${r.payment_status === 'paid' || r.payment_status === 'free' ? 'ok' : 'pending'}">${r.payment_status}</span></td>
+            <td><button class="btn secondary" onclick="viewLeadReport('${r.id}')">View / Download</button></td>
+          </tr>`).join('')
+      : '<tr><td colspan="4" class="muted">No reports yet.</td></tr>';
+
+    document.getElementById('leadDetailBody').innerHTML = `
+      <p><strong>Email:</strong> ${u.email} &nbsp; <strong>Mobile:</strong> ${u.phone_number || '—'}</p>
+      <p><strong>Type:</strong> ${u.client_type} &nbsp; <strong>Institution:</strong> ${(data.demographics && data.demographics.institution) || '—'}</p>
+      <p><strong>Status:</strong>
+        <select class="statusSelect" onchange="updateLeadStatus('${userId}', this.value)">
+          ${statusOptionsHtml(u.lead_status)}
+        </select>
+      </p>
+      <h3>Reports</h3>
+      <table>
+        <thead><tr><th>Plan</th><th>Date</th><th>Payment</th><th></th></tr></thead>
+        <tbody>${reportsHtml}</tbody>
+      </table>
+    `;
+  } catch (e) { alert(e.message); }
+}
+
+function closeLeadDetail() {
+  document.getElementById('leadDetailCard').style.display = 'none';
+  document.getElementById('tab-leads').querySelector('.card').style.display = 'block';
+}
+
+async function viewLeadReport(reportId) {
+  try {
+    const report = await api(`/admin/reports/${reportId}`);
+    const win = window.open('', '_blank');
+    win.document.write(`<!DOCTYPE html><html><head><title>Report</title>
+      <style>body{font-family:Inter,Arial,sans-serif;padding:2rem;} @media print { body{padding:1cm;} } @page{size:auto;margin:0;}</style>
+      </head><body>${report.html_content}<script>window.onload=function(){window.print();};<\/script></body></html>`);
+    win.document.close();
+  } catch (e) { alert(e.message); }
 }
 
 async function createSchool() {

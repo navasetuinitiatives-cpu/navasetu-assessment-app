@@ -127,26 +127,32 @@ router.get('/system', async (req, res) => {
   }
 });
 
-// Central CRM: every lead (B2C individual + B2B teacher), their current
-// school link (if any), and their latest assessment progress. This is the
-// "leads, progress, reports" view the pilot needs as its backend CRM.
+// Central CRM: every lead (B2C individual + B2B teacher) with the columns
+// the pilot's CRM view needs — name, email, mobile, type, institution, plan,
+// status, and a stable, human-facing lead number.
 router.get('/leads', async (req, res) => {
   try {
     const { search, clientType } = req.query;
     const result = await pool.query(
-      `SELECT u.id, u.email, u.full_name, u.role, u.client_type, u.created_at, u.last_login,
+      `SELECT u.id, u.lead_number, u.email, u.full_name, u.phone_number, u.role, u.client_type,
+              u.lead_status, u.created_at, u.last_login,
               a.id AS latest_assessment_id, a.status AS assessment_status, a.submitted_at,
-              s.name AS school_name, s.id AS school_id,
-              (SELECT COUNT(*) FROM reports r WHERE r.user_id = u.id) AS report_count
+              COALESCE(d.institution, s.name) AS institution,
+              r.plan_type AS plan,
+              (SELECT COUNT(*) FROM reports rc WHERE rc.user_id = u.id) AS report_count
        FROM users u
        LEFT JOIN LATERAL (
          SELECT * FROM assessments WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1
        ) a ON true
        LEFT JOIN schools s ON s.id = a.school_id
+       LEFT JOIN user_demographics d ON d.user_id = u.id
+       LEFT JOIN LATERAL (
+         SELECT plan_type FROM reports WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1
+       ) r ON true
        WHERE u.role != 'platform_admin'
          AND ($1::text IS NULL OR u.full_name ILIKE '%' || $1 || '%' OR u.email ILIKE '%' || $1 || '%')
          AND ($2::text IS NULL OR u.client_type = $2)
-       ORDER BY u.created_at DESC
+       ORDER BY u.lead_number ASC
        LIMIT 300`,
       [search || null, clientType || null]
     );
@@ -157,10 +163,32 @@ router.get('/leads', async (req, res) => {
   }
 });
 
+// Update a lead's CRM status (submitted -> counselling_booked -> counselled)
+router.put('/leads/:userId/status', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { status } = req.body;
+    const allowed = ['submitted', 'counselling_booked', 'counselled'];
+    if (!allowed.includes(status)) {
+      return res.status(400).json({ error: `Status must be one of: ${allowed.join(', ')}` });
+    }
+    const result = await pool.query(
+      `UPDATE users SET lead_status = $1 WHERE id = $2 AND role != 'platform_admin'
+       RETURNING id, lead_number, lead_status`,
+      [status, userId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Lead not found' });
+    res.json({ success: true, lead: result.rows[0] });
+  } catch (error) {
+    console.error('Update lead status error:', error);
+    res.status(500).json({ error: 'Failed to update lead status' });
+  }
+});
+
 router.get('/leads/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
-    const user = await pool.query('SELECT id, email, full_name, role, client_type, created_at, last_login FROM users WHERE id = $1', [userId]);
+    const user = await pool.query('SELECT id, lead_number, email, full_name, phone_number, role, client_type, lead_status, created_at, last_login FROM users WHERE id = $1', [userId]);
     if (user.rows.length === 0) return res.status(404).json({ error: 'Not found' });
 
     const demographics = await pool.query('SELECT * FROM user_demographics WHERE user_id = $1', [userId]);
