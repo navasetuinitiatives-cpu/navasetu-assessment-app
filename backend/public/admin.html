@@ -34,6 +34,12 @@
   .pill.fresh { background:#E5E7EB; color:#374151; }
   .pill.junked { background:#FEE2E2; color:#991B1B; }
   select.statusSelect { width:auto; padding:0.35rem 0.6rem; font-size:0.8rem; font-weight:600; border-radius:999px; border:none; cursor:pointer; }
+  .leadTabBtn { background:none; border:none; padding:0.6rem 0.9rem; cursor:pointer; font-size:0.88rem; color:#6B7280; border-bottom:3px solid transparent; }
+  .leadTabBtn.active { color:var(--primary); border-bottom-color:var(--gold); font-weight:600; }
+  .activityItem { padding:0.7rem 0; border-bottom:1px solid var(--border); }
+  .activityItem .type-badge { display:inline-block; font-size:0.7rem; font-weight:700; text-transform:uppercase; padding:0.1rem 0.5rem; border-radius:4px; margin-right:0.5rem; }
+  .activityItem .type-badge.email { background:#DBEAFE; color:#1E40AF; }
+  .activityItem .type-badge.note { background:#EDE9FE; color:#5B21B6; }
   .muted { color:#6B7280; font-size:0.85rem; }
   #loginScreen { max-width:400px; margin:4rem auto; }
 </style>
@@ -81,7 +87,16 @@
       <div class="card" id="leadDetailCard" style="display:none;">
         <button class="btn secondary" onclick="closeLeadDetail()">← Back to Leads</button>
         <h2 id="leadDetailTitle">Lead</h2>
-        <div id="leadDetailBody"></div>
+        <div class="leadTabs" style="display:flex; gap:0.5rem; border-bottom:1px solid var(--border); margin:1rem 0;">
+          <button class="leadTabBtn active" onclick="showLeadTab('overview')">Overview</button>
+          <button class="leadTabBtn" onclick="showLeadTab('reports')">Reports &amp; Responses</button>
+          <button class="leadTabBtn" onclick="showLeadTab('activity')">Activity</button>
+          <button class="leadTabBtn" onclick="showLeadTab('appointments')">Appointments</button>
+        </div>
+        <div id="leadTab-overview" class="leadTabPane"></div>
+        <div id="leadTab-reports" class="leadTabPane" style="display:none;"></div>
+        <div id="leadTab-activity" class="leadTabPane" style="display:none;"></div>
+        <div id="leadTab-appointments" class="leadTabPane" style="display:none;"></div>
       </div>
     </section>
 
@@ -327,52 +342,177 @@ async function updateLeadStatus(userId, status, selectEl) {
 async function openLeadDetail(userId) {
   try {
     const data = await api(`/admin/leads/${userId}`);
-    const u = data.user;
+    window._currentLead = data;
     document.getElementById('tab-leads').querySelector('.card').style.display = 'none';
     const detailCard = document.getElementById('leadDetailCard');
     detailCard.style.display = 'block';
     detailCard.dataset.userId = userId;
-    document.getElementById('leadDetailTitle').textContent = `Lead #${u.lead_number ?? '—'} — ${u.full_name}`;
+    document.getElementById('leadDetailTitle').textContent = `Lead #${data.user.lead_number ?? '—'} — ${data.user.full_name}`;
 
-    const reportsHtml = data.reports.length
-      ? data.reports.map(r => `
+    renderLeadOverview();
+    renderLeadReports();
+    showLeadTab('overview');
+    loadLeadActivity(userId);
+    loadLeadAppointments(userId);
+  } catch (e) { alert(e.message); }
+}
+
+function showLeadTab(name) {
+  document.querySelectorAll('.leadTabBtn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.leadTabPane').forEach(p => p.style.display = 'none');
+  const idx = ['overview', 'reports', 'activity', 'appointments'].indexOf(name);
+  document.querySelectorAll('.leadTabBtn')[idx].classList.add('active');
+  document.getElementById(`leadTab-${name}`).style.display = 'block';
+}
+
+function renderLeadOverview() {
+  const { user: u, demographics } = window._currentLead;
+  document.getElementById('leadTab-overview').innerHTML = `
+    <p><strong>Email:</strong> ${u.email} &nbsp; <strong>Mobile:</strong> ${u.phone_number || '—'}</p>
+    <p><strong>Type:</strong> ${u.client_type} &nbsp; <strong>Institution:</strong> ${(demographics && demographics.institution) || '—'}</p>
+    <p><strong>Registered:</strong> ${new Date(u.created_at).toLocaleDateString()} &nbsp; <strong>Last login:</strong> ${u.last_login ? new Date(u.last_login).toLocaleString() : 'never'}</p>
+    <p><strong>Status:</strong>
+      <select class="statusSelect" id="leadDetailStatus" onchange="updateLeadStatus('${u.id}', this.value, this)">
+        ${statusOptionsHtml(u.lead_status)}
+      </select>
+    </p>
+  `;
+  styleStatusSelect(document.getElementById('leadDetailStatus'), u.lead_status);
+}
+
+function renderLeadReports() {
+  const { reports, assessments } = window._currentLead;
+  const reportsHtml = reports.length
+    ? reports.map(r => `
+        <tr>
+          <td>${r.plan_type}</td>
+          <td>${new Date(r.created_at).toLocaleDateString()}</td>
+          <td><span class="pill ${r.payment_status === 'paid' || r.payment_status === 'free' ? 'ok' : 'pending'}">${r.payment_status}</span></td>
+          <td><button class="btn secondary" onclick="viewLeadReport('${r.id}')">View / Download</button></td>
+        </tr>`).join('')
+    : '<tr><td colspan="4" class="muted">No reports yet.</td></tr>';
+
+  const assessmentsHtml = assessments.length
+    ? assessments.map(a => `
+        <tr>
+          <td>${a.status}</td>
+          <td>${a.submitted_at ? new Date(a.submitted_at).toLocaleDateString() : '—'}</td>
+          <td><button class="btn secondary" onclick="viewLeadResponses('${a.id}')">View / Download Responses</button></td>
+        </tr>`).join('')
+    : '<tr><td colspan="3" class="muted">No assessment attempts yet.</td></tr>';
+
+  document.getElementById('leadTab-reports').innerHTML = `
+    <h3>Assessment Responses</h3>
+    <table>
+      <thead><tr><th>Status</th><th>Submitted</th><th></th></tr></thead>
+      <tbody>${assessmentsHtml}</tbody>
+    </table>
+    <h3>Reports</h3>
+    <table>
+      <thead><tr><th>Plan</th><th>Date</th><th>Payment</th><th></th></tr></thead>
+      <tbody>${reportsHtml}</tbody>
+    </table>
+  `;
+}
+
+async function loadLeadActivity(userId) {
+  const pane = document.getElementById('leadTab-activity');
+  pane.innerHTML = '<p class="muted">Loading…</p>';
+  try {
+    const data = await api(`/admin/leads/${userId}/activity`);
+    const itemsHtml = data.activity.length
+      ? data.activity.map(a => `
+          <div class="activityItem">
+            <span class="type-badge ${a.type}">${a.type}</span>
+            <span class="muted">${new Date(a.created_at).toLocaleString()}</span>
+            ${a.created_by_name ? `<span class="muted"> · by ${a.created_by_name}</span>` : ''}
+            ${a.subject ? `<div style="font-weight:600; margin-top:0.3rem;">${a.subject}</div>` : ''}
+            <div style="white-space:pre-wrap; margin-top:0.2rem; font-size:0.9rem;">${a.body || ''}</div>
+          </div>`).join('')
+      : '<p class="muted">No activity yet.</p>';
+    pane.innerHTML = `
+      <h3>Add a Note</h3>
+      <textarea id="newNoteBody" rows="2" placeholder="Logged a call, left a voicemail, etc."></textarea>
+      <button class="btn" onclick="addLeadNote('${userId}')">Add Note</button>
+      <h3 style="margin-top:1.5rem;">History</h3>
+      ${itemsHtml}
+    `;
+  } catch (e) { pane.innerHTML = `<p class="muted">${e.message}</p>`; }
+}
+
+async function addLeadNote(userId) {
+  const body = document.getElementById('newNoteBody').value.trim();
+  if (!body) return;
+  try {
+    await api(`/admin/leads/${userId}/notes`, { method: 'POST', body: JSON.stringify({ body }) });
+    loadLeadActivity(userId);
+  } catch (e) { alert(e.message); }
+}
+
+async function loadLeadAppointments(userId) {
+  const pane = document.getElementById('leadTab-appointments');
+  pane.innerHTML = '<p class="muted">Loading…</p>';
+  try {
+    const data = await api(`/admin/leads/${userId}/appointments`);
+    const rowsHtml = data.appointments.length
+      ? data.appointments.map(ap => `
           <tr>
-            <td>${r.plan_type}</td>
-            <td>${new Date(r.created_at).toLocaleDateString()}</td>
-            <td><span class="pill ${r.payment_status === 'paid' || r.payment_status === 'free' ? 'ok' : 'pending'}">${r.payment_status}</span></td>
-            <td><button class="btn secondary" onclick="viewLeadReport('${r.id}')">View / Download</button></td>
+            <td>${ap.consultant_name || '—'}</td>
+            <td>${ap.scheduled_at ? new Date(ap.scheduled_at).toLocaleString() : (ap.preferred_slot ? new Date(ap.preferred_slot).toLocaleString() + ' (preferred)' : '—')}</td>
+            <td>
+              <select onchange="updateAppointment('${ap.id}', this.value, '${userId}')">
+                ${['requested', 'scheduled', 'completed', 'cancelled'].map(s => `<option value="${s}" ${s === ap.status ? 'selected' : ''}>${s}</option>`).join('')}
+              </select>
+            </td>
+            <td>${ap.notes || '—'}</td>
           </tr>`).join('')
-      : '<tr><td colspan="4" class="muted">No reports yet.</td></tr>';
+      : '<tr><td colspan="4" class="muted">No appointments logged yet.</td></tr>';
 
-    const assessmentsHtml = data.assessments.length
-      ? data.assessments.map(a => `
-          <tr>
-            <td>${a.status}</td>
-            <td>${a.submitted_at ? new Date(a.submitted_at).toLocaleDateString() : '—'}</td>
-            <td><button class="btn secondary" onclick="viewLeadResponses('${a.id}')">View / Download Responses</button></td>
-          </tr>`).join('')
-      : '<tr><td colspan="3" class="muted">No assessment attempts yet.</td></tr>';
-
-    document.getElementById('leadDetailBody').innerHTML = `
-      <p><strong>Email:</strong> ${u.email} &nbsp; <strong>Mobile:</strong> ${u.phone_number || '—'}</p>
-      <p><strong>Type:</strong> ${u.client_type} &nbsp; <strong>Institution:</strong> ${(data.demographics && data.demographics.institution) || '—'}</p>
-      <p><strong>Status:</strong>
-        <select class="statusSelect" id="leadDetailStatus" onchange="updateLeadStatus('${userId}', this.value, this)">
-          ${statusOptionsHtml(u.lead_status)}
-        </select>
-      </p>
-      <h3>Assessment Responses</h3>
+    pane.innerHTML = `
+      <h3>Log a Booking</h3>
+      <label>Consultant Name</label><input id="apConsultant" placeholder="e.g. Dr. Meera Rao">
+      <label>Date &amp; Time</label><input id="apScheduledAt" type="datetime-local">
+      <label>Notes</label><textarea id="apNotes" rows="2"></textarea>
+      <button class="btn" onclick="createAppointment('${userId}')">Save Appointment</button>
+      <h3 style="margin-top:1.5rem;">Appointments</h3>
       <table>
-        <thead><tr><th>Status</th><th>Submitted</th><th></th></tr></thead>
-        <tbody>${assessmentsHtml}</tbody>
-      </table>
-      <h3>Reports</h3>
-      <table>
-        <thead><tr><th>Plan</th><th>Date</th><th>Payment</th><th></th></tr></thead>
-        <tbody>${reportsHtml}</tbody>
+        <thead><tr><th>Consultant</th><th>When</th><th>Status</th><th>Notes</th></tr></thead>
+        <tbody>${rowsHtml}</tbody>
       </table>
     `;
-    styleStatusSelect(document.getElementById('leadDetailStatus'), u.lead_status);
+  } catch (e) { pane.innerHTML = `<p class="muted">${e.message}</p>`; }
+}
+
+async function createAppointment(userId) {
+  const consultantName = document.getElementById('apConsultant').value.trim();
+  const scheduledAtRaw = document.getElementById('apScheduledAt').value;
+  const notes = document.getElementById('apNotes').value.trim();
+  try {
+    await api(`/admin/leads/${userId}/appointments`, {
+      method: 'POST',
+      body: JSON.stringify({
+        consultantName: consultantName || null,
+        scheduledAt: scheduledAtRaw ? new Date(scheduledAtRaw).toISOString() : null,
+        notes: notes || null
+      })
+    });
+    loadLeadAppointments(userId);
+    // The appointment may have moved the lead's CRM stage — refresh Overview.
+    const data = await api(`/admin/leads/${userId}`);
+    window._currentLead = data;
+    renderLeadOverview();
+  } catch (e) { alert(e.message); }
+}
+
+async function updateAppointment(appointmentId, status, userId) {
+  try {
+    await api(`/admin/appointments/${appointmentId}`, { method: 'PUT', body: JSON.stringify({ status }) });
+    loadLeadAppointments(userId);
+    if (status === 'completed') {
+      const data = await api(`/admin/leads/${userId}`);
+      window._currentLead = data;
+      renderLeadOverview();
+    }
   } catch (e) { alert(e.message); }
 }
 

@@ -114,6 +114,15 @@ router.delete('/admins/:id', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Delete admin error:', error);
+    // 23503 = Postgres foreign-key violation. This admin account owns real
+    // data elsewhere (e.g. it was promoted from an existing individual/
+    // teacher account that has its own reports or orders) — deleting it
+    // would orphan that data, so we refuse instead of failing silently.
+    if (error.code === '23503') {
+      return res.status(409).json({
+        error: 'This admin account still owns other records (e.g. reports, orders, or an assessment history from before it was promoted to admin) and can\'t be deleted while those exist.'
+      });
+    }
     res.status(500).json({ error: 'Failed to remove admin' });
   }
 });
@@ -206,6 +215,120 @@ router.get('/leads/:userId', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch lead detail' });
+  }
+});
+
+// --- Lead Activity (emails sent + manual notes) -------------------------
+// Matched by user_id when known, falling back to the lead's email so an
+// invite sent before a teacher had an account still shows up once they
+// register (email is the only thing we have at invite time).
+router.get('/leads/:userId/activity', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await pool.query('SELECT email FROM users WHERE id = $1', [userId]);
+    if (user.rows.length === 0) return res.status(404).json({ error: 'Lead not found' });
+    const result = await pool.query(
+      `SELECT la.*, u.full_name AS created_by_name FROM lead_activity la
+       LEFT JOIN users u ON u.id = la.created_by
+       WHERE la.user_id = $1 OR la.recipient_email = $2
+       ORDER BY la.created_at DESC`,
+      [userId, user.rows[0].email]
+    );
+    res.json({ activity: result.rows });
+  } catch (error) {
+    console.error('Fetch activity error:', error);
+    res.status(500).json({ error: 'Failed to fetch activity' });
+  }
+});
+
+router.post('/leads/:userId/notes', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { body } = req.body;
+    if (!body || !body.trim()) return res.status(400).json({ error: 'Note text is required' });
+    const user = await pool.query('SELECT email FROM users WHERE id = $1', [userId]);
+    if (user.rows.length === 0) return res.status(404).json({ error: 'Lead not found' });
+    const result = await pool.query(
+      `INSERT INTO lead_activity (user_id, recipient_email, type, body, created_by)
+       VALUES ($1, $2, 'note', $3, $4) RETURNING *`,
+      [userId, user.rows[0].email, body.trim(), req.user.userId]
+    );
+    res.status(201).json({ activity: result.rows[0] });
+  } catch (error) {
+    console.error('Add note error:', error);
+    res.status(500).json({ error: 'Failed to add note' });
+  }
+});
+
+// --- Appointments (counselling sessions) --------------------------------
+// Built on the existing consultation_requests table. consultant_name is a
+// free-text field since the pilot doesn't maintain a consultants roster —
+// consultant_id stays available for later if that changes.
+router.get('/leads/:userId/appointments', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT cr.*, u.full_name AS created_by_name FROM consultation_requests cr
+       LEFT JOIN users u ON u.id = cr.created_by
+       WHERE cr.user_id = $1 ORDER BY COALESCE(cr.scheduled_at, cr.preferred_slot) DESC NULLS LAST, cr.created_at DESC`,
+      [req.params.userId]
+    );
+    res.json({ appointments: result.rows });
+  } catch (error) {
+    console.error('Fetch appointments error:', error);
+    res.status(500).json({ error: 'Failed to fetch appointments' });
+  }
+});
+
+router.post('/leads/:userId/appointments', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { consultantName, scheduledAt, notes, status } = req.body;
+    const user = await pool.query('SELECT id FROM users WHERE id = $1', [userId]);
+    if (user.rows.length === 0) return res.status(404).json({ error: 'Lead not found' });
+    const result = await pool.query(
+      `INSERT INTO consultation_requests (user_id, consultant_name, scheduled_at, notes, status, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [userId, consultantName || null, scheduledAt || null, notes || null, status || (scheduledAt ? 'scheduled' : 'requested'), req.user.userId]
+    );
+    // Booking an appointment is a strong signal to move the lead's CRM stage.
+    if ((status || 'scheduled') !== 'cancelled') {
+      await pool.query(
+        `UPDATE users SET lead_status = 'counselling_booked' WHERE id = $1 AND lead_status NOT IN ('counselled', 'junked')`,
+        [userId]
+      );
+    }
+    res.status(201).json({ appointment: result.rows[0] });
+  } catch (error) {
+    console.error('Create appointment error:', error);
+    res.status(500).json({ error: 'Failed to create appointment' });
+  }
+});
+
+router.put('/appointments/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { consultantName, scheduledAt, notes, status } = req.body;
+    const existing = await pool.query('SELECT * FROM consultation_requests WHERE id = $1', [id]);
+    if (existing.rows.length === 0) return res.status(404).json({ error: 'Appointment not found' });
+    const current = existing.rows[0];
+    const result = await pool.query(
+      `UPDATE consultation_requests SET consultant_name = $1, scheduled_at = $2, notes = $3, status = $4, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $5 RETURNING *`,
+      [
+        consultantName !== undefined ? consultantName : current.consultant_name,
+        scheduledAt !== undefined ? scheduledAt : current.scheduled_at,
+        notes !== undefined ? notes : current.notes,
+        status || current.status,
+        id
+      ]
+    );
+    if (status === 'completed') {
+      await pool.query(`UPDATE users SET lead_status = 'counselled' WHERE id = $1`, [current.user_id]);
+    }
+    res.json({ appointment: result.rows[0] });
+  } catch (error) {
+    console.error('Update appointment error:', error);
+    res.status(500).json({ error: 'Failed to update appointment' });
   }
 });
 

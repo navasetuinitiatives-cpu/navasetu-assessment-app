@@ -212,6 +212,22 @@ router.post('/:schoolId/invite', requireAuth, requireAdmin, async (req, res) => 
       [schoolId]
     );
 
+    // Log this invite into each teacher's lead activity feed so it shows up
+    // in their admin detail view, even if they don't have an account yet
+    // (matched by email — see GET /admin/leads/:userId/activity).
+    const subject = `${school.name} — NavaSetu Teacher Wellness Assessment`;
+    const activityBody = `Invite link: ${link}${message ? `\n\nPersonal message: ${message}` : ''}`;
+    for (const teacher of teachersResult.rows) {
+      const emailLower = (teacher.email || '').trim().toLowerCase();
+      if (!emailLower) continue;
+      const matchedUser = await pool.query('SELECT id FROM users WHERE email = $1', [emailLower]);
+      await pool.query(
+        `INSERT INTO lead_activity (user_id, recipient_email, type, subject, body, created_by)
+         VALUES ($1, $2, 'email', $3, $4, $5)`,
+        [matchedUser.rows[0] ? matchedUser.rows[0].id : null, emailLower, subject, activityBody, req.user.userId]
+      );
+    }
+
     res.json({ success: true, ...outcome });
   } catch (error) {
     console.error('Bulk invite error:', error);
