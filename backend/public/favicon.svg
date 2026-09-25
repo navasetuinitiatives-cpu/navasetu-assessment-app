@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F4D35E"/>
+      <stop offset="50%" stop-color="#D4A017"/>
+      <stop offset="100%" stop-color="#B8860B"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="18" fill="#0A0E27"/>
+  <!-- Shield outline -->
+  <path d="M64 14 L104 28 L104 62 C104 90 87 108 64 116 C41 108 24 90 24 62 L24 28 Z"
+        fill="none" stroke="url(#gold)" stroke-width="4"/>
+  <path d="M64 21 L97 33 L97 62 C97 85.5 83 100.5 64 108 C45 100.5 31 85.5 31 62 L31 33 Z"
+        fill="none" stroke="url(#gold)" stroke-width="1.5" opacity="0.8"/>
+  <!-- Sun rays -->
+  <g stroke="url(#gold)" stroke-width="2.4" stroke-linecap="round">
+    <line x1="64" y1="30" x2="64" y2="40"/>
+    <line x1="50" y1="34" x2="54" y2="43"/>
+    <line x1="78" y1="34" x2="74" y2="43"/>
+    <line x1="40" y1="44" x2="46" y2="50"/>
+    <line x1="88" y1="44" x2="82" y2="50"/>
+  </g>
+  <!-- Sun -->
+  <circle cx="64" cy="58" r="15" fill="url(#gold)"/>
+  <!-- Bridge deck -->
+  <path d="M38 78 Q64 66 90 78" fill="none" stroke="url(#gold)" stroke-width="3" stroke-linecap="round"/>
+  <line x1="34" y1="82" x2="94" y2="82" stroke="url(#gold)" stroke-width="3" stroke-linecap="round"/>
+  <!-- Bridge pillars -->
+  <rect x="50" y="78" width="4" height="14" fill="url(#gold)"/>
+  <rect x="74" y="78" width="4" height="14" fill="url(#gold)"/>
+  <!-- Water wave -->
+  <path d="M32 96 Q46 90 60 96 T88 96 T96 96" fill="none" stroke="url(#gold)" stroke-width="2.6" stroke-linecap="round"/>
+</svg>

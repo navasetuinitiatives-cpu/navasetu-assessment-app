@@ -27,20 +27,33 @@ router.get('/admins', async (req, res) => {
 
 router.post('/admins', async (req, res) => {
   try {
-    const { email, password, fullName } = req.body;
+    let { email, password, fullName } = req.body;
     if (!email || !password || !fullName) {
       return res.status(400).json({ error: 'Name, email and password are all required' });
     }
     if (password.length < 8) {
       return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
+    // Normalize so this always matches an existing account regardless of
+    // how the email was capitalized when that person first registered —
+    // Postgres text equality is case-sensitive, so without this, adding an
+    // admin whose email differs only in case from an existing row creates a
+    // silent duplicate (a second account) instead of promoting the real one.
+    email = email.trim().toLowerCase();
+    const passwordHash = await bcrypt.hash(password, 10);
 
-    const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    const existing = await pool.query('SELECT id, role FROM users WHERE email = $1', [email]);
     if (existing.rows.length > 0) {
-      return res.status(409).json({ error: 'That email is already registered' });
+      // They already have an account (e.g. took the assessment first) —
+      // promote it to admin rather than erroring out or duplicating it.
+      const result = await pool.query(
+        `UPDATE users SET role = 'platform_admin', full_name = $1, password_hash = $2 WHERE id = $3
+         RETURNING id, email, full_name, created_at`,
+        [fullName, passwordHash, existing.rows[0].id]
+      );
+      return res.status(200).json({ admin: result.rows[0], promoted: true });
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
     const id = uuidv4();
     const result = await pool.query(
       `INSERT INTO users (id, email, password_hash, full_name, role, client_type, status)
@@ -58,7 +71,8 @@ router.post('/admins', async (req, res) => {
 router.put('/admins/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { email, password, fullName } = req.body;
+    let { email, password, fullName } = req.body;
+    if (email) email = email.trim().toLowerCase();
 
     const target = await pool.query(`SELECT * FROM users WHERE id = $1 AND role = 'platform_admin'`, [id]);
     if (target.rows.length === 0) return res.status(404).json({ error: 'Admin not found' });

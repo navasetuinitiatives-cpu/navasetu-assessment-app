@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>NavaSetu Teacher Wellness Assessment</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="alternate icon" href="/favicon.svg">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Crimson+Text:wght@400;600;700&family=Inter:wght@300;400;500;600;700&display=swap">
     <style>
         :root {
@@ -321,7 +323,10 @@
                     </div>
                     <div class="form-group">
                         <label>Password <span class="required">*</span></label>
-                        <input type="password" id="loginPassword" placeholder="Enter your password" required>
+                        <div style="position:relative;">
+                            <input type="password" id="loginPassword" placeholder="Enter your password" required style="padding-right:2.75rem;">
+                            <button type="button" onclick="togglePasswordVisibility('loginPassword', this)" aria-label="Show password" style="position:absolute; right:0.25rem; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:1.1rem; padding:0.4rem;">👁️</button>
+                        </div>
                     </div>
 
                     <p style="margin-bottom: 1rem;">
@@ -358,7 +363,10 @@
                         </div>
                         <div class="form-group">
                             <label>Password <span class="required">*</span></label>
-                            <input type="password" id="regPassword" placeholder="Min 8 characters" required>
+                            <div style="position:relative;">
+                                <input type="password" id="regPassword" placeholder="Min 8 characters" required style="padding-right:2.75rem;">
+                                <button type="button" onclick="togglePasswordVisibility('regPassword', this)" aria-label="Show password" style="position:absolute; right:0.25rem; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:1.1rem; padding:0.4rem;">👁️</button>
+                            </div>
                         </div>
                     </div>
 
@@ -586,6 +594,16 @@
     </div>
 
     <script>
+        // Toggles a password field between hidden and plain text, and
+        // swaps the eye icon so it's obvious which state it's in.
+        function togglePasswordVisibility(inputId, btn) {
+            const input = document.getElementById(inputId);
+            const isHidden = input.type === 'password';
+            input.type = isHidden ? 'text' : 'password';
+            btn.textContent = isHidden ? '🙈' : '👁️';
+            btn.setAttribute('aria-label', isHidden ? 'Hide password' : 'Show password');
+        }
+
         // IP PROTECTION - Disable Right Click
         document.addEventListener('contextmenu', function(e) {
             e.preventDefault();
@@ -1099,8 +1117,7 @@
                 container.innerHTML = `
                     <div style="background: var(--primary); border-radius: 8px; padding: 2rem; margin-bottom: 1.5rem; color: white; position: relative; overflow: hidden;">
                         <div style="position:relative; z-index:1;">
-                            <h2 style="color: #FFFFFF; margin: 0; font-size: 1.6rem;">Welcome back, ${firstName} 👋</h2>
-                            <p style="color: var(--primary-light); margin: 0.5rem 0 0 0; font-size: 0.95rem;">Every journey needs a Setu — glad to have you back on yours.</p>
+                            <h2 style="color: #FFFFFF; margin: 0; font-size: 1.6rem;">Welcome ${firstName}! Glad to have you back</h2>
                         </div>
                     </div>
 
@@ -1119,10 +1136,10 @@
                                 <div style="font-weight:600; color:var(--primary);">Visit Our Website</div>
                                 <div style="font-size:0.85rem; color:var(--text-light); margin-top:0.35rem;">See what else NavaSetu offers educators and institutions.</div>
                             </a>
-                            <a href="https://navasetu.edumilestone.com" target="_blank" rel="noopener" style="display:block; text-decoration:none; background:white; border:1px solid var(--border); border-radius:8px; padding:1.25rem; transition: border-color 0.2s;" onmouseover="this.style.borderColor='var(--primary-light)'" onmouseout="this.style.borderColor='var(--border)'">
+                            <a href="https://navasetu.edumilestones.com" target="_blank" rel="noopener" style="display:block; text-decoration:none; background:white; border:1px solid var(--border); border-radius:8px; padding:1.25rem; transition: border-color 0.2s;" onmouseover="this.style.borderColor='var(--primary-light)'" onmouseout="this.style.borderColor='var(--border)'">
                                 <div style="font-size:1.4rem; margin-bottom:0.5rem;">🧠</div>
-                                <div style="font-weight:600; color:var(--primary);">Try Our Psychometric Tool</div>
-                                <div style="font-size:0.85rem; color:var(--text-light); margin-top:0.35rem;">Curious what else we measure? Explore our full psychometric platform.</div>
+                                <div style="font-weight:600; color:var(--primary);">Explore Upskilling Options & Other Psychometric Tests</div>
+                                <div style="font-size:0.85rem; color:var(--text-light); margin-top:0.35rem;">Discover professional development programs and our full range of psychometric assessments.</div>
                             </a>
                         </div>
                     </div>

@@ -41,7 +41,10 @@
   <label>Email</label>
   <input id="adminEmail" type="email" placeholder="you@example.com">
   <label>Password</label>
-  <input id="adminPassword" type="password">
+  <div style="position:relative;">
+    <input id="adminPassword" type="password" style="padding-right:2.75rem;">
+    <button type="button" onclick="togglePasswordVisibility('adminPassword', this)" aria-label="Show password" style="position:absolute; right:0.25rem; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:1.1rem; padding:0.4rem;">👁️</button>
+  </div>
   <button class="btn" onclick="adminLogin()">Login</button>
   <p class="muted" id="loginError"></p>
 </div>
@@ -136,7 +139,10 @@
         <label>Full Name</label><input id="adminFormName">
         <label>Email</label><input id="adminFormEmail" type="email">
         <label>Password <span class="muted" id="adminFormPwHint">(min 8 characters)</span></label>
-        <input id="adminFormPassword" type="password" placeholder="Leave blank to keep unchanged" autocomplete="new-password">
+        <div style="position:relative;">
+          <input id="adminFormPassword" type="password" placeholder="Leave blank to keep unchanged" autocomplete="new-password" style="padding-right:2.75rem;">
+          <button type="button" onclick="togglePasswordVisibility('adminFormPassword', this)" aria-label="Show password" style="position:absolute; right:0.25rem; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:1.1rem; padding:0.4rem;">👁️</button>
+        </div>
         <button class="btn" onclick="saveAdmin()" id="adminFormSubmit">Create Admin</button>
         <button class="btn secondary" onclick="resetAdminForm()">Cancel</button>
         <p class="muted" id="adminFormError"></p>
@@ -166,6 +172,14 @@ let currentSchoolId = null;
 // show who's logged in) without a round trip. Never trust this for auth
 // decisions server-side; it's purely a UX check so a stale token doesn't
 // silently show the panel.
+function togglePasswordVisibility(inputId, btn) {
+  const input = document.getElementById(inputId);
+  const isHidden = input.type === 'password';
+  input.type = isHidden ? 'text' : 'password';
+  btn.textContent = isHidden ? '🙈' : '👁️';
+  btn.setAttribute('aria-label', isHidden ? 'Hide password' : 'Show password');
+}
+
 function decodeToken(t) {
   try {
     const payload = JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
@@ -430,7 +444,8 @@ async function saveAdmin() {
       await api(`/admin/admins/${id}`, { method: 'PUT', body: JSON.stringify({ fullName, email, password: password || undefined }) });
     } else {
       if (!fullName || !email || !password) throw new Error('Name, email and password are all required');
-      await api('/admin/admins', { method: 'POST', body: JSON.stringify({ fullName, email, password }) });
+      const result = await api('/admin/admins', { method: 'POST', body: JSON.stringify({ fullName, email, password }) });
+      if (result.promoted) alert(`${fullName} already had an account (as a teacher/individual) — it's been promoted to admin instead of creating a duplicate.`);
     }
     resetAdminForm();
     loadAdmins();

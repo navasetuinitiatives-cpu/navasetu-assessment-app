@@ -10,11 +10,16 @@ const router = express.Router();
 // Register
 router.post('/register', async (req, res) => {
   try {
-    const { email, password, fullName, phoneNumber } = req.body;
+    let { email, password, fullName, phoneNumber } = req.body;
 
     if (!email || !password || !fullName) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
+    // Normalize so 'Foo@x.com' and 'foo@x.com' are always the same account —
+    // Postgres text equality is case-sensitive, so without this two accounts
+    // for the same person could silently be created (and only one of them
+    // would carry any role change made later, e.g. promoting to admin).
+    email = email.trim().toLowerCase();
 
     // Check if user exists
     const userExists = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
@@ -67,11 +72,12 @@ router.post('/register', async (req, res) => {
 // Login
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    let { email, password } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password required' });
     }
+    email = email.trim().toLowerCase();
 
     // Find user
     const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
