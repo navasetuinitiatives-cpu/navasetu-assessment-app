@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NavaSetu Admin</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root { --primary:#0a0e27; --gold:#D4A017; --bg:#F9FAFB; --border:#E5E7EB; --danger:#EF4444; --ok:#10B981; }
   * { box-sizing:border-box; }
@@ -30,9 +31,9 @@
   .pill { padding:0.15rem 0.6rem; border-radius:999px; font-size:0.75rem; font-weight:600; }
   .pill.ok { background:#D1FAE5; color:#065F46; }
   .pill.pending { background:#FEF3C7; color:#92400E; }
-  .pill.booked { background:#DBEAFE; color:#1E40AF; }
-  .pill.fresh { background:#E5E7EB; color:#374151; }
-  .pill.junked { background:#FEE2E2; color:#991B1B; }
+  .pill.booked { background:#E9D5FF; color:#6B21A8; }
+  .pill.fresh { background:#DBEAFE; color:#1E3A8A; }
+  .pill.junked { background:#FCE7E9; color:#9F1239; }
   select.statusSelect { width:auto; padding:0.35rem 0.6rem; font-size:0.8rem; font-weight:600; border-radius:999px; border:none; cursor:pointer; }
   .leadTabBtn { background:none; border:none; padding:0.6rem 0.9rem; cursor:pointer; font-size:0.88rem; color:#6B7280; border-bottom:3px solid transparent; }
   .leadTabBtn.active { color:var(--primary); border-bottom-color:var(--gold); font-weight:600; }
@@ -41,6 +42,14 @@
   .activityItem .type-badge.email { background:#DBEAFE; color:#1E40AF; }
   .activityItem .type-badge.note { background:#EDE9FE; color:#5B21B6; }
   .muted { color:#6B7280; font-size:0.85rem; }
+  .calGrid { display:grid; grid-template-columns:repeat(7, 1fr); gap:0.4rem; }
+  .calGrid .calDow { text-align:center; font-size:0.75rem; font-weight:600; color:#6B7280; padding:0.3rem 0; }
+  .calGrid .calDay { min-height:70px; border:1px solid var(--border); border-radius:6px; padding:0.35rem; cursor:pointer; font-size:0.8rem; }
+  .calGrid .calDay:hover { background:#F3F4F6; }
+  .calGrid .calDay.empty { border:none; cursor:default; }
+  .calGrid .calDay.today { border-color:var(--gold); border-width:2px; }
+  .calGrid .calDay .calDayNum { font-weight:600; }
+  .calGrid .calDay .calDot { display:inline-block; width:7px; height:7px; border-radius:999px; background:#6B21A8; margin:0.2rem 0.15rem 0 0; }
   #loginScreen { max-width:400px; margin:4rem auto; }
 </style>
 </head>
@@ -69,6 +78,7 @@
   <nav>
     <button class="active" onclick="showTab('leads')">CRM / Leads</button>
     <button onclick="showTab('schools')">Schools</button>
+    <button onclick="showTab('calendar')">Calendar</button>
     <button onclick="showTab('orders')">Payments</button>
     <button onclick="showTab('admins')">Admins</button>
     <button onclick="showTab('settings')">Settings</button>
@@ -101,39 +111,101 @@
     </section>
 
     <section id="tab-schools">
-      <div class="card">
+      <div class="card" id="schoolListView">
         <h2>Create a School Block</h2>
         <label>School Name</label><input id="schoolName">
-        <label>District / State</label><input id="schoolDistrict" placeholder="e.g. Pune, Maharashtra">
-        <label>Contact Person / Email</label><input id="schoolContact" placeholder="name, email">
+        <label>District</label><input id="schoolDistrict" placeholder="e.g. Pune">
+        <label>State</label><input id="schoolState" placeholder="e.g. Maharashtra">
+        <h3 style="margin-bottom:0;">Contact Person</h3>
+        <label>Name</label><input id="schoolContactName">
+        <label>Mobile No.</label><input id="schoolContactPhone">
+        <label>Email ID</label><input id="schoolContactEmail" type="email">
+        <label>Designation</label><input id="schoolContactDesignation" placeholder="e.g. Principal">
         <button class="btn" onclick="createSchool()">Create School</button>
       </div>
-      <div class="card">
+      <div class="card" id="schoolListTableCard">
         <h2>Schools</h2>
         <table>
-          <thead><tr><th>Name</th><th>School Code</th><th>Teachers</th><th>Completed</th><th></th></tr></thead>
+          <thead><tr><th>Name</th><th>State</th><th>School Code</th><th>Teachers</th><th>Completed</th><th></th></tr></thead>
           <tbody id="schoolsBody"></tbody>
         </table>
       </div>
-      <div class="card" id="schoolDetailCard" style="display:none;">
-        <h2 id="schoolDetailName">School</h2>
-        <p class="muted">Give teachers either the shared link below, or just the code — both identify them as part of this school and skip straight to a free Navigate report.</p>
-        <p><strong>School Code:</strong> <span id="schoolDetailCode" style="font-family:monospace; font-size:1.1rem;">—</span>
-          <button class="btn secondary" onclick="regenerateCode()" style="margin-left:0.5rem;">Regenerate Code</button>
-        </p>
-        <label>Upload Roster (paste CSV: name,email,designation,subject — header row optional)</label>
-        <textarea id="rosterCsv" rows="6" placeholder="Jane Doe,jane@school.edu,Teacher,Maths"></textarea>
-        <button class="btn" onclick="uploadRoster()">Upload Roster</button>
-        <label style="margin-top:1.5rem;">Personal message to include in the invite email</label>
-        <textarea id="inviteMessage" rows="2"></textarea>
-        <button class="btn secondary" onclick="sendInvites()">Send Bulk Invite Emails</button>
-        <p class="muted" id="inviteResult"></p>
-        <button class="btn secondary" onclick="loadProjectReport()">View Project Report</button>
-        <div id="projectReport"></div>
-        <table>
-          <thead><tr><th>Name</th><th>Email</th><th>Status</th></tr></thead>
-          <tbody id="teachersBody"></tbody>
-        </table>
+
+      <div id="schoolManagePage" style="display:none;">
+        <button class="btn secondary" onclick="closeSchoolManage()">← Back to Schools</button>
+        <div class="card">
+          <h2 id="schoolDetailName">School</h2>
+          <p><strong>School Code:</strong> <span id="schoolDetailCode" style="font-family:monospace; font-size:1.1rem;">—</span>
+            <button class="btn secondary" onclick="regenerateCode()" style="margin-left:0.5rem;">Regenerate Code</button>
+          </p>
+          <p class="muted">Give teachers either the shared link below, or just the code — both identify them as part of this school and skip straight to a free Navigate report.</p>
+          <label>School Name</label><input id="mgSchoolName">
+          <label>District</label><input id="mgSchoolDistrict">
+          <label>State</label><input id="mgSchoolState">
+          <h3 style="margin-bottom:0;">Contact Person</h3>
+          <label>Name</label><input id="mgContactName">
+          <label>Mobile No.</label><input id="mgContactPhone">
+          <label>Email ID</label><input id="mgContactEmail" type="email">
+          <label>Designation</label><input id="mgContactDesignation">
+          <button class="btn" onclick="saveSchoolDetails()">Save Changes</button>
+          <span class="muted" id="schoolSaveResult"></span>
+        </div>
+
+        <div class="card">
+          <h2>Teacher Roster</h2>
+          <p class="muted">Add teachers manually below, or upload a spreadsheet (.xlsx or .csv). Clicking a registered teacher's name opens their full lead detail page.</p>
+
+          <div style="display:flex; gap:2rem; flex-wrap:wrap;">
+            <div style="flex:1; min-width:260px;">
+              <h3>Add a Teacher</h3>
+              <label>Employee ID</label><input id="addEmployeeId">
+              <label>Full Name</label><input id="addFullName">
+              <label>Email</label><input id="addEmail" type="email">
+              <label>Mobile No.</label><input id="addPhone">
+              <label>Subject (Optional)</label><input id="addSubject">
+              <button class="btn" onclick="addTeacherManual()">Add Teacher</button>
+            </div>
+            <div style="flex:1; min-width:260px;">
+              <h3>Bulk Upload</h3>
+              <label>Upload File (.xlsx or .csv)</label>
+              <input type="file" id="rosterFile" accept=".xlsx,.xls,.csv">
+              <button class="btn" onclick="uploadRosterFile()">Upload</button>
+              <p class="muted" id="rosterUploadResult"></p>
+              <button class="btn secondary" onclick="downloadRosterTemplate()">Download Template</button>
+              <button class="btn secondary" onclick="emailRosterTemplate()">Email Template &amp; Code to Contact</button>
+              <p class="muted" id="templateEmailResult"></p>
+            </div>
+          </div>
+
+          <label style="margin-top:1.5rem;">Personal message to include in the invite email</label>
+          <textarea id="inviteMessage" rows="2"></textarea>
+          <button class="btn secondary" onclick="sendInvites()">Send Bulk Invite Emails</button>
+          <p class="muted" id="inviteResult"></p>
+          <button class="btn secondary" onclick="loadProjectReport()">View Project Report</button>
+          <div id="projectReport"></div>
+
+          <table>
+            <thead><tr><th>Employee ID</th><th>Name</th><th>Email</th><th>Mobile</th><th>Subject</th><th>Status</th></tr></thead>
+            <tbody id="teachersBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-calendar">
+      <div class="card">
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <h2 id="calMonthLabel" style="margin:0;">Appointments Calendar</h2>
+          <div>
+            <button class="btn secondary" onclick="calendarShiftMonth(-1)">← Prev</button>
+            <button class="btn secondary" onclick="calendarShiftMonth(1)">Next →</button>
+          </div>
+        </div>
+        <div id="calendarGrid" style="margin-top:1rem;"></div>
+      </div>
+      <div class="card" id="calendarDayCard" style="display:none;">
+        <h2 id="calendarDayTitle">Appointments</h2>
+        <div id="calendarDayList"></div>
       </div>
     </section>
 
@@ -281,14 +353,94 @@ function showTab(name) {
   if (name === 'schools') loadSchools();
   if (name === 'orders') loadOrders();
   if (name === 'admins') loadAdmins();
+  if (name === 'calendar') loadCalendar();
 }
 
+// --- Calendar tab (appointments only) -----------------------------------
+let calendarCursor = new Date(); // first-of-month tracking; day component ignored
+
+async function loadCalendar() {
+  try {
+    const data = await api('/admin/appointments');
+    window._allAppointments = data.appointments;
+    renderCalendar();
+  } catch (e) { document.getElementById('calendarGrid').innerHTML = `<p class="muted">${e.message}</p>`; }
+}
+
+function calendarShiftMonth(delta) {
+  calendarCursor = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() + delta, 1);
+  renderCalendar();
+  document.getElementById('calendarDayCard').style.display = 'none';
+}
+
+function appointmentsOnDate(dateStr) {
+  return (window._allAppointments || []).filter(ap => {
+    const when = ap.scheduled_at || ap.preferred_slot;
+    if (!when) return false;
+    return new Date(when).toDateString() === dateStr;
+  });
+}
+
+function renderCalendar() {
+  const year = calendarCursor.getFullYear();
+  const month = calendarCursor.getMonth();
+  document.getElementById('calMonthLabel').textContent = calendarCursor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+
+  const firstDow = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const todayStr = new Date().toDateString();
+
+  let cells = ['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => `<div class="calDow">${d}</div>`).join('');
+  for (let i = 0; i < firstDow; i++) cells += `<div class="calDay empty"></div>`;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateObj = new Date(year, month, d);
+    const dateStr = dateObj.toDateString();
+    const dayAppointments = appointmentsOnDate(dateStr);
+    const dots = dayAppointments.slice(0, 4).map(() => '<span class="calDot"></span>').join('');
+    cells += `<div class="calDay ${dateStr === todayStr ? 'today' : ''}" onclick="showCalendarDay('${dateStr}')">
+      <div class="calDayNum">${d}</div>
+      <div>${dots}</div>
+    </div>`;
+  }
+  document.getElementById('calendarGrid').innerHTML = `<div class="calGrid">${cells}</div>`;
+}
+
+function showCalendarDay(dateStr) {
+  const items = appointmentsOnDate(dateStr);
+  document.getElementById('calendarDayCard').style.display = 'block';
+  document.getElementById('calendarDayTitle').textContent = `Appointments — ${dateStr}`;
+  document.getElementById('calendarDayList').innerHTML = items.length
+    ? items.map(ap => `
+        <div class="activityItem">
+          <strong>${new Date(ap.scheduled_at || ap.preferred_slot).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong>
+          &nbsp; <a href="#" onclick="jumpToLead('${ap.user_id}'); return false;">${ap.lead_name}</a>
+          (#${ap.lead_number ?? '—'}) &nbsp;
+          <span class="pill ${ap.status === 'completed' ? 'ok' : ap.status === 'cancelled' ? 'junked' : 'booked'}">${ap.status}</span>
+          ${ap.consultant_name ? `<div class="muted">with ${ap.consultant_name}</div>` : ''}
+          ${ap.notes ? `<div class="muted">${ap.notes}</div>` : ''}
+        </div>`).join('')
+    : '<p class="muted">No appointments this day.</p>';
+}
+
+function jumpToLead(userId) {
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('main section').forEach(s => s.classList.remove('active'));
+  document.querySelector('nav button').classList.add('active'); // "CRM / Leads" is the first nav button
+  document.getElementById('tab-leads').classList.add('active');
+  openLeadDetail(userId);
+}
+
+// Pastel palette, each chosen to read as what the status means: sky blue
+// for a brand-new lead, soft amber for "in the works", lavender for a
+// booked session (matches the Calendar tab's booking color), mint green
+// for a completed/successful outcome, and dusty rose for a dead lead
+// (muted rather than alarming red, since junking isn't an error state).
 const LEAD_STATUSES = [
-  { value: 'fresh_lead', label: 'Fresh Lead', bg: '#E5E7EB', fg: '#374151' },
+  { value: 'fresh_lead', label: 'Fresh Lead', bg: '#DBEAFE', fg: '#1E3A8A' },
   { value: 'submitted', label: 'Submitted', bg: '#FEF3C7', fg: '#92400E' },
-  { value: 'counselling_booked', label: 'Counselling Session Booked', bg: '#DBEAFE', fg: '#1E40AF' },
+  { value: 'counselling_booked', label: 'Counselling Session Booked', bg: '#E9D5FF', fg: '#6B21A8' },
   { value: 'counselled', label: 'Counselled', bg: '#D1FAE5', fg: '#065F46' },
-  { value: 'junked', label: 'Junked', bg: '#FEE2E2', fg: '#991B1B' }
+  { value: 'junked', label: 'Junked', bg: '#FCE7E9', fg: '#9F1239' }
 ];
 
 function statusMeta(status) {
@@ -549,15 +701,21 @@ async function viewLeadReport(reportId) {
 }
 
 async function createSchool() {
-  const [contactName, contactEmail] = (document.getElementById('schoolContact').value || '').split(',').map(s => s.trim());
   try {
     await api('/schools', {
       method: 'POST',
-      body: JSON.stringify({ name: document.getElementById('schoolName').value, district: document.getElementById('schoolDistrict').value, contactName, contactEmail })
+      body: JSON.stringify({
+        name: document.getElementById('schoolName').value,
+        district: document.getElementById('schoolDistrict').value,
+        state: document.getElementById('schoolState').value,
+        contactName: document.getElementById('schoolContactName').value,
+        contactPhone: document.getElementById('schoolContactPhone').value,
+        contactEmail: document.getElementById('schoolContactEmail').value,
+        contactDesignation: document.getElementById('schoolContactDesignation').value
+      })
     });
-    document.getElementById('schoolName').value = '';
-    document.getElementById('schoolDistrict').value = '';
-    document.getElementById('schoolContact').value = '';
+    ['schoolName', 'schoolDistrict', 'schoolState', 'schoolContactName', 'schoolContactPhone', 'schoolContactEmail', 'schoolContactDesignation']
+      .forEach(id => document.getElementById(id).value = '');
     loadSchools();
   } catch (e) { alert(e.message); }
 }
@@ -569,22 +727,64 @@ async function loadSchools() {
     document.getElementById('schoolsBody').innerHTML = data.schools.map(s => `
       <tr>
         <td>${s.name}</td>
+        <td>${s.state || '—'}</td>
         <td style="font-family:monospace;">${s.school_code || '—'}</td>
         <td>${s.total_teachers}</td>
         <td>${s.completed_teachers}</td>
-        <td><button class="btn secondary" onclick="openSchool('${s.id}', '${s.name.replace(/'/g, "\\'")}')">Manage</button></td>
+        <td><button class="btn secondary" onclick="openSchool('${s.id}')">Manage</button></td>
       </tr>`).join('');
   } catch (e) { console.error(e); }
 }
 
-async function openSchool(id, name) {
+async function openSchool(id) {
   currentSchoolId = id;
-  document.getElementById('schoolDetailCard').style.display = 'block';
-  document.getElementById('schoolDetailName').textContent = name;
+  document.getElementById('schoolListView').style.display = 'none';
+  document.getElementById('schoolListTableCard').style.display = 'none';
+  document.getElementById('schoolManagePage').style.display = 'block';
   document.getElementById('projectReport').innerHTML = '';
-  const school = (window._schoolsCache || []).find(s => s.id === id);
-  document.getElementById('schoolDetailCode').textContent = (school && school.school_code) || '—';
+  document.getElementById('schoolSaveResult').textContent = '';
+
+  const s = await api(`/schools/${id}`);
+  window._currentSchool = s;
+  document.getElementById('schoolDetailName').textContent = s.name;
+  document.getElementById('schoolDetailCode').textContent = s.school_code || '—';
+  document.getElementById('mgSchoolName').value = s.name || '';
+  document.getElementById('mgSchoolDistrict').value = s.district || '';
+  document.getElementById('mgSchoolState').value = s.state || '';
+  document.getElementById('mgContactName').value = s.contact_name || '';
+  document.getElementById('mgContactPhone').value = s.contact_phone || '';
+  document.getElementById('mgContactEmail').value = s.contact_email || '';
+  document.getElementById('mgContactDesignation').value = s.contact_designation || '';
+
   loadTeachers();
+}
+
+function closeSchoolManage() {
+  document.getElementById('schoolManagePage').style.display = 'none';
+  document.getElementById('schoolListView').style.display = 'block';
+  document.getElementById('schoolListTableCard').style.display = 'block';
+  loadSchools();
+}
+
+async function saveSchoolDetails() {
+  try {
+    const result = await api(`/schools/${currentSchoolId}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        name: document.getElementById('mgSchoolName').value,
+        district: document.getElementById('mgSchoolDistrict').value,
+        state: document.getElementById('mgSchoolState').value,
+        contactName: document.getElementById('mgContactName').value,
+        contactPhone: document.getElementById('mgContactPhone').value,
+        contactEmail: document.getElementById('mgContactEmail').value,
+        contactDesignation: document.getElementById('mgContactDesignation').value
+      })
+    });
+    window._currentSchool = result.school;
+    document.getElementById('schoolDetailName').textContent = result.school.name;
+    document.getElementById('schoolSaveResult').textContent = 'Saved.';
+    setTimeout(() => document.getElementById('schoolSaveResult').textContent = '', 2000);
+  } catch (e) { alert(e.message); }
 }
 
 async function regenerateCode() {
@@ -592,27 +792,122 @@ async function regenerateCode() {
   try {
     const result = await api(`/schools/${currentSchoolId}/regenerate-code`, { method: 'POST' });
     document.getElementById('schoolDetailCode').textContent = result.school.school_code;
-    loadSchools();
   } catch (e) { alert(e.message); }
+}
+
+function teacherStatusPillClass(status) {
+  if (status === 'completed') return 'ok';
+  if (status === 'in_progress') return 'booked';
+  return 'pending';
 }
 
 async function loadTeachers() {
   const data = await api(`/schools/${currentSchoolId}/teachers`);
+  window._currentTeachers = data.teachers;
   document.getElementById('teachersBody').innerHTML = data.teachers.map(t => `
-    <tr><td>${t.full_name}</td><td>${t.email}</td><td>${t.status}</td></tr>`).join('');
+    <tr>
+      <td>${t.employee_id || '—'}</td>
+      <td>${t.user_id ? `<a href="#" onclick="jumpToLead('${t.user_id}'); return false;">${t.full_name}</a>` : t.full_name}</td>
+      <td>${t.email}</td>
+      <td>${t.phone_number || '—'}</td>
+      <td>${t.subject || '—'}</td>
+      <td>
+        <select onchange="updateTeacherStatus('${t.id}', this.value)">
+          ${['invited', 'in_progress', 'completed'].map(s => `<option value="${s}" ${s === t.status ? 'selected' : ''}>${s}</option>`).join('')}
+        </select>
+      </td>
+    </tr>`).join('');
 }
 
-async function uploadRoster() {
+async function updateTeacherStatus(teacherId, status) {
+  try {
+    await api(`/schools/${currentSchoolId}/teachers/${teacherId}/status`, { method: 'PUT', body: JSON.stringify({ status }) });
+  } catch (e) { alert(e.message); loadTeachers(); }
+}
+
+async function addTeacherManual() {
+  const fullName = document.getElementById('addFullName').value.trim();
+  const email = document.getElementById('addEmail').value.trim();
+  if (!fullName || !email) return alert('Name and email are required');
   try {
     const result = await api(`/schools/${currentSchoolId}/teachers/upload`, {
       method: 'POST',
-      body: JSON.stringify({ csvText: document.getElementById('rosterCsv').value })
+      body: JSON.stringify({
+        teachers: [{
+          employeeId: document.getElementById('addEmployeeId').value.trim() || null,
+          fullName,
+          email,
+          phoneNumber: document.getElementById('addPhone').value.trim() || null,
+          subject: document.getElementById('addSubject').value.trim() || null
+        }]
+      })
     });
-    alert(`Imported ${result.imported} of ${result.total} rows.`);
-    document.getElementById('rosterCsv').value = '';
+    if (result.imported === 0) throw new Error('Could not add that row — check the email is valid.');
+    ['addEmployeeId', 'addFullName', 'addEmail', 'addPhone', 'addSubject'].forEach(id => document.getElementById(id).value = '');
+    loadTeachers();
+  } catch (e) { alert(e.message); }
+}
+
+// Reads an uploaded .xlsx/.xls/.csv file entirely client-side (SheetJS),
+// expecting the same column headers as the downloadable template, then
+// posts the parsed rows to the same upload endpoint the manual-add form uses.
+async function uploadRosterFile() {
+  const fileInput = document.getElementById('rosterFile');
+  const file = fileInput.files[0];
+  const resultEl = document.getElementById('rosterUploadResult');
+  if (!file) return alert('Choose a file first');
+  try {
+    const buffer = await file.arrayBuffer();
+    const workbook = XLSX.read(buffer, { type: 'array' });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+    const teachers = rows.map(r => ({
+      employeeId: String(r['Employee ID'] ?? r['employee id'] ?? '').trim() || null,
+      fullName: String(r['Full Name'] ?? r['Name'] ?? r['name'] ?? '').trim(),
+      email: String(r['Email'] ?? r['email'] ?? '').trim(),
+      phoneNumber: String(r['Mobile Number'] ?? r['Mobile No'] ?? r['mobile'] ?? '').trim() || null,
+      subject: String(r['Subject (Optional)'] ?? r['Subject'] ?? r['subject'] ?? '').trim() || null
+    })).filter(t => t.email);
+
+    if (teachers.length === 0) throw new Error('No valid rows found — check the file matches the template columns.');
+
+    const result = await api(`/schools/${currentSchoolId}/teachers/upload`, {
+      method: 'POST',
+      body: JSON.stringify({ teachers })
+    });
+    resultEl.textContent = `Imported ${result.imported} of ${result.total} rows${result.skipped ? ` (${result.skipped} skipped)` : ''}.`;
+    fileInput.value = '';
     loadTeachers();
     loadSchools();
+  } catch (e) { resultEl.textContent = e.message; }
+}
+
+async function downloadRosterTemplate() {
+  try {
+    const res = await fetch(`${API}/schools/roster-template.xlsx`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) throw new Error('Failed to download template');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'navasetu-teacher-roster-template.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   } catch (e) { alert(e.message); }
+}
+
+async function emailRosterTemplate() {
+  const resultEl = document.getElementById('templateEmailResult');
+  resultEl.textContent = 'Sending…';
+  try {
+    const result = await api(`/schools/${currentSchoolId}/send-template`, { method: 'POST' });
+    resultEl.textContent = result.configured
+      ? (result.sent ? `Sent to ${window._currentSchool.contact_email}.` : `Failed to send: ${result.error}`)
+      : result.message;
+  } catch (e) { resultEl.textContent = e.message; }
 }
 
 async function sendInvites() {

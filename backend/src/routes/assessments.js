@@ -35,6 +35,16 @@ router.post('/', requireAuth, async (req, res) => {
       [id, userId, schoolId || null, schoolTeacherId || null, clientType === 'b2b' ? 'b2b' : 'b2c']
     );
 
+    // Reflect real progress on the school roster row as soon as she actually
+    // starts (not just when invited) — the CRM shouldn't say "invited" while
+    // she's mid-assessment.
+    if (schoolTeacherId) {
+      await pool.query(
+        `UPDATE school_teachers SET status = 'in_progress' WHERE id = $1 AND status = 'invited'`,
+        [schoolTeacherId]
+      );
+    }
+
     res.status(201).json({ success: true, assessment: result.rows[0], resumed: false });
   } catch (error) {
     console.error('Start assessment error:', error);

@@ -72,3 +72,32 @@ export async function sendBulkInviteEmails({ teachers, schoolName, link, schoolC
 
   return { sent: true, configured: true, sentCount, total: drafts.length, failures };
 }
+
+/**
+ * Sends a single email with an optional file attachment (used for the
+ * school roster template + school code, sent to a school's contact person).
+ * Same "skeletal now, wire up later" fallback as the bulk invite sender.
+ */
+export async function sendEmailWithAttachment({ to, subject, text, attachment }) {
+  if (!isConfigured()) {
+    return {
+      sent: false,
+      configured: false,
+      message: 'Email sending is not configured yet (GMAIL_APP_PASSWORD not set) — download the template yourself and send it manually for now.'
+    };
+  }
+
+  const transport = getTransport();
+  try {
+    await transport.sendMail({
+      from: `"NavaSetu Initiatives" <${process.env.GMAIL_USER}>`,
+      to,
+      subject,
+      text,
+      attachments: attachment ? [{ filename: attachment.filename, content: attachment.content }] : []
+    });
+    return { sent: true, configured: true };
+  } catch (error) {
+    return { sent: false, configured: true, error: error.message };
+  }
+}

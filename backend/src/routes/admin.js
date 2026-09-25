@@ -332,6 +332,24 @@ router.put('/appointments/:id', async (req, res) => {
   }
 });
 
+// All counselling appointments across every lead, for the Calendar tab.
+// Kept simple (no pagination) — pilot scale, and the frontend groups these
+// by date client-side to draw the month grid.
+router.get('/appointments', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT cr.*, u.full_name AS lead_name, u.email AS lead_email, u.lead_number
+       FROM consultation_requests cr
+       JOIN users u ON u.id = cr.user_id
+       ORDER BY COALESCE(cr.scheduled_at, cr.preferred_slot) ASC NULLS LAST`
+    );
+    res.json({ appointments: result.rows });
+  } catch (error) {
+    console.error('Fetch all appointments error:', error);
+    res.status(500).json({ error: 'Failed to fetch appointments' });
+  }
+});
+
 // Admin can view a lead's raw assessment answers (question text + the
 // option they picked), not just the generated report — useful when a
 // counsellor wants to see exactly how someone answered before a session.

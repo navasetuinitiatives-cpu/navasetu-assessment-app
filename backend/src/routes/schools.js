@@ -5,7 +5,23 @@ import jwt from 'jsonwebtoken';
 import { pool } from '../config/database.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { generateSchoolReportHtml } from '../utils/schoolReport.js';
-import { sendBulkInviteEmails } from '../utils/mailer.js';
+import { sendBulkInviteEmails, sendEmailWithAttachment } from '../utils/mailer.js';
+// Default import (not `import * as XLSX`) — xlsx is a CommonJS package, and
+// the default import is the one interop pattern guaranteed to expose its
+// exports (.utils, .write, etc.) regardless of how Node's ESM/CJS static
+// analysis handles the package's internal export style.
+import XLSX from 'xlsx';
+
+// Column order/labels must match what the frontend's "Download Template"
+// button and the roster upload parser both expect.
+const ROSTER_TEMPLATE_HEADERS = ['Employee ID', 'Full Name', 'Email', 'Mobile Number', 'Subject (Optional)'];
+
+function buildRosterTemplateBuffer() {
+  const worksheet = XLSX.utils.aoa_to_sheet([ROSTER_TEMPLATE_HEADERS]);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Teacher Roster');
+  return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+}
 
 const router = express.Router();
 
@@ -53,21 +69,47 @@ async function generateUniqueSchoolCode(name) {
 
 router.post('/', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const { name, district, state, country, schoolType, contactName, contactEmail, contactPhone } = req.body;
+    const { name, district, state, country, schoolType, contactName, contactEmail, contactPhone, contactDesignation } = req.body;
     if (!name) return res.status(400).json({ error: 'School name is required' });
 
     const id = uuidv4();
     const schoolCode = await generateUniqueSchoolCode(name);
     const result = await pool.query(
-      `INSERT INTO schools (id, name, district, state, country, school_type, contact_name, contact_email, contact_phone, created_by, school_code)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
-      [id, name, district || null, state || null, country || 'India', schoolType || null, contactName || null, contactEmail || null, contactPhone || null, req.user.userId, schoolCode]
+      `INSERT INTO schools (id, name, district, state, country, school_type, contact_name, contact_email, contact_phone, contact_designation, created_by, school_code)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+      [id, name, district || null, state || null, country || 'India', schoolType || null, contactName || null, contactEmail || null, contactPhone || null, contactDesignation || null, req.user.userId, schoolCode]
     );
 
     res.status(201).json({ success: true, school: result.rows[0] });
   } catch (error) {
     console.error('Create school error:', error);
     res.status(500).json({ error: 'Failed to create school' });
+  }
+});
+
+// Admin can edit a school's own details (name, location, contact person)
+// after creation — the "Manage" page's editable top section.
+router.put('/:schoolId', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { schoolId } = req.params;
+    const { name, district, state, country, schoolType, contactName, contactEmail, contactPhone, contactDesignation } = req.body;
+    const existing = await pool.query('SELECT * FROM schools WHERE id = $1', [schoolId]);
+    if (existing.rows.length === 0) return res.status(404).json({ error: 'School not found' });
+    const s = existing.rows[0];
+    const result = await pool.query(
+      `UPDATE schools SET name = $1, district = $2, state = $3, country = $4, school_type = $5,
+         contact_name = $6, contact_email = $7, contact_phone = $8, contact_designation = $9, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $10 RETURNING *`,
+      [
+        name || s.name, district ?? s.district, state ?? s.state, country ?? s.country, schoolType ?? s.school_type,
+        contactName ?? s.contact_name, contactEmail ?? s.contact_email, contactPhone ?? s.contact_phone,
+        contactDesignation ?? s.contact_designation, schoolId
+      ]
+    );
+    res.json({ success: true, school: result.rows[0] });
+  } catch (error) {
+    console.error('Update school error:', error);
+    res.status(500).json({ error: 'Failed to update school' });
   }
 });
 
@@ -102,6 +144,17 @@ router.get('/by-code/:code', async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: 'Failed to look up school code' });
   }
+});
+
+// Downloadable roster template — used by the "Download Template" button so
+// the admin's copy and the one emailed to schools are always identical.
+// Registered before GET /:schoolId so "roster-template.xlsx" isn't swallowed
+// as a schoolId.
+router.get('/roster-template.xlsx', requireAuth, requireAdmin, (req, res) => {
+  const buffer = buildRosterTemplateBuffer();
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="navasetu-teacher-roster-template.xlsx"');
+  res.send(buffer);
 });
 
 router.get('/', requireAuth, requireAdmin, async (req, res) => {
@@ -150,12 +203,13 @@ router.post('/:schoolId/teachers/upload', requireAuth, requireAdmin, async (req,
     for (const t of roster) {
       if (!t.email || !t.fullName) { skipped++; continue; }
       const result = await pool.query(
-        `INSERT INTO school_teachers (school_id, full_name, email, designation, subject, status)
-         VALUES ($1, $2, $3, $4, $5, 'invited')
+        `INSERT INTO school_teachers (school_id, full_name, email, designation, subject, employee_id, phone_number, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'invited')
          ON CONFLICT (school_id, email) DO UPDATE SET full_name = EXCLUDED.full_name,
-           designation = EXCLUDED.designation, subject = EXCLUDED.subject
+           designation = EXCLUDED.designation, subject = EXCLUDED.subject,
+           employee_id = EXCLUDED.employee_id, phone_number = EXCLUDED.phone_number
          RETURNING id`,
-        [schoolId, t.fullName, t.email.toLowerCase(), t.designation || null, t.subject || null]
+        [schoolId, t.fullName, t.email.toLowerCase(), t.designation || null, t.subject || null, t.employeeId || null, t.phoneNumber || null]
       );
       if (result.rows.length > 0) imported++;
     }
@@ -164,6 +218,27 @@ router.post('/:schoolId/teachers/upload', requireAuth, requireAdmin, async (req,
   } catch (error) {
     console.error('Roster upload error:', error);
     res.status(500).json({ error: 'Failed to upload roster' });
+  }
+});
+
+// Admin/counsellor manual status override — independent of the automatic
+// invited -> in_progress -> completed flow driven by actual assessment
+// activity, for cases like "she emailed her responses separately".
+router.put('/:schoolId/teachers/:teacherId/status', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { schoolId, teacherId } = req.params;
+    const { status } = req.body;
+    const allowed = ['invited', 'in_progress', 'completed'];
+    if (!allowed.includes(status)) return res.status(400).json({ error: `Status must be one of: ${allowed.join(', ')}` });
+    const result = await pool.query(
+      `UPDATE school_teachers SET status = $1 WHERE id = $2 AND school_id = $3 RETURNING *`,
+      [status, teacherId, schoolId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Teacher not found on this roster' });
+    res.json({ success: true, teacher: result.rows[0] });
+  } catch (error) {
+    console.error('Update teacher status error:', error);
+    res.status(500).json({ error: 'Failed to update status' });
   }
 });
 
@@ -179,6 +254,47 @@ router.get('/:schoolId/teachers', requireAuth, requireAdmin, async (req, res) =>
     res.json({ teachers: result.rows });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch teachers' });
+  }
+});
+
+// Downloadable roster template — used by the "Download Template" button so
+// the admin's copy and the one emailed to schools are always identical.
+// Emails the roster template + this school's code to its registered contact
+// person, straight from the Manage page — so the admin doesn't have to
+// download and forward it by hand.
+router.post('/:schoolId/send-template', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const school = await pool.query('SELECT * FROM schools WHERE id = $1', [req.params.schoolId]);
+    if (school.rows.length === 0) return res.status(404).json({ error: 'School not found' });
+    const s = school.rows[0];
+    if (!s.contact_email) {
+      return res.status(400).json({ error: 'This school has no contact email on file yet — add one on the Manage page first.' });
+    }
+
+    const buffer = buildRosterTemplateBuffer();
+    const text = `Dear ${s.contact_name || 'Sir/Madam'},
+
+Please find attached the teacher roster template for ${s.name}'s NavaSetu Teacher Wellness Assessment.
+
+Your school code is: ${s.school_code}
+
+Fill in one row per teacher (Employee ID, Full Name, Email, Mobile Number, and Subject if applicable) and send it back to us, or share it with your NavaSetu point of contact to upload directly.
+
+Warm regards,
+NavaSetu Initiatives
+navasetuinitiatives@gmail.com | www.navasetu.online`;
+
+    const outcome = await sendEmailWithAttachment({
+      to: s.contact_email,
+      subject: `${s.name} — Teacher Roster Template & School Code`,
+      text,
+      attachment: { filename: 'navasetu-teacher-roster-template.xlsx', content: buffer }
+    });
+
+    res.json({ success: true, ...outcome });
+  } catch (error) {
+    console.error('Send template email error:', error);
+    res.status(500).json({ error: 'Failed to send template email' });
   }
 });
 
