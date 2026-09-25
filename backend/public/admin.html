@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NavaSetu Admin</title>
+<title>NavaSetu HR Panel</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root { --primary:#0a0e27; --gold:#D4A017; --bg:#F9FAFB; --border:#E5E7EB; --danger:#EF4444; --ok:#10B981; }
@@ -51,12 +51,18 @@
   .calGrid .calDay .calDayNum { font-weight:600; }
   .calGrid .calDay .calDot { display:inline-block; width:7px; height:7px; border-radius:999px; background:#6B21A8; margin:0.2rem 0.15rem 0 0; }
   #loginScreen { max-width:400px; margin:4rem auto; }
+  .deletedLeadRow td { text-decoration:line-through; color:#9CA3AF; }
+  .roleBadge { padding:0.1rem 0.5rem; border-radius:4px; font-size:0.72rem; font-weight:700; text-transform:uppercase; }
+  .roleBadge.platform_admin { background:#E0E7FF; color:#3730A3; }
+  .roleBadge.counsellor { background:#FCE7F3; color:#9D174D; }
+  .dangerZone { border:1px solid var(--danger); border-radius:8px; padding:1.25rem; background:#FEF2F2; }
+  .dangerZone h3 { color:var(--danger); margin-top:0; }
 </style>
 </head>
 <body>
 
 <div id="loginScreen" class="card">
-  <h2>NavaSetu Admin Login</h2>
+  <h2>NavaSetu HR Panel Login</h2>
   <label>Email</label>
   <input id="adminEmail" type="email" placeholder="you@example.com">
   <label>Password</label>
@@ -71,26 +77,43 @@
 <div id="app" style="display:none;">
   <header>
     <img id="headerLogo" src="/api/settings/logo" onerror="this.style.display='none'" alt="">
-    <h1>NavaSetu Admin</h1>
+    <h1>NavaSetu HR Panel</h1>
     <span class="muted" id="loggedInAs" style="color:#D1D5DB; margin-left:auto;"></span>
     <button class="btn secondary" style="margin:0;" onclick="adminLogout()">Log out</button>
   </header>
   <nav>
     <button class="active" onclick="showTab('leads')">CRM / Leads</button>
-    <button onclick="showTab('schools')">Schools</button>
+    <button id="navSchools" onclick="showTab('schools')">Schools</button>
     <button onclick="showTab('calendar')">Calendar</button>
-    <button onclick="showTab('orders')">Payments</button>
-    <button onclick="showTab('admins')">Admins</button>
+    <button id="navOrders" onclick="showTab('orders')">Payments</button>
+    <button id="navStaff" onclick="showTab('admins')">Staff</button>
     <button onclick="showTab('settings')">Settings</button>
   </nav>
   <main>
 
     <section id="tab-leads" class="active">
       <div class="card">
-        <h2>Leads &amp; Progress</h2>
-        <input placeholder="Search by name or email" id="leadSearch" oninput="loadLeads()">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap;">
+          <h2 style="margin:0;">Leads &amp; Progress</h2>
+          <button class="btn" onclick="openAddLeadForm()">+ Add Lead</button>
+        </div>
+        <div id="addLeadForm" class="card" style="display:none; margin-top:1rem; background:#F9FAFB;">
+          <h3 style="margin-top:0;">Add a Lead</h3>
+          <label>Full Name</label><input id="newLeadName">
+          <label>Email</label><input id="newLeadEmail" type="email">
+          <label>Mobile No.</label><input id="newLeadPhone">
+          <label>Institution (optional)</label><input id="newLeadInstitution">
+          <div id="newLeadCounsellorWrap" style="display:none;">
+            <label>Assign to Counsellor (optional — defaults to unassigned)</label>
+            <select id="newLeadCounsellor"><option value="">Unassigned</option></select>
+          </div>
+          <button class="btn" onclick="submitAddLead()">Save Lead</button>
+          <button class="btn secondary" onclick="closeAddLeadForm()">Cancel</button>
+          <p class="muted" id="addLeadError"></p>
+        </div>
+        <input placeholder="Search by name or email" id="leadSearch" oninput="loadLeads()" style="margin-top:1rem;">
         <table>
-          <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Mobile</th><th>Type</th><th>Institution</th><th>Plan</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Mobile</th><th>Type</th><th>Institution</th><th>Plan</th><th>Assigned To</th><th>Status</th><th></th></tr></thead>
           <tbody id="leadsBody"></tbody>
         </table>
       </div>
@@ -222,24 +245,29 @@
 
     <section id="tab-admins">
       <div class="card">
-        <h2>NavaSetu Admins</h2>
-        <p class="muted">Each admin logs in with their own email and password. There must always be at least one.</p>
+        <h2>NavaSetu Staff</h2>
+        <p class="muted">Admins have complete visibility across every lead and every tab. Counsellors only see the leads assigned to them. There must always be at least one admin.</p>
         <table>
-          <thead><tr><th>Name</th><th>Email</th><th>Last Login</th><th></th></tr></thead>
+          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Last Login</th><th></th></tr></thead>
           <tbody id="adminsBody"></tbody>
         </table>
       </div>
       <div class="card">
-        <h2 id="adminFormTitle">Add Admin</h2>
+        <h2 id="adminFormTitle">Add Staff Member</h2>
         <input type="hidden" id="adminFormId">
         <label>Full Name</label><input id="adminFormName">
         <label>Email</label><input id="adminFormEmail" type="email">
+        <label>Role</label>
+        <select id="adminFormRole">
+          <option value="platform_admin">Admin (complete visibility)</option>
+          <option value="counsellor">Counsellor (own leads only)</option>
+        </select>
         <label>Password <span class="muted" id="adminFormPwHint">(min 8 characters)</span></label>
         <div style="position:relative;">
           <input id="adminFormPassword" type="password" placeholder="Leave blank to keep unchanged" autocomplete="new-password" style="padding-right:2.75rem;">
           <button type="button" onclick="togglePasswordVisibility('adminFormPassword', this)" aria-label="Show password" style="position:absolute; right:0.25rem; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:1.1rem; padding:0.4rem;">👁️</button>
         </div>
-        <button class="btn" onclick="saveAdmin()" id="adminFormSubmit">Create Admin</button>
+        <button class="btn" onclick="saveAdmin()" id="adminFormSubmit">Create Staff Member</button>
         <button class="btn secondary" onclick="resetAdminForm()">Cancel</button>
         <p class="muted" id="adminFormError"></p>
       </div>
@@ -247,11 +275,59 @@
 
     <section id="tab-settings">
       <div class="card">
-        <h2>Branding</h2>
-        <p class="muted">This logo appears on the assessment site, this admin panel, and every generated report/invoice.</p>
-        <input type="file" id="logoFile" accept="image/*">
-        <button class="btn" onclick="uploadLogo()">Upload Logo</button>
-        <button class="btn secondary danger" onclick="removeLogo()">Remove Logo</button>
+        <h2>My Account</h2>
+        <p class="muted">Change your own login password.</p>
+        <label>Current Password</label>
+        <div style="position:relative;">
+          <input id="myCurrentPassword" type="password" style="padding-right:2.75rem;">
+          <button type="button" onclick="togglePasswordVisibility('myCurrentPassword', this)" aria-label="Show password" style="position:absolute; right:0.25rem; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:1.1rem; padding:0.4rem;">👁️</button>
+        </div>
+        <label>New Password <span class="muted">(min 8 characters)</span></label>
+        <div style="position:relative;">
+          <input id="myNewPassword" type="password" style="padding-right:2.75rem;">
+          <button type="button" onclick="togglePasswordVisibility('myNewPassword', this)" aria-label="Show password" style="position:absolute; right:0.25rem; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:1.1rem; padding:0.4rem;">👁️</button>
+        </div>
+        <button class="btn" onclick="changeMyPassword()">Update Password</button>
+        <p class="muted" id="changePasswordResult"></p>
+      </div>
+
+      <div id="adminOnlySettings" style="display:none;">
+        <div class="card">
+          <h2>Organization Profile</h2>
+          <p class="muted">Shown on invoices/reports where applicable and kept here for reference.</p>
+          <label>Organization Name</label><input id="orgName">
+          <label>Address</label><textarea id="orgAddress" rows="2"></textarea>
+          <label>GST Number</label><input id="orgGst">
+          <button class="btn" onclick="saveOrgSettings()">Save Organization Details</button>
+          <p class="muted" id="orgSaveResult"></p>
+        </div>
+
+        <div class="card">
+          <h2>Branding</h2>
+          <p class="muted">This logo appears on the assessment site, this HR panel, and every generated report/invoice.</p>
+          <input type="file" id="logoFile" accept="image/*">
+          <button class="btn" onclick="uploadLogo()">Upload Logo</button>
+          <button class="btn secondary danger" onclick="removeLogo()">Remove Logo</button>
+        </div>
+
+        <div class="card">
+          <h2>Backup &amp; Restore</h2>
+          <p class="muted">Download a full JSON snapshot of every lead, school, assessment, report, order and appointment. Restoring replaces all current lead/CRM data with the file's contents — staff accounts and org settings are never touched by either action.</p>
+          <button class="btn secondary" onclick="downloadBackup()">Download Backup (JSON)</button>
+          <label style="margin-top:1rem;">Restore from Backup File</label>
+          <input type="file" id="restoreFile" accept="application/json">
+          <button class="btn secondary" onclick="restoreBackup()">Restore</button>
+          <p class="muted" id="backupResult"></p>
+        </div>
+
+        <div class="dangerZone">
+          <h3>Danger Zone</h3>
+          <p>Permanently erase all leads, schools, assessments, reports, orders and appointments. Staff accounts and org settings are kept. This cannot be undone — download a backup first.</p>
+          <label>Type <code>DELETE ALL DATA</code> to confirm</label>
+          <input id="clearDataConfirm" placeholder="DELETE ALL DATA">
+          <button class="btn danger" onclick="clearTrialData()">Clear Trial Data</button>
+          <p class="muted" id="clearDataResult"></p>
+        </div>
       </div>
     </section>
 
@@ -314,7 +390,7 @@ async function adminLogin() {
       method: 'POST',
       body: JSON.stringify({ email: document.getElementById('adminEmail').value, password: document.getElementById('adminPassword').value })
     });
-    if (data.user.role !== 'platform_admin') throw new Error('This account is not a NavaSetu admin.');
+    if (!['platform_admin', 'counsellor'].includes(data.user.role)) throw new Error('This account does not have HR Panel access.');
     token = data.accessToken;
     currentAdmin = data.user;
     localStorage.setItem('navasetu_admin_token', token);
@@ -328,7 +404,20 @@ function enterApp() {
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   document.getElementById('loggedInAs').textContent = currentAdmin ? `${currentAdmin.fullName} (${currentAdmin.email})` : '';
+  applyRoleVisibility();
   loadLeads();
+}
+
+// Counsellors have "her/his leads only" visibility — Schools, Payments and
+// Staff management are hidden entirely (not just blocked server-side), and
+// only the My Account section of Settings is shown. Admins see everything.
+function applyRoleVisibility() {
+  const isCounsellor = currentAdmin && currentAdmin.role === 'counsellor';
+  document.getElementById('navSchools').style.display = isCounsellor ? 'none' : '';
+  document.getElementById('navOrders').style.display = isCounsellor ? 'none' : '';
+  document.getElementById('navStaff').style.display = isCounsellor ? 'none' : '';
+  document.getElementById('adminOnlySettings').style.display = isCounsellor ? 'none' : 'block';
+  document.getElementById('newLeadCounsellorWrap').style.display = isCounsellor ? 'none' : 'block';
 }
 
 // On page load: only auto-skip the login screen if the saved token both
@@ -336,7 +425,11 @@ function enterApp() {
 // admin panel until the first API call failed.
 if (token && tokenIsValid(token)) {
   currentAdmin = decodeToken(token);
-  api('/auth/me').then(data => { currentAdmin = data.user; document.getElementById('loggedInAs').textContent = `${data.user.full_name} (${data.user.email})`; }).catch(() => {});
+  api('/auth/me').then(data => {
+    currentAdmin = data.user;
+    document.getElementById('loggedInAs').textContent = `${data.user.full_name} (${data.user.email})`;
+    applyRoleVisibility();
+  }).catch(() => {});
   enterApp();
 } else if (token) {
   // Stale/expired token — clear it so the login form shows instead of a
@@ -354,6 +447,7 @@ function showTab(name) {
   if (name === 'orders') loadOrders();
   if (name === 'admins') loadAdmins();
   if (name === 'calendar') loadCalendar();
+  if (name === 'settings' && currentAdmin && currentAdmin.role === 'platform_admin') loadOrgSettings();
 }
 
 // --- Calendar tab (appointments only) -----------------------------------
@@ -457,13 +551,36 @@ function styleStatusSelect(select, status) {
   select.style.color = meta.fg;
 }
 
+let _counsellorsCache = null;
+
+async function loadCounsellors() {
+  if (!currentAdmin || currentAdmin.role !== 'platform_admin') return [];
+  if (_counsellorsCache) return _counsellorsCache;
+  try {
+    const data = await api('/admin/admins');
+    _counsellorsCache = data.admins.filter(a => a.role === 'counsellor');
+    return _counsellorsCache;
+  } catch (e) { return []; }
+}
+
+function assignedCellHtml(l) {
+  const isAdmin = currentAdmin && currentAdmin.role === 'platform_admin';
+  if (!isAdmin) return l.assigned_to_name || '—';
+  const counsellors = _counsellorsCache || [];
+  const options = [`<option value="">Unassigned</option>`]
+    .concat(counsellors.map(c => `<option value="${c.id}" ${c.id === l.assigned_to ? 'selected' : ''}>${c.full_name}</option>`)).join('');
+  return `<select onchange="reassignLead('${l.id}', this.value)">${options}</select>`;
+}
+
 async function loadLeads() {
   try {
     const search = document.getElementById('leadSearch').value;
-    const data = await api(`/admin/leads?search=${encodeURIComponent(search)}`);
+    const [data] = await Promise.all([api(`/admin/leads?search=${encodeURIComponent(search)}`), loadCounsellors()]);
     window._leadsCache = data.leads;
-    document.getElementById('leadsBody').innerHTML = data.leads.map(l => `
-      <tr>
+    document.getElementById('leadsBody').innerHTML = data.leads.map(l => {
+      const deleted = !!l.deleted_at;
+      return `
+      <tr class="${deleted ? 'deletedLeadRow' : ''}">
         <td>${l.lead_number ?? '—'}</td>
         <td>${l.full_name}</td>
         <td>${l.email}</td>
@@ -471,15 +588,95 @@ async function loadLeads() {
         <td>${l.client_type}</td>
         <td>${l.institution || '—'}</td>
         <td>${l.plan || '—'}</td>
+        <td>${assignedCellHtml(l)}</td>
         <td>
-          <select class="statusSelect" onchange="updateLeadStatus('${l.id}', this.value, this)">
-            ${statusOptionsHtml(l.lead_status)}
-          </select>
+          ${deleted
+            ? `<span class="pill junked">Deleted</span>`
+            : `<select class="statusSelect" onchange="updateLeadStatus('${l.id}', this.value, this)">${statusOptionsHtml(l.lead_status)}</select>`}
         </td>
-        <td><button class="btn secondary" onclick="openLeadDetail('${l.id}')">Details</button></td>
-      </tr>`).join('');
-    document.querySelectorAll('#leadsBody select.statusSelect').forEach((sel, i) => styleStatusSelect(sel, data.leads[i].lead_status));
+        <td>
+          <button class="btn secondary" onclick="openLeadDetail('${l.id}')">Details</button>
+          ${deleted
+            ? (currentAdmin && currentAdmin.role === 'platform_admin' ? `<button class="btn secondary" onclick="restoreLead('${l.id}')">Restore</button>` : '')
+            : `<button class="btn secondary danger" onclick="deleteLeadPrompt('${l.id}')">Delete</button>`}
+        </td>
+      </tr>${deleted && l.delete_reason ? `<tr class="${deleted ? '' : ''}"><td></td><td colspan="9" class="muted" style="font-style:italic;">Reason: ${l.delete_reason}</td></tr>` : ''}`;
+    }).join('');
+    document.querySelectorAll('#leadsBody select.statusSelect').forEach((sel) => {
+      const lead = data.leads.find(l => sel.getAttribute('onchange').includes(l.id));
+      if (lead) styleStatusSelect(sel, lead.lead_status);
+    });
   } catch (e) { console.error(e); }
+}
+
+async function reassignLead(userId, counsellorId) {
+  try {
+    await api(`/admin/leads/${userId}/assign`, { method: 'PUT', body: JSON.stringify({ counsellorId: counsellorId || null }) });
+    loadLeads();
+  } catch (e) { alert(e.message); loadLeads(); }
+}
+
+async function refreshAfterLeadChange(userId) {
+  loadLeads();
+  const detailCard = document.getElementById('leadDetailCard');
+  if (detailCard.style.display !== 'none' && detailCard.dataset.userId === userId) {
+    const data = await api(`/admin/leads/${userId}`);
+    window._currentLead = data;
+    renderLeadOverview();
+  }
+}
+
+async function deleteLeadPrompt(userId) {
+  const reason = prompt('Reason for deleting this lead (required):');
+  if (reason === null) return;
+  if (!reason.trim()) return alert('A reason is required to delete a lead.');
+  try {
+    await api(`/admin/leads/${userId}/delete`, { method: 'POST', body: JSON.stringify({ reason: reason.trim() }) });
+    refreshAfterLeadChange(userId);
+  } catch (e) { alert(e.message); }
+}
+
+async function restoreLead(userId) {
+  try {
+    await api(`/admin/leads/${userId}/restore`, { method: 'POST' });
+    refreshAfterLeadChange(userId);
+  } catch (e) { alert(e.message); }
+}
+
+function openAddLeadForm() {
+  document.getElementById('addLeadForm').style.display = 'block';
+  document.getElementById('addLeadError').textContent = '';
+  loadCounsellors().then(counsellors => {
+    const sel = document.getElementById('newLeadCounsellor');
+    sel.innerHTML = `<option value="">Unassigned</option>` + counsellors.map(c => `<option value="${c.id}">${c.full_name}</option>`).join('');
+  });
+}
+
+function closeAddLeadForm() {
+  document.getElementById('addLeadForm').style.display = 'none';
+  ['newLeadName', 'newLeadEmail', 'newLeadPhone', 'newLeadInstitution'].forEach(id => document.getElementById(id).value = '');
+}
+
+async function submitAddLead() {
+  const fullName = document.getElementById('newLeadName').value.trim();
+  const email = document.getElementById('newLeadEmail').value.trim();
+  const errEl = document.getElementById('addLeadError');
+  errEl.textContent = '';
+  if (!fullName || !email) { errEl.textContent = 'Name and email are required'; return; }
+  try {
+    await api('/admin/leads', {
+      method: 'POST',
+      body: JSON.stringify({
+        fullName,
+        email,
+        phoneNumber: document.getElementById('newLeadPhone').value.trim() || null,
+        institution: document.getElementById('newLeadInstitution').value.trim() || null,
+        counsellorId: document.getElementById('newLeadCounsellor') ? (document.getElementById('newLeadCounsellor').value || null) : null
+      })
+    });
+    closeAddLeadForm();
+    loadLeads();
+  } catch (e) { errEl.textContent = e.message; }
 }
 
 async function updateLeadStatus(userId, status, selectEl) {
@@ -493,7 +690,7 @@ async function updateLeadStatus(userId, status, selectEl) {
 
 async function openLeadDetail(userId) {
   try {
-    const data = await api(`/admin/leads/${userId}`);
+    const [data] = await Promise.all([api(`/admin/leads/${userId}`), loadCounsellors()]);
     window._currentLead = data;
     document.getElementById('tab-leads').querySelector('.card').style.display = 'none';
     const detailCard = document.getElementById('leadDetailCard');
@@ -519,17 +716,32 @@ function showLeadTab(name) {
 
 function renderLeadOverview() {
   const { user: u, demographics } = window._currentLead;
+  const isAdmin = currentAdmin && currentAdmin.role === 'platform_admin';
+  const deleted = !!u.deleted_at;
+  const counsellors = _counsellorsCache || [];
+  const assignHtml = isAdmin
+    ? `<select onchange="reassignLead('${u.id}', this.value)">
+        <option value="">Unassigned</option>
+        ${counsellors.map(c => `<option value="${c.id}" ${c.id === u.assigned_to ? 'selected' : ''}>${c.full_name}</option>`).join('')}
+      </select>`
+    : (u.assigned_to_name || '—');
+
   document.getElementById('leadTab-overview').innerHTML = `
     <p><strong>Email:</strong> ${u.email} &nbsp; <strong>Mobile:</strong> ${u.phone_number || '—'}</p>
     <p><strong>Type:</strong> ${u.client_type} &nbsp; <strong>Institution:</strong> ${(demographics && demographics.institution) || '—'}</p>
     <p><strong>Registered:</strong> ${new Date(u.created_at).toLocaleDateString()} &nbsp; <strong>Last login:</strong> ${u.last_login ? new Date(u.last_login).toLocaleString() : 'never'}</p>
-    <p><strong>Status:</strong>
-      <select class="statusSelect" id="leadDetailStatus" onchange="updateLeadStatus('${u.id}', this.value, this)">
-        ${statusOptionsHtml(u.lead_status)}
-      </select>
-    </p>
+    <p><strong>Assigned To:</strong> ${assignHtml}</p>
+    ${deleted
+      ? `<p><span class="pill junked">Deleted</span> &nbsp; <span class="muted">Reason: ${u.delete_reason || '—'}</span>
+          ${isAdmin ? ` &nbsp; <button class="btn secondary" onclick="restoreLead('${u.id}')">Restore</button>` : ''}</p>`
+      : `<p><strong>Status:</strong>
+          <select class="statusSelect" id="leadDetailStatus" onchange="updateLeadStatus('${u.id}', this.value, this)">
+            ${statusOptionsHtml(u.lead_status)}
+          </select>
+          &nbsp; <button class="btn secondary danger" onclick="deleteLeadPrompt('${u.id}')">Delete Lead</button>
+        </p>`}
   `;
-  styleStatusSelect(document.getElementById('leadDetailStatus'), u.lead_status);
+  if (!deleted) styleStatusSelect(document.getElementById('leadDetailStatus'), u.lead_status);
 }
 
 function renderLeadReports() {
@@ -964,10 +1176,12 @@ async function markPaid(orderId) {
 async function loadAdmins() {
   try {
     const data = await api('/admin/admins');
+    _counsellorsCache = data.admins.filter(a => a.role === 'counsellor'); // keep the assign-dropdown cache fresh
     document.getElementById('adminsBody').innerHTML = data.admins.map(a => `
       <tr>
         <td>${a.full_name}</td>
         <td>${a.email}</td>
+        <td><span class="roleBadge ${a.role}">${a.role === 'counsellor' ? 'Counsellor' : 'Admin'}</span></td>
         <td>${a.last_login ? new Date(a.last_login).toLocaleString() : 'never'}</td>
         <td>
           <button class="btn secondary" onclick='editAdmin(${JSON.stringify(a).replace(/'/g, "&#39;")})'>Edit</button>
@@ -981,8 +1195,9 @@ function editAdmin(admin) {
   document.getElementById('adminFormId').value = admin.id;
   document.getElementById('adminFormName').value = admin.full_name;
   document.getElementById('adminFormEmail').value = admin.email;
+  document.getElementById('adminFormRole').value = admin.role;
   document.getElementById('adminFormPassword').value = '';
-  document.getElementById('adminFormTitle').textContent = `Edit Admin — ${admin.full_name}`;
+  document.getElementById('adminFormTitle').textContent = `Edit Staff Member — ${admin.full_name}`;
   document.getElementById('adminFormSubmit').textContent = 'Save Changes';
   document.getElementById('adminFormPwHint').textContent = '(leave blank to keep current password)';
   document.getElementById('adminFormError').textContent = '';
@@ -992,9 +1207,10 @@ function resetAdminForm() {
   document.getElementById('adminFormId').value = '';
   document.getElementById('adminFormName').value = '';
   document.getElementById('adminFormEmail').value = '';
+  document.getElementById('adminFormRole').value = 'platform_admin';
   document.getElementById('adminFormPassword').value = '';
-  document.getElementById('adminFormTitle').textContent = 'Add Admin';
-  document.getElementById('adminFormSubmit').textContent = 'Create Admin';
+  document.getElementById('adminFormTitle').textContent = 'Add Staff Member';
+  document.getElementById('adminFormSubmit').textContent = 'Create Staff Member';
   document.getElementById('adminFormPwHint').textContent = '(min 8 characters)';
   document.getElementById('adminFormError').textContent = '';
 }
@@ -1003,16 +1219,17 @@ async function saveAdmin() {
   const id = document.getElementById('adminFormId').value;
   const fullName = document.getElementById('adminFormName').value.trim();
   const email = document.getElementById('adminFormEmail').value.trim();
+  const role = document.getElementById('adminFormRole').value;
   const password = document.getElementById('adminFormPassword').value;
   const errEl = document.getElementById('adminFormError');
   errEl.textContent = '';
   try {
     if (id) {
-      await api(`/admin/admins/${id}`, { method: 'PUT', body: JSON.stringify({ fullName, email, password: password || undefined }) });
+      await api(`/admin/admins/${id}`, { method: 'PUT', body: JSON.stringify({ fullName, email, role, password: password || undefined }) });
     } else {
       if (!fullName || !email || !password) throw new Error('Name, email and password are all required');
-      const result = await api('/admin/admins', { method: 'POST', body: JSON.stringify({ fullName, email, password }) });
-      if (result.promoted) alert(`${fullName} already had an account (as a teacher/individual) — it's been promoted to admin instead of creating a duplicate.`);
+      const result = await api('/admin/admins', { method: 'POST', body: JSON.stringify({ fullName, email, password, role }) });
+      if (result.promoted) alert(`${fullName} already had an account (as a teacher/individual) — it's been promoted to staff instead of creating a duplicate.`);
     }
     resetAdminForm();
     loadAdmins();
@@ -1052,6 +1269,96 @@ async function removeLogo() {
     await api('/settings/logo', { method: 'DELETE' });
     document.getElementById('headerLogo').style.display = 'none';
   } catch (e) { alert(e.message); }
+}
+
+// --- Settings: My Account / Org Profile / Backup / Clear Data -----------
+
+async function changeMyPassword() {
+  const currentPassword = document.getElementById('myCurrentPassword').value;
+  const newPassword = document.getElementById('myNewPassword').value;
+  const resultEl = document.getElementById('changePasswordResult');
+  resultEl.textContent = '';
+  try {
+    await api('/settings/change-password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) });
+    document.getElementById('myCurrentPassword').value = '';
+    document.getElementById('myNewPassword').value = '';
+    resultEl.textContent = 'Password updated.';
+  } catch (e) { resultEl.textContent = e.message; }
+}
+
+async function loadOrgSettings() {
+  try {
+    const data = await api('/settings/org');
+    document.getElementById('orgName').value = data.org_name || '';
+    document.getElementById('orgAddress').value = data.address || '';
+    document.getElementById('orgGst').value = data.gst_number || '';
+  } catch (e) { console.error(e); }
+}
+
+async function saveOrgSettings() {
+  const resultEl = document.getElementById('orgSaveResult');
+  resultEl.textContent = '';
+  try {
+    await api('/settings/org', {
+      method: 'PUT',
+      body: JSON.stringify({
+        orgName: document.getElementById('orgName').value.trim(),
+        address: document.getElementById('orgAddress').value.trim(),
+        gstNumber: document.getElementById('orgGst').value.trim()
+      })
+    });
+    resultEl.textContent = 'Saved.';
+    setTimeout(() => resultEl.textContent = '', 2000);
+  } catch (e) { resultEl.textContent = e.message; }
+}
+
+async function downloadBackup() {
+  try {
+    const res = await fetch(`${API}/settings/backup`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) throw new Error('Failed to build backup');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `navasetu-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (e) { alert(e.message); }
+}
+
+async function restoreBackup() {
+  const fileInput = document.getElementById('restoreFile');
+  const file = fileInput.files[0];
+  const resultEl = document.getElementById('backupResult');
+  if (!file) return alert('Choose a backup .json file first');
+  if (!confirm('This REPLACES all current leads, schools, assessments, reports, orders and appointments with the contents of this file. Staff accounts and org settings are kept. Continue?')) return;
+  try {
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    const result = await api('/settings/backup/restore', {
+      method: 'POST',
+      body: JSON.stringify({ confirm: 'RESTORE', data: parsed.data || parsed })
+    });
+    resultEl.textContent = `Restored: ${Object.entries(result.restored).map(([k, v]) => `${k} (${v})`).join(', ')}.`;
+    fileInput.value = '';
+    loadLeads();
+  } catch (e) { resultEl.textContent = e.message; }
+}
+
+async function clearTrialData() {
+  const confirmText = document.getElementById('clearDataConfirm').value;
+  const resultEl = document.getElementById('clearDataResult');
+  resultEl.textContent = '';
+  if (confirmText !== 'DELETE ALL DATA') return resultEl.textContent = 'Type DELETE ALL DATA exactly to confirm.';
+  if (!confirm('This permanently erases all leads, schools, assessments, reports, orders and appointments. Staff accounts and org settings are kept. This cannot be undone. Continue?')) return;
+  try {
+    const result = await api('/settings/clear-trial-data', { method: 'POST', body: JSON.stringify({ confirm: confirmText }) });
+    resultEl.textContent = `Done — ${result.leadsDeleted} lead(s) removed.`;
+    document.getElementById('clearDataConfirm').value = '';
+    loadLeads();
+  } catch (e) { resultEl.textContent = e.message; }
 }
 </script>
 </body>

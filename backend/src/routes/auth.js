@@ -22,22 +22,34 @@ router.post('/register', async (req, res) => {
     email = email.trim().toLowerCase();
 
     // Check if user exists
-    const userExists = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
-    if (userExists.rows.length > 0) {
+    const userExists = await pool.query('SELECT id, has_registered FROM users WHERE email = $1', [email]);
+    if (userExists.rows.length > 0 && userExists.rows[0].has_registered) {
       return res.status(409).json({ error: 'Email already registered' });
     }
 
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Create user
-    const userId = uuidv4();
-    const result = await pool.query(
-      'INSERT INTO users (id, email, password_hash, full_name, phone_number, role) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, email, full_name, role',
-      [userId, email, passwordHash, fullName, phoneNumber || null, 'individual']
-    );
-
-    const user = result.rows[0];
+    let user;
+    if (userExists.rows.length > 0) {
+      // A counsellor/admin already added this person as a manual CRM lead
+      // (has_registered = false, placeholder password) — this is that same
+      // person registering for real, so claim the existing row rather than
+      // erroring out or creating a duplicate account.
+      const claimed = await pool.query(
+        `UPDATE users SET password_hash = $1, full_name = $2, phone_number = COALESCE($3, phone_number), has_registered = true
+         WHERE id = $4 RETURNING id, email, full_name, role`,
+        [passwordHash, fullName, phoneNumber || null, userExists.rows[0].id]
+      );
+      user = claimed.rows[0];
+    } else {
+      const userId = uuidv4();
+      const result = await pool.query(
+        'INSERT INTO users (id, email, password_hash, full_name, phone_number, role) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, email, full_name, role',
+        [userId, email, passwordHash, fullName, phoneNumber || null, 'individual']
+      );
+      user = result.rows[0];
+    }
 
     // Generate tokens
     const accessToken = jwt.sign(

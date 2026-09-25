@@ -23,6 +23,16 @@ export function requireAdmin(req, res, next) {
   next();
 }
 
+// Use after requireAuth — platform admins (full visibility) OR counsellors
+// (their assigned leads only). Routes using this must apply their own
+// per-record scoping for counsellors — this middleware only gates entry.
+export function requireStaff(req, res, next) {
+  if (!req.user || !['platform_admin', 'counsellor'].includes(req.user.role)) {
+    return res.status(403).json({ error: 'Staff access required' });
+  }
+  next();
+}
+
 // Like requireAuth but does not fail the request if there's no/invalid token —
 // useful for the public assessment flow where login is optional until submit.
 export function optionalAuth(req, res, next) {
