@@ -31,7 +31,9 @@
   .pill.ok { background:#D1FAE5; color:#065F46; }
   .pill.pending { background:#FEF3C7; color:#92400E; }
   .pill.booked { background:#DBEAFE; color:#1E40AF; }
-  select.statusSelect { width:auto; padding:0.35rem 0.5rem; font-size:0.8rem; }
+  .pill.fresh { background:#E5E7EB; color:#374151; }
+  .pill.junked { background:#FEE2E2; color:#991B1B; }
+  select.statusSelect { width:auto; padding:0.35rem 0.6rem; font-size:0.8rem; font-weight:600; border-radius:999px; border:none; cursor:pointer; }
   .muted { color:#6B7280; font-size:0.85rem; }
   #loginScreen { max-width:400px; margin:4rem auto; }
 </style>
@@ -267,19 +269,25 @@ function showTab(name) {
 }
 
 const LEAD_STATUSES = [
-  { value: 'submitted', label: 'Submitted' },
-  { value: 'counselling_booked', label: 'Counselling Session Booked' },
-  { value: 'counselled', label: 'Counselled' }
+  { value: 'fresh_lead', label: 'Fresh Lead', bg: '#E5E7EB', fg: '#374151' },
+  { value: 'submitted', label: 'Submitted', bg: '#FEF3C7', fg: '#92400E' },
+  { value: 'counselling_booked', label: 'Counselling Session Booked', bg: '#DBEAFE', fg: '#1E40AF' },
+  { value: 'counselled', label: 'Counselled', bg: '#D1FAE5', fg: '#065F46' },
+  { value: 'junked', label: 'Junked', bg: '#FEE2E2', fg: '#991B1B' }
 ];
 
-function statusPillClass(status) {
-  if (status === 'counselled') return 'ok';
-  if (status === 'counselling_booked') return 'booked';
-  return 'pending';
+function statusMeta(status) {
+  return LEAD_STATUSES.find(s => s.value === status) || LEAD_STATUSES[0];
 }
 
 function statusOptionsHtml(current) {
   return LEAD_STATUSES.map(s => `<option value="${s.value}" ${s.value === current ? 'selected' : ''}>${s.label}</option>`).join('');
+}
+
+function styleStatusSelect(select, status) {
+  const meta = statusMeta(status);
+  select.style.background = meta.bg;
+  select.style.color = meta.fg;
 }
 
 async function loadLeads() {
@@ -297,20 +305,22 @@ async function loadLeads() {
         <td>${l.institution || '—'}</td>
         <td>${l.plan || '—'}</td>
         <td>
-          <select class="statusSelect" onchange="updateLeadStatus('${l.id}', this.value)">
+          <select class="statusSelect" onchange="updateLeadStatus('${l.id}', this.value, this)">
             ${statusOptionsHtml(l.lead_status)}
           </select>
         </td>
         <td><button class="btn secondary" onclick="openLeadDetail('${l.id}')">Details</button></td>
       </tr>`).join('');
+    document.querySelectorAll('#leadsBody select.statusSelect').forEach((sel, i) => styleStatusSelect(sel, data.leads[i].lead_status));
   } catch (e) { console.error(e); }
 }
 
-async function updateLeadStatus(userId, status) {
+async function updateLeadStatus(userId, status, selectEl) {
   try {
     await api(`/admin/leads/${userId}/status`, { method: 'PUT', body: JSON.stringify({ status }) });
     const lead = (window._leadsCache || []).find(l => l.id === userId);
     if (lead) lead.lead_status = status;
+    if (selectEl) styleStatusSelect(selectEl, status);
   } catch (e) { alert(e.message); loadLeads(); }
 }
 
@@ -334,20 +344,51 @@ async function openLeadDetail(userId) {
           </tr>`).join('')
       : '<tr><td colspan="4" class="muted">No reports yet.</td></tr>';
 
+    const assessmentsHtml = data.assessments.length
+      ? data.assessments.map(a => `
+          <tr>
+            <td>${a.status}</td>
+            <td>${a.submitted_at ? new Date(a.submitted_at).toLocaleDateString() : '—'}</td>
+            <td><button class="btn secondary" onclick="viewLeadResponses('${a.id}')">View / Download Responses</button></td>
+          </tr>`).join('')
+      : '<tr><td colspan="3" class="muted">No assessment attempts yet.</td></tr>';
+
     document.getElementById('leadDetailBody').innerHTML = `
       <p><strong>Email:</strong> ${u.email} &nbsp; <strong>Mobile:</strong> ${u.phone_number || '—'}</p>
       <p><strong>Type:</strong> ${u.client_type} &nbsp; <strong>Institution:</strong> ${(data.demographics && data.demographics.institution) || '—'}</p>
       <p><strong>Status:</strong>
-        <select class="statusSelect" onchange="updateLeadStatus('${userId}', this.value)">
+        <select class="statusSelect" id="leadDetailStatus" onchange="updateLeadStatus('${userId}', this.value, this)">
           ${statusOptionsHtml(u.lead_status)}
         </select>
       </p>
+      <h3>Assessment Responses</h3>
+      <table>
+        <thead><tr><th>Status</th><th>Submitted</th><th></th></tr></thead>
+        <tbody>${assessmentsHtml}</tbody>
+      </table>
       <h3>Reports</h3>
       <table>
         <thead><tr><th>Plan</th><th>Date</th><th>Payment</th><th></th></tr></thead>
         <tbody>${reportsHtml}</tbody>
       </table>
     `;
+    styleStatusSelect(document.getElementById('leadDetailStatus'), u.lead_status);
+  } catch (e) { alert(e.message); }
+}
+
+async function viewLeadResponses(assessmentId) {
+  try {
+    const data = await api(`/admin/assessments/${assessmentId}/responses`);
+    const rows = data.items.map((it, idx) => `
+      <div style="padding:0.6rem 0; border-bottom:1px solid #E5E7EB;">
+        <div style="font-size:0.9rem;">${idx + 1}. ${it.text}</div>
+        <div style="font-size:0.9rem; font-weight:600; color:#D4A017; margin-top:0.2rem;">${it.answerText ?? '(not answered)'}</div>
+      </div>`).join('');
+    const win = window.open('', '_blank');
+    win.document.write(`<!DOCTYPE html><html><head><title>Assessment Responses</title>
+      <style>body{font-family:Inter,Arial,sans-serif;padding:2rem;} @media print { body{padding:1cm;} } @page{size:auto;margin:0;}</style>
+      </head><body><h2>Assessment Responses</h2><p style="color:#6B7280;">Status: ${data.status} ${data.submittedAt ? '· Submitted ' + new Date(data.submittedAt).toLocaleDateString() : ''}</p>${rows}<script>window.onload=function(){window.print();};<\/script></body></html>`);
+    win.document.close();
   } catch (e) { alert(e.message); }
 }
 

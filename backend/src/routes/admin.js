@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { pool } from '../config/database.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import { questionBank } from '../utils/scoring.js';
 
 const router = express.Router();
 
@@ -168,7 +169,7 @@ router.put('/leads/:userId/status', async (req, res) => {
   try {
     const { userId } = req.params;
     const { status } = req.body;
-    const allowed = ['submitted', 'counselling_booked', 'counselled'];
+    const allowed = ['fresh_lead', 'submitted', 'counselling_booked', 'counselled', 'junked'];
     if (!allowed.includes(status)) {
       return res.status(400).json({ error: `Status must be one of: ${allowed.join(', ')}` });
     }
@@ -205,6 +206,36 @@ router.get('/leads/:userId', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch lead detail' });
+  }
+});
+
+// Admin can view a lead's raw assessment answers (question text + the
+// option they picked), not just the generated report — useful when a
+// counsellor wants to see exactly how someone answered before a session.
+router.get('/assessments/:assessmentId/responses', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM assessments WHERE id = $1', [req.params.assessmentId]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Assessment not found' });
+    const assessment = result.rows[0];
+    const responses = assessment.responses || {};
+    const items = questionBank.map((q) => {
+      const answerIdx = responses[q.id];
+      return {
+        id: q.id,
+        text: q.text,
+        answerText: (answerIdx !== undefined && answerIdx !== null && q.options) ? q.options[answerIdx] : null,
+        answered: answerIdx !== undefined && answerIdx !== null
+      };
+    });
+    res.json({
+      assessmentId: assessment.id,
+      status: assessment.status,
+      submittedAt: assessment.submitted_at,
+      items
+    });
+  } catch (error) {
+    console.error('Fetch responses error:', error);
+    res.status(500).json({ error: 'Failed to fetch responses' });
   }
 });
 
