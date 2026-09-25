@@ -1,10 +1,107 @@
 import express from 'express';
+import bcrypt from 'bcryptjs';
+import { v4 as uuidv4 } from 'uuid';
 import { pool } from '../config/database.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
 router.use(requireAuth, requireAdmin);
+
+// --- NavaSetu admin accounts (platform_admin role) ---------------------
+// Lets an existing admin create/edit/remove other named admins, each with
+// their own email + password, instead of everyone sharing one login.
+
+router.get('/admins', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, email, full_name, created_at, last_login FROM users
+       WHERE role = 'platform_admin' ORDER BY created_at ASC`
+    );
+    res.json({ admins: result.rows });
+  } catch (error) {
+    console.error('List admins error:', error);
+    res.status(500).json({ error: 'Failed to fetch admins' });
+  }
+});
+
+router.post('/admins', async (req, res) => {
+  try {
+    const { email, password, fullName } = req.body;
+    if (!email || !password || !fullName) {
+      return res.status(400).json({ error: 'Name, email and password are all required' });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
+    const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ error: 'That email is already registered' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const id = uuidv4();
+    const result = await pool.query(
+      `INSERT INTO users (id, email, password_hash, full_name, role, client_type, status)
+       VALUES ($1, $2, $3, $4, 'platform_admin', 'b2c', 'active')
+       RETURNING id, email, full_name, created_at`,
+      [id, email, passwordHash, fullName]
+    );
+    res.status(201).json({ admin: result.rows[0] });
+  } catch (error) {
+    console.error('Create admin error:', error);
+    res.status(500).json({ error: 'Failed to create admin' });
+  }
+});
+
+router.put('/admins/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { email, password, fullName } = req.body;
+
+    const target = await pool.query(`SELECT * FROM users WHERE id = $1 AND role = 'platform_admin'`, [id]);
+    if (target.rows.length === 0) return res.status(404).json({ error: 'Admin not found' });
+
+    if (email && email !== target.rows[0].email) {
+      const clash = await pool.query('SELECT id FROM users WHERE email = $1 AND id != $2', [email, id]);
+      if (clash.rows.length > 0) return res.status(409).json({ error: 'That email is already registered' });
+    }
+    if (password && password.length > 0 && password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
+    const passwordHash = password ? await bcrypt.hash(password, 10) : target.rows[0].password_hash;
+    const result = await pool.query(
+      `UPDATE users SET email = $1, full_name = $2, password_hash = $3 WHERE id = $4
+       RETURNING id, email, full_name, created_at`,
+      [email || target.rows[0].email, fullName || target.rows[0].full_name, passwordHash, id]
+    );
+    res.json({ admin: result.rows[0] });
+  } catch (error) {
+    console.error('Update admin error:', error);
+    res.status(500).json({ error: 'Failed to update admin' });
+  }
+});
+
+router.delete('/admins/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (id === req.user.userId) {
+      return res.status(400).json({ error: "You can't remove your own admin account while logged in as it" });
+    }
+    const countResult = await pool.query(`SELECT COUNT(*) AS n FROM users WHERE role = 'platform_admin'`);
+    if (parseInt(countResult.rows[0].n, 10) <= 1) {
+      return res.status(400).json({ error: 'At least one admin account must remain' });
+    }
+    const result = await pool.query(`DELETE FROM users WHERE id = $1 AND role = 'platform_admin' RETURNING id`, [id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Admin not found' });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete admin error:', error);
+    res.status(500).json({ error: 'Failed to remove admin' });
+  }
+});
 
 // System status
 router.get('/system', async (req, res) => {

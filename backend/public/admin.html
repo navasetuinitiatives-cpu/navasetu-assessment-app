@@ -39,7 +39,7 @@
 <div id="loginScreen" class="card">
   <h2>NavaSetu Admin Login</h2>
   <label>Email</label>
-  <input id="adminEmail" type="email" value="navasetuinitiatives@gmail.com">
+  <input id="adminEmail" type="email" placeholder="you@example.com">
   <label>Password</label>
   <input id="adminPassword" type="password">
   <button class="btn" onclick="adminLogin()">Login</button>
@@ -50,11 +50,14 @@
   <header>
     <img id="headerLogo" src="/api/settings/logo" onerror="this.style.display='none'" alt="">
     <h1>NavaSetu Admin</h1>
+    <span class="muted" id="loggedInAs" style="color:#D1D5DB; margin-left:auto;"></span>
+    <button class="btn secondary" style="margin:0;" onclick="adminLogout()">Log out</button>
   </header>
   <nav>
     <button class="active" onclick="showTab('leads')">CRM / Leads</button>
     <button onclick="showTab('schools')">Schools</button>
     <button onclick="showTab('orders')">Payments</button>
+    <button onclick="showTab('admins')">Admins</button>
     <button onclick="showTab('settings')">Settings</button>
   </nav>
   <main>
@@ -118,6 +121,28 @@
       </div>
     </section>
 
+    <section id="tab-admins">
+      <div class="card">
+        <h2>NavaSetu Admins</h2>
+        <p class="muted">Each admin logs in with their own email and password. There must always be at least one.</p>
+        <table>
+          <thead><tr><th>Name</th><th>Email</th><th>Last Login</th><th></th></tr></thead>
+          <tbody id="adminsBody"></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h2 id="adminFormTitle">Add Admin</h2>
+        <input type="hidden" id="adminFormId">
+        <label>Full Name</label><input id="adminFormName">
+        <label>Email</label><input id="adminFormEmail" type="email">
+        <label>Password <span class="muted" id="adminFormPwHint">(min 8 characters)</span></label>
+        <input id="adminFormPassword" type="password" placeholder="Leave blank to keep unchanged" autocomplete="new-password">
+        <button class="btn" onclick="saveAdmin()" id="adminFormSubmit">Create Admin</button>
+        <button class="btn secondary" onclick="resetAdminForm()">Cancel</button>
+        <p class="muted" id="adminFormError"></p>
+      </div>
+    </section>
+
     <section id="tab-settings">
       <div class="card">
         <h2>Branding</h2>
@@ -134,7 +159,33 @@
 <script>
 const API = '/api';
 let token = localStorage.getItem('navasetu_admin_token');
+let currentAdmin = null;
 let currentSchoolId = null;
+
+// A JWT's payload is just base64 — decode it locally to check expiry (and
+// show who's logged in) without a round trip. Never trust this for auth
+// decisions server-side; it's purely a UX check so a stale token doesn't
+// silently show the panel.
+function decodeToken(t) {
+  try {
+    const payload = JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return payload;
+  } catch (e) { return null; }
+}
+
+function tokenIsValid(t) {
+  const payload = t && decodeToken(t);
+  return !!(payload && payload.exp && payload.exp * 1000 > Date.now());
+}
+
+function adminLogout() {
+  token = null;
+  currentAdmin = null;
+  localStorage.removeItem('navasetu_admin_token');
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'block';
+  document.getElementById('adminPassword').value = '';
+}
 
 async function api(path, options = {}) {
   const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
@@ -142,6 +193,7 @@ async function api(path, options = {}) {
   const res = await fetch(`${API}${path}`, Object.assign({}, options, { headers }));
   let data = null;
   try { data = await res.json(); } catch (e) {}
+  if (res.status === 401 && token) { adminLogout(); throw new Error('Session expired — please log in again.'); }
   if (!res.ok) throw new Error((data && data.error) || `Request failed (${res.status})`);
   return data;
 }
@@ -154,16 +206,34 @@ async function adminLogin() {
     });
     if (data.user.role !== 'platform_admin') throw new Error('This account is not a NavaSetu admin.');
     token = data.accessToken;
+    currentAdmin = data.user;
     localStorage.setItem('navasetu_admin_token', token);
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
-    loadLeads();
+    enterApp();
   } catch (e) {
     document.getElementById('loginError').textContent = e.message;
   }
 }
 
-if (token) { document.getElementById('loginScreen').style.display = 'none'; document.getElementById('app').style.display = 'block'; loadLeads(); }
+function enterApp() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('loggedInAs').textContent = currentAdmin ? `${currentAdmin.fullName} (${currentAdmin.email})` : '';
+  loadLeads();
+}
+
+// On page load: only auto-skip the login screen if the saved token both
+// exists AND hasn't expired yet — an expired token used to still show the
+// admin panel until the first API call failed.
+if (token && tokenIsValid(token)) {
+  currentAdmin = decodeToken(token);
+  api('/auth/me').then(data => { currentAdmin = data.user; document.getElementById('loggedInAs').textContent = `${data.user.full_name} (${data.user.email})`; }).catch(() => {});
+  enterApp();
+} else if (token) {
+  // Stale/expired token — clear it so the login form shows instead of a
+  // panel that will just start failing API calls.
+  localStorage.removeItem('navasetu_admin_token');
+  token = null;
+}
 
 function showTab(name) {
   document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
@@ -172,6 +242,7 @@ function showTab(name) {
   document.getElementById(`tab-${name}`).classList.add('active');
   if (name === 'schools') loadSchools();
   if (name === 'orders') loadOrders();
+  if (name === 'admins') loadAdmins();
 }
 
 async function loadLeads() {
@@ -306,6 +377,71 @@ async function markPaid(orderId) {
   try {
     await api(`/payments/orders/${orderId}/mark-paid`, { method: 'POST', body: JSON.stringify({ notes: 'Marked paid via admin panel' }) });
     loadOrders();
+  } catch (e) { alert(e.message); }
+}
+
+async function loadAdmins() {
+  try {
+    const data = await api('/admin/admins');
+    document.getElementById('adminsBody').innerHTML = data.admins.map(a => `
+      <tr>
+        <td>${a.full_name}</td>
+        <td>${a.email}</td>
+        <td>${a.last_login ? new Date(a.last_login).toLocaleString() : 'never'}</td>
+        <td>
+          <button class="btn secondary" onclick='editAdmin(${JSON.stringify(a).replace(/'/g, "&#39;")})'>Edit</button>
+          <button class="btn secondary danger" onclick="deleteAdmin('${a.id}', '${a.full_name.replace(/'/g, "\\'")}')">Remove</button>
+        </td>
+      </tr>`).join('');
+  } catch (e) { console.error(e); }
+}
+
+function editAdmin(admin) {
+  document.getElementById('adminFormId').value = admin.id;
+  document.getElementById('adminFormName').value = admin.full_name;
+  document.getElementById('adminFormEmail').value = admin.email;
+  document.getElementById('adminFormPassword').value = '';
+  document.getElementById('adminFormTitle').textContent = `Edit Admin — ${admin.full_name}`;
+  document.getElementById('adminFormSubmit').textContent = 'Save Changes';
+  document.getElementById('adminFormPwHint').textContent = '(leave blank to keep current password)';
+  document.getElementById('adminFormError').textContent = '';
+}
+
+function resetAdminForm() {
+  document.getElementById('adminFormId').value = '';
+  document.getElementById('adminFormName').value = '';
+  document.getElementById('adminFormEmail').value = '';
+  document.getElementById('adminFormPassword').value = '';
+  document.getElementById('adminFormTitle').textContent = 'Add Admin';
+  document.getElementById('adminFormSubmit').textContent = 'Create Admin';
+  document.getElementById('adminFormPwHint').textContent = '(min 8 characters)';
+  document.getElementById('adminFormError').textContent = '';
+}
+
+async function saveAdmin() {
+  const id = document.getElementById('adminFormId').value;
+  const fullName = document.getElementById('adminFormName').value.trim();
+  const email = document.getElementById('adminFormEmail').value.trim();
+  const password = document.getElementById('adminFormPassword').value;
+  const errEl = document.getElementById('adminFormError');
+  errEl.textContent = '';
+  try {
+    if (id) {
+      await api(`/admin/admins/${id}`, { method: 'PUT', body: JSON.stringify({ fullName, email, password: password || undefined }) });
+    } else {
+      if (!fullName || !email || !password) throw new Error('Name, email and password are all required');
+      await api('/admin/admins', { method: 'POST', body: JSON.stringify({ fullName, email, password }) });
+    }
+    resetAdminForm();
+    loadAdmins();
+  } catch (e) { errEl.textContent = e.message; }
+}
+
+async function deleteAdmin(id, name) {
+  if (!confirm(`Remove admin "${name}"? They will no longer be able to log in.`)) return;
+  try {
+    await api(`/admin/admins/${id}`, { method: 'DELETE' });
+    loadAdmins();
   } catch (e) { alert(e.message); }
 }
 
