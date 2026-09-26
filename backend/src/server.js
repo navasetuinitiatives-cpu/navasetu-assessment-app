@@ -44,8 +44,16 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// Serve static files from public folder (HTML assessment)
-app.use(express.static(path.join(__dirname, '../public')));
+// Serve static files from public folder (HTML assessment). `index: false`
+// stops express.static from auto-serving public/index.html for bare "/"
+// requests (its default behavior) — the root route below now sends the
+// two-path welcome.html instead. Named files (/index.html, /ssb.html,
+// /admin.html, /welcome.html, etc.) are unaffected and still served
+// normally by the static middleware.
+app.use(express.static(path.join(__dirname, '../public'), { index: false }));
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/welcome.html'));
+});
 
 // Rate limiting
 const limiter = rateLimit({

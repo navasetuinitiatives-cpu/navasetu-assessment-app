@@ -94,6 +94,9 @@
   </div>
 
   <div id="appScreen" class="hidden">
+    <div style="display:flex; justify-content:flex-end; margin-bottom:0.6rem;">
+      <button class="btn secondary" id="fillSampleBtn" onclick="fillSampleSSB()" style="margin-top:0; font-size:0.82rem; padding:0.5rem 1rem;">🧪 Fill Sample &amp; Generate Report</button>
+    </div>
     <div class="progressBar"><div id="progressFill" style="width:0%;"></div></div>
     <div id="stepContainer"></div>
   </div>
@@ -537,8 +540,91 @@ function renderAlreadySubmitted() {
   document.getElementById('stepContainer').innerHTML = `
     <div class="card">
       <h2>You've already completed this assessment</h2>
-      <p class="muted">Your OLQ Readiness report has been saved. Contact NavaSetu if you'd like to retake it.</p>
+      <p class="muted">Your OLQ Readiness report has been saved. Contact NavaSetu if you'd like to retake it. Or use "🧪 Fill Sample & Generate Report" above to generate a fresh sample.</p>
     </div>`;
+}
+
+// --- Pilot demo: Fill Sample Answers ---------------------------------------
+// One click generates a complete, randomly-answered attempt and its report,
+// for an SME to review without manually clicking through every step. Always
+// starts from a *new* assessment: since POST /ssb/assessments only resumes an
+// 'in_progress' row, and this flow immediately submits (freezing the row),
+// the very next click naturally gets a brand-new row + a brand-new random
+// draw of WAT/SRT/GTO/TAT — so every run is a genuinely new sample with its
+// own report, never a repeat of the last one. No backend changes needed:
+// this reuses the exact same start/save/submit endpoints real candidates use,
+// so the report it produces is scored by the same real pipeline, not a mock.
+function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+const SAMPLE_WAT_REACTIONS = [
+  'I would face this calmly and make a clear plan.',
+  'This makes me think of working together with my team.',
+  'I try to stay confident even when this happens.',
+  'This is something I would rather avoid.',
+  'I feel a little nervous just thinking about this.',
+  'I would take charge and organize a quick plan.',
+  'This reminds me of a time I helped someone.',
+  'I would ask for help before deciding what to do.',
+  'This pushes me to work harder and stay disciplined.',
+  'I would speak to everyone honestly and find a fair way forward.'
+];
+const SAMPLE_SRT_REACTIONS = [
+  'I would stay calm, gather everyone, and make a clear plan before acting.',
+  'I would take charge immediately and give clear instructions to the group.',
+  'I would ask someone more experienced for advice before deciding.',
+  'I would speak to everyone honestly and try to find a fair solution.',
+  'I would take responsibility for my part of the problem and fix it first.',
+  'I would wait and see what the group decides before doing anything.',
+  'I would think it through calmly and then act on the best option.'
+];
+const SAMPLE_TAT_STORIES = [
+  'The person in the picture decides to take the harder path because they know it will help them grow. They plan carefully, ask a friend for advice, and reach their goal despite the difficulty, feeling proud of the effort.',
+  'The character hesitates for a while, unsure what to do next. They eventually choose the easier option, avoiding the challenge, and later wish they had tried harder when they see others succeed.',
+  'Seeing the situation, the person quickly organizes the people around them, gives each one a clear task, and leads the group to solve the problem calmly and efficiently.',
+  'The person feels overwhelmed at first but takes a moment to think, remembers a similar situation from before, and slowly works out a practical plan that helps everyone involved.'
+];
+const SAMPLE_SDT_ANSWERS = [
+  'I am a disciplined, hardworking person who likes to plan ahead. I sometimes get impatient when things do not go as planned, and I am working on being more flexible.',
+  'People describe me as friendly and easy to talk to. I enjoy working in teams, though I can be a little indecisive when there are too many options.',
+  'I consider myself calm under pressure and fairly confident. My biggest weakness is that I take on too much work and forget to ask for help.',
+  'I am someone who values honesty and responsibility. I can be overly critical of myself, which is something I am actively trying to improve.'
+];
+
+async function fillSampleSSB() {
+  if (!confirm('This will generate a complete random sample assessment and submit it right away (pilot demo feature). Continue?')) return;
+  const btn = document.getElementById('fillSampleBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '🧪 Generating…'; }
+  try {
+    // Always fetches/creates via the normal start endpoint: if the previous
+    // sample was submitted (or nothing was started yet), this creates a
+    // brand-new row with a brand-new random item draw.
+    const startData = await api('/ssb/assessments', { method: 'POST' });
+    assessmentId = startData.assessment.id;
+    itemSelection = startData.assessment.item_selection || null;
+    applyItemSelection();
+
+    responses = { bigFive: {}, traits: {}, wat: {}, srt: {}, gto: {}, tat: {}, sdt: {} };
+    meta.bigFiveItems.forEach((q) => { responses.bigFive[q.id] = randInt(0, q.options.length - 1); });
+    meta.traitItemBank.forEach((q) => { responses.traits[q.id] = randInt(0, q.options.length - 1); });
+    selectedWat.forEach((word) => { responses.wat[word] = `${word} — ${SAMPLE_WAT_REACTIONS[randInt(0, SAMPLE_WAT_REACTIONS.length - 1)]}`; });
+    selectedSrt.forEach((situation) => { responses.srt[situation] = SAMPLE_SRT_REACTIONS[randInt(0, SAMPLE_SRT_REACTIONS.length - 1)]; });
+    selectedGto.forEach((scenario) => { responses.gto[scenario.id] = randInt(0, scenario.options.length - 1); });
+    selectedTat.forEach((p) => { responses.tat[p.id] = SAMPLE_TAT_STORIES[randInt(0, SAMPLE_TAT_STORIES.length - 1)]; });
+    meta.sdtPrompts.forEach((p) => { responses.sdt[p.id] = SAMPLE_SDT_ANSWERS[randInt(0, SAMPLE_SDT_ANSWERS.length - 1)]; });
+
+    await Promise.all(['bigFive', 'traits', 'wat', 'srt', 'gto', 'tat', 'sdt'].map((s) => saveSection(s)));
+
+    const planKeys = Object.keys(meta.plans || {});
+    selectedPlanType = planKeys.length ? planKeys[randInt(0, planKeys.length - 1)] : null;
+
+    currentStepIndex = STEPS.length - 1;
+    document.getElementById('progressFill').style.width = '100%';
+    await submitAndRenderReport(document.getElementById('stepContainer'));
+  } catch (e) {
+    alert('Could not generate a sample: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🧪 Fill Sample & Generate Report'; }
+  }
 }
 </script>
 </body>
