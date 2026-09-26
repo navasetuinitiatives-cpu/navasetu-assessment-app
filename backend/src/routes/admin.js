@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { pool } from '../config/database.js';
 import { requireAuth, requireAdmin, requireStaff } from '../middleware/auth.js';
 import { questionBank } from '../utils/scoring.js';
+import { buildSsbResponseItems } from '../utils/ssbScoring.js';
 
 const router = express.Router();
 
@@ -183,7 +184,7 @@ router.get('/leads', requireStaff, async (req, res) => {
       `SELECT u.id, u.lead_number, u.email, u.full_name, u.phone_number, u.role, u.client_type,
               u.lead_status, u.created_at, u.last_login, u.assigned_to, u.deleted_at, u.delete_reason,
               ass.full_name AS assigned_to_name,
-              a.id AS latest_assessment_id, a.status AS assessment_status, a.submitted_at,
+              a.id AS latest_assessment_id, a.status AS assessment_status, a.submitted_at, a.track AS latest_track,
               COALESCE(d.institution, s.name) AS institution,
               r.plan_type AS plan,
               (SELECT COUNT(*) FROM reports rc WHERE rc.user_id = u.id) AS report_count
@@ -530,15 +531,20 @@ router.get('/assessments/:assessmentId/responses', requireStaff, async (req, res
     const assessment = result.rows[0];
     if (!(await canAccessLead(req, assessment.user_id))) return res.status(403).json({ error: 'You do not have access to this lead' });
     const responses = assessment.responses || {};
-    const items = questionBank.map((q) => {
-      const answerIdx = responses[q.id];
-      return {
-        id: q.id,
-        text: q.text,
-        answerText: (answerIdx !== undefined && answerIdx !== null && q.options) ? q.options[answerIdx] : null,
-        answered: answerIdx !== undefined && answerIdx !== null
-      };
-    });
+    // SSB assessments use an entirely separate item bank/section shape
+    // (see ssbScoring.js) — branch here rather than touching the wellness
+    // mapping below, which stays exactly as it was.
+    const items = assessment.track === 'ssb'
+      ? buildSsbResponseItems(responses)
+      : questionBank.map((q) => {
+          const answerIdx = responses[q.id];
+          return {
+            id: q.id,
+            text: q.text,
+            answerText: (answerIdx !== undefined && answerIdx !== null && q.options) ? q.options[answerIdx] : null,
+            answered: answerIdx !== undefined && answerIdx !== null
+          };
+        });
     res.json({
       assessmentId: assessment.id,
       status: assessment.status,

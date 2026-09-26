@@ -14,6 +14,7 @@ import consultationRoutes from './routes/consultations.js';
 import schoolRoutes from './routes/schools.js';
 import adminRoutes from './routes/admin.js';
 import settingsRoutes from './routes/settings.js';
+import ssbRoutes from './routes/ssb.js';
 // NOTE: routes/wellness.js is retired dead code from an earlier attempt at
 // this app (parallel scoring flow against tables that were never migrated).
 // It's intentionally not mounted below. Safe to delete the file entirely.
@@ -90,6 +91,7 @@ app.use('/api/consultations', consultationRoutes);
 app.use('/api/schools', schoolRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/ssb', ssbRoutes);
 
 // 404 handler
 app.use((req, res) => {

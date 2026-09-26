@@ -585,7 +585,7 @@ async function loadLeads() {
         <td>${l.full_name}</td>
         <td>${l.email}</td>
         <td>${l.phone_number || '—'}</td>
-        <td>${l.client_type}</td>
+        <td>${l.client_type}${l.latest_track === 'ssb' ? ' <span class="roleBadge counsellor" style="font-size:0.65rem;">SSB</span>' : ''}</td>
         <td>${l.institution || '—'}</td>
         <td>${l.plan || '—'}</td>
         <td>${assignedCellHtml(l)}</td>
@@ -728,7 +728,7 @@ function renderLeadOverview() {
 
   document.getElementById('leadTab-overview').innerHTML = `
     <p><strong>Email:</strong> ${u.email} &nbsp; <strong>Mobile:</strong> ${u.phone_number || '—'}</p>
-    <p><strong>Type:</strong> ${u.client_type} &nbsp; <strong>Institution:</strong> ${(demographics && demographics.institution) || '—'}</p>
+    <p><strong>Type:</strong> ${u.client_type}${window._currentLead.assessments && window._currentLead.assessments.some(a => a.track === 'ssb') ? ' <span class="roleBadge counsellor" style="font-size:0.65rem;">SSB</span>' : ''} &nbsp; <strong>Institution:</strong> ${(demographics && demographics.institution) || '—'}</p>
     <p><strong>Registered:</strong> ${new Date(u.created_at).toLocaleDateString()} &nbsp; <strong>Last login:</strong> ${u.last_login ? new Date(u.last_login).toLocaleString() : 'never'}</p>
     <p><strong>Assigned To:</strong> ${assignHtml}</p>
     ${deleted

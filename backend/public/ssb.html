@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NavaSetu — SSB OLQ Readiness</title>
+<style>
+  :root { --primary:#0a0e27; --gold:#D4A017; --bg:#F9FAFB; --border:#E5E7EB; --accent:#5B21B6; }
+  * { box-sizing:border-box; }
+  body { font-family:-apple-system, Segoe UI, Inter, sans-serif; background:var(--bg); margin:0; color:#1F2937; }
+  header { background:var(--primary); color:#fff; padding:1rem 1.5rem; display:flex; align-items:center; gap:1rem; }
+  header img { max-height:36px; }
+  header h1 { font-size:1.1rem; margin:0; font-weight:600; }
+  header a.home { color:#D1D5DB; text-decoration:none; margin-left:auto; font-size:0.85rem; }
+  main { max-width:760px; margin:0 auto; padding:1.5rem 1.25rem 4rem; }
+  .card { background:#fff; border:1px solid var(--border); border-radius:10px; padding:1.75rem; margin-bottom:1.25rem; }
+  .card h2 { margin-top:0; font-size:1.2rem; }
+  .muted { color:#6B7280; font-size:0.88rem; line-height:1.5; }
+  label { display:block; font-size:0.88rem; font-weight:600; margin:0.85rem 0 0.3rem; }
+  input, select, textarea { width:100%; padding:0.6rem; border:1px solid var(--border); border-radius:6px; font-size:0.92rem; font-family:inherit; }
+  textarea { resize:vertical; }
+  button.btn { background:var(--accent); color:#fff; border:none; padding:0.7rem 1.4rem; border-radius:8px; cursor:pointer; font-size:0.92rem; font-weight:600; margin-top:1rem; }
+  button.btn.secondary { background:#fff; color:var(--accent); border:1px solid var(--accent); }
+  button.btn:disabled { opacity:0.5; cursor:not-allowed; }
+  .progressBar { height:6px; background:var(--border); border-radius:999px; overflow:hidden; margin-bottom:1.5rem; }
+  .progressBar > div { height:100%; background:var(--accent); transition:width 0.3s; }
+  .likertItem { padding:0.9rem 0; border-bottom:1px solid var(--border); }
+  .likertItem:last-child { border-bottom:none; }
+  .likertItem .qtext { font-size:0.94rem; margin-bottom:0.5rem; }
+  .likertOptions { display:flex; gap:0.4rem; flex-wrap:wrap; }
+  .likertOptions label { display:flex; align-items:center; gap:0.3rem; font-weight:400; font-size:0.8rem; background:#F3F4F6; padding:0.35rem 0.6rem; border-radius:999px; cursor:pointer; margin:0; }
+  .likertOptions input { width:auto; }
+  .watItem, .srtItem { padding:0.85rem 0; border-bottom:1px solid var(--border); }
+  .watItem .word, .srtItem .situation { font-weight:600; margin-bottom:0.4rem; }
+  .gtoScenario { padding:1rem 0; border-bottom:1px solid var(--border); }
+  .gtoScenario .prompt { font-weight:600; margin-bottom:0.6rem; }
+  .gtoOption { display:flex; gap:0.5rem; align-items:flex-start; padding:0.5rem 0.6rem; border:1px solid var(--border); border-radius:8px; margin-bottom:0.5rem; cursor:pointer; font-size:0.88rem; }
+  .gtoOption input { width:auto; margin-top:0.2rem; }
+  .gtoOption.selected { border-color:var(--accent); background:#F5F3FF; }
+  .factorBar { margin-bottom:1rem; }
+  .factorBar .fLabel { display:flex; justify-content:space-between; font-size:0.9rem; font-weight:600; margin-bottom:0.3rem; }
+  .factorBar .track { height:14px; background:#F3F4F6; border-radius:999px; overflow:hidden; }
+  .factorBar .fill { height:100%; border-radius:999px; }
+  .disclaimer { background:#FFFBEB; border:1px solid #FDE68A; border-radius:8px; padding:1rem; font-size:0.85rem; color:#92400E; margin:1rem 0; }
+  .planItem { border-left:3px solid var(--accent); padding:0.6rem 0 0.6rem 0.9rem; margin-bottom:0.9rem; }
+  .planItem h4 { margin:0 0 0.3rem; font-size:0.98rem; }
+  .planItem ul { margin:0.4rem 0 0; padding-left:1.1rem; font-size:0.88rem; color:#374151; }
+  #authScreen { max-width:400px; margin:3rem auto; }
+  .hidden { display:none !important; }
+  .stepLabel { font-size:0.8rem; color:#9CA3AF; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:0.3rem; }
+</style>
+</head>
+<body>
+
+<header>
+  <img src="/api/settings/logo" onerror="this.style.display='none'" alt="">
+  <h1>NavaSetu — SSB OLQ Readiness</h1>
+  <a class="home" href="/welcome.html">← Choose a different path</a>
+</header>
+
+<main>
+
+  <div id="authScreen" class="card">
+    <h2 id="authTitle">Sign in to begin</h2>
+    <p class="muted">Your account is the same one used across NavaSetu — if you already have a wellness assessment account, log in with it.</p>
+    <div id="authRegisterFields" class="hidden">
+      <label>Full Name</label><input id="authName">
+    </div>
+    <label>Email</label><input id="authEmail" type="email">
+    <label>Password</label><input id="authPassword" type="password">
+    <button class="btn" id="authSubmitBtn" onclick="authLogin()">Log In</button>
+    <p class="muted" style="margin-top:0.75rem;">
+      <a href="#" id="authToggleLink" onclick="toggleAuthMode(); return false;">New here? Create an account instead</a>
+    </p>
+    <p class="muted" id="authError" style="color:#B91C1C;"></p>
+  </div>
+
+  <div id="appScreen" class="hidden">
+    <div class="progressBar"><div id="progressFill" style="width:0%;"></div></div>
+    <div id="stepContainer"></div>
+  </div>
+
+</main>
+
+<script>
+const API = '/api';
+let token = localStorage.getItem('navasetu_token');
+let meta = null;
+let assessmentId = null;
+let responses = { bigFive: {}, traits: {}, wat: {}, srt: {}, gto: {}, tat: {}, sdt: {} };
+let isRegisterMode = false;
+
+const STEPS = ['bigFive', 'traits', 'wat', 'srt', 'gto', 'tat', 'sdt', 'report'];
+let currentStepIndex = 0;
+
+async function api(path, options = {}) {
+  const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(`${API}${path}`, Object.assign({}, options, { headers }));
+  let data = null;
+  try { data = await res.json(); } catch (e) {}
+  if (!res.ok) throw new Error((data && data.error) || `Request failed (${res.status})`);
+  return data;
+}
+
+function toggleAuthMode() {
+  isRegisterMode = !isRegisterMode;
+  document.getElementById('authRegisterFields').classList.toggle('hidden', !isRegisterMode);
+  document.getElementById('authTitle').textContent = isRegisterMode ? 'Create your account' : 'Sign in to begin';
+  document.getElementById('authSubmitBtn').textContent = isRegisterMode ? 'Create Account & Continue' : 'Log In';
+  document.getElementById('authSubmitBtn').setAttribute('onclick', isRegisterMode ? 'authRegister()' : 'authLogin()');
+  document.getElementById('authToggleLink').textContent = isRegisterMode ? 'Already have an account? Log in instead' : 'New here? Create an account instead';
+}
+
+async function authLogin() {
+  const errEl = document.getElementById('authError');
+  errEl.textContent = '';
+  try {
+    const data = await api('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email: document.getElementById('authEmail').value, password: document.getElementById('authPassword').value })
+    });
+    token = data.accessToken;
+    localStorage.setItem('navasetu_token', token);
+    await initAssessment();
+  } catch (e) { errEl.textContent = e.message; }
+}
+
+async function authRegister() {
+  const errEl = document.getElementById('authError');
+  errEl.textContent = '';
+  try {
+    const data = await api('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({
+        fullName: document.getElementById('authName').value,
+        email: document.getElementById('authEmail').value,
+        password: document.getElementById('authPassword').value
+      })
+    });
+    token = data.accessToken;
+    localStorage.setItem('navasetu_token', token);
+    await initAssessment();
+  } catch (e) { errEl.textContent = e.message; }
+}
+
+async function initAssessment() {
+  document.getElementById('authScreen').classList.add('hidden');
+  document.getElementById('appScreen').classList.remove('hidden');
+  try {
+    const [metaData, startData] = await Promise.all([
+      api('/ssb/meta'),
+      api('/ssb/assessments', { method: 'POST' })
+    ]);
+    meta = metaData;
+    assessmentId = startData.assessment.id;
+    if (startData.assessment.status === 'submitted') {
+      renderAlreadySubmitted();
+      return;
+    }
+    if (startData.resumed && startData.assessment.responses) {
+      responses = Object.assign(responses, startData.assessment.responses);
+    }
+    renderStep();
+  } catch (e) {
+    document.getElementById('stepContainer').innerHTML = `<div class="card"><p class="muted" style="color:#B91C1C;">${e.message}</p></div>`;
+  }
+}
+
+if (token) {
+  api('/auth/me').then(() => initAssessment()).catch(() => {
+    localStorage.removeItem('navasetu_token');
+    token = null;
+  });
+}
+
+function updateProgress() {
+  const pct = Math.round((currentStepIndex / (STEPS.length - 1)) * 100);
+  document.getElementById('progressFill').style.width = `${pct}%`;
+}
+
+function renderStep() {
+  updateProgress();
+  const step = STEPS[currentStepIndex];
+  const container = document.getElementById('stepContainer');
+  if (step === 'bigFive' || step === 'traits') return renderLikertStep(step, container);
+  if (step === 'wat') return renderWatStep(container);
+  if (step === 'srt') return renderSrtStep(container);
+  if (step === 'gto') return renderGtoStep(container);
+  if (step === 'tat') return renderTatStep(container);
+  if (step === 'sdt') return renderSdtStep(container);
+  if (step === 'report') return submitAndRenderReport(container);
+}
+
+function likertRow(item, sectionKey) {
+  const current = responses[sectionKey][item.id];
+  const opts = item.options.map((opt, idx) => `
+    <label>
+      <input type="radio" name="${item.id}" value="${idx}" ${Number(current) === idx ? 'checked' : ''} onchange="responses['${sectionKey}']['${item.id}'] = ${idx}">
+      ${opt}
+    </label>`).join('');
+  return `<div class="likertItem"><div class="qtext">${item.text}</div><div class="likertOptions">${opts}</div></div>`;
+}
+
+function renderLikertStep(sectionKey, container) {
+  const items = sectionKey === 'bigFive' ? meta.bigFiveItems : meta.traitItemBank;
+  const title = sectionKey === 'bigFive' ? 'Part 1a — Personality (Big Five)' : 'Part 1b — SSB-Specific Trait Scales';
+  const intro = sectionKey === 'bigFive'
+    ? 'Rate how accurately each statement describes you. There are no right or wrong answers — answer honestly for the most useful profile.'
+    : 'These items measure locus of control, achievement motivation, hardiness, and social maturity — all established constructs relevant to how OLQs are assessed.';
+  container.innerHTML = `
+    <div class="stepLabel">Step ${currentStepIndex + 1} of ${STEPS.length}</div>
+    <div class="card">
+      <h2>${title}</h2>
+      <p class="muted">${intro}</p>
+      ${items.map((item) => likertRow(item, sectionKey)).join('')}
+      <button class="btn" onclick="nextFromLikert('${sectionKey}', ${items.length})">Continue</button>
+      <p class="muted" id="likertError" style="color:#B91C1C;"></p>
+    </div>`;
+}
+
+async function nextFromLikert(sectionKey, expectedCount) {
+  const answered = Object.keys(responses[sectionKey]).length;
+  if (answered < expectedCount) {
+    document.getElementById('likertError').textContent = `Please answer all ${expectedCount} items (${expectedCount - answered} left).`;
+    return;
+  }
+  await saveSection(sectionKey);
+  currentStepIndex++;
+  renderStep();
+}
+
+function renderWatStep(container) {
+  container.innerHTML = `
+    <div class="stepLabel">Step ${currentStepIndex + 1} of ${STEPS.length}</div>
+    <div class="card">
+      <h2>Part 2 — Word Association (WAT)</h2>
+      <p class="muted">For each word, write the <strong>first sentence</strong> that comes to mind — don't overthink it. This is a practice exercise: patterns like spontaneity and constructive tone are heuristically flagged, not clinically scored (see your report for what that means).</p>
+      ${meta.watWords.map((word) => `
+        <div class="watItem">
+          <div class="word">${word}</div>
+          <input type="text" value="${(responses.wat[word] || '').replace(/"/g, '&quot;')}" oninput="responses.wat['${word}'] = this.value" placeholder="Your first-reaction sentence...">
+        </div>`).join('')}
+      <button class="btn secondary" onclick="skipStep()">Skip for now</button>
+      <button class="btn" onclick="nextFromFreeText('wat')">Continue</button>
+    </div>`;
+}
+
+function renderSrtStep(container) {
+  container.innerHTML = `
+    <div class="stepLabel">Step ${currentStepIndex + 1} of ${STEPS.length}</div>
+    <div class="card">
+      <h2>Part 3 — Situation Reaction (SRT)</h2>
+      <p class="muted">Write how you would react to each situation, in a sentence or two. This is for your own practice and reflection — an admin/counsellor can review it with you, but it is not auto-scored.</p>
+      ${meta.srtSituations.map((situation, i) => `
+        <div class="srtItem">
+          <div class="situation">${i + 1}. ${situation}</div>
+          <textarea rows="2" oninput="responses.srt[${i}] = this.value">${responses.srt[i] || ''}</textarea>
+        </div>`).join('')}
+      <button class="btn secondary" onclick="skipStep()">Skip for now</button>
+      <button class="btn" onclick="nextFromFreeText('srt')">Continue</button>
+    </div>`;
+}
+
+function renderGtoStep(container) {
+  container.innerHTML = `
+    <div class="stepLabel">Step ${currentStepIndex + 1} of ${STEPS.length}</div>
+    <div class="card">
+      <h2>Part 4 — GTO-Style Situational Judgment</h2>
+      <p class="muted">For each scenario, choose the response closest to what you would actually do — not what sounds best.</p>
+      ${meta.gtoScenarios.map((scenario) => `
+        <div class="gtoScenario">
+          <div class="prompt">${scenario.prompt}</div>
+          ${scenario.options.map((opt, idx) => `
+            <label class="gtoOption ${Number(responses.gto[scenario.id]) === idx ? 'selected' : ''}">
+              <input type="radio" name="${scenario.id}" value="${idx}" ${Number(responses.gto[scenario.id]) === idx ? 'checked' : ''} onchange="selectGto('${scenario.id}', ${idx})">
+              ${opt.text}
+            </label>`).join('')}
+        </div>`).join('')}
+      <button class="btn" onclick="nextFromGto()">Continue</button>
+      <p class="muted" id="gtoError" style="color:#B91C1C;"></p>
+    </div>`;
+}
+
+function selectGto(scenarioId, idx) {
+  responses.gto[scenarioId] = idx;
+  renderGtoStep(document.getElementById('stepContainer'));
+}
+
+async function nextFromGto() {
+  if (Object.keys(responses.gto).length < meta.gtoScenarios.length) {
+    document.getElementById('gtoError').textContent = 'Please choose an option for every scenario.';
+    return;
+  }
+  await saveSection('gto');
+  currentStepIndex++;
+  renderStep();
+}
+
+function renderTatStep(container) {
+  container.innerHTML = `
+    <div class="stepLabel">Step ${currentStepIndex + 1} of ${STEPS.length}</div>
+    <div class="card">
+      <h2>Part 5 — Picture Story Reflection (TAT-style)</h2>
+      <p class="muted"><strong>Not scored.</strong> Real TAT interpretation needs a trained psychologist reading it alongside your live behavior — this is offered purely as guided self-reflection practice.</p>
+      ${meta.tatPrompts.map((p) => `
+        <div class="srtItem">
+          <div class="situation">${p.description}</div>
+          <div class="muted" style="margin-bottom:0.4rem;">${p.guidance}</div>
+          <textarea rows="3" oninput="responses.tat['${p.id}'] = this.value">${responses.tat[p.id] || ''}</textarea>
+        </div>`).join('')}
+      <button class="btn secondary" onclick="skipStep()">Skip for now</button>
+      <button class="btn" onclick="nextFromFreeText('tat')">Continue</button>
+    </div>`;
+}
+
+function renderSdtStep(container) {
+  container.innerHTML = `
+    <div class="stepLabel">Step ${currentStepIndex + 1} of ${STEPS.length}</div>
+    <div class="card">
+      <h2>Part 6 — Self Description (SDT)</h2>
+      <p class="muted"><strong>Not scored.</strong> The real SDT is cross-checked against interview and observation by trained assessors — this is for your own honest self-reflection.</p>
+      ${meta.sdtPrompts.map((p) => `
+        <div class="srtItem">
+          <div class="situation">${p.label}</div>
+          <div class="muted" style="margin-bottom:0.4rem;">${p.hint}</div>
+          <textarea rows="3" oninput="responses.sdt['${p.id}'] = this.value">${responses.sdt[p.id] || ''}</textarea>
+        </div>`).join('')}
+      <button class="btn" onclick="nextFromFreeText('sdt')">Finish &amp; See My Readiness Profile</button>
+    </div>`;
+}
+
+async function skipStep() {
+  currentStepIndex++;
+  renderStep();
+}
+
+async function nextFromFreeText(sectionKey) {
+  await saveSection(sectionKey);
+  currentStepIndex++;
+  renderStep();
+}
+
+async function saveSection(sectionKey) {
+  try {
+    await api(`/ssb/assessments/${assessmentId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ section: sectionKey, answers: responses[sectionKey] })
+    });
+  } catch (e) { console.error('Autosave failed for', sectionKey, e.message); }
+}
+
+const FACTOR_COLORS = {
+  'Planning & Organizing': '#2563EB',
+  'Social Adjustment': '#059669',
+  'Social Effectiveness': '#D97706',
+  'Dynamic Factor': '#DC2626'
+};
+
+async function submitAndRenderReport(container) {
+  container.innerHTML = `<div class="card"><p class="muted">Scoring your profile…</p></div>`;
+  try {
+    const result = await api(`/ssb/assessments/${assessmentId}/submit`, { method: 'POST' });
+    renderReport(container, result.profile, result.improvementPlan);
+    saveReportRecord(result.profile, result.improvementPlan);
+  } catch (e) {
+    container.innerHTML = `<div class="card"><p class="muted" style="color:#B91C1C;">${e.message}</p>
+      ${e.message.includes('complete the trait') ? `<button class="btn secondary" onclick="currentStepIndex=0; renderStep();">Go back to Part 1</button>` : ''}
+    </div>`;
+  }
+}
+
+function renderReport(container, profile, plan) {
+  const factorBars = Object.entries(profile.factorScores).map(([factor, score]) => `
+    <div class="factorBar">
+      <div class="fLabel"><span>${factor}</span><span>${score.toFixed(1)} / 5 — ${profile.factorDetail[factor].label}</span></div>
+      <div class="track"><div class="fill" style="width:${(score / 5) * 100}%; background:${FACTOR_COLORS[factor]};"></div></div>
+      <div class="muted" style="margin-top:0.3rem;">OLQs: ${profile.factorDetail[factor].olqs.join(', ')}</div>
+    </div>`).join('');
+
+  const planHtml = plan.map((p) => `
+    <div class="planItem">
+      <h4>${p.factor} — ${p.label} (${p.score.toFixed(1)} / 5)</h4>
+      <ul>${p.actions.map((a) => `<li>${a}</li>`).join('')}</ul>
+    </div>`).join('');
+
+  document.getElementById('stepContainer').innerHTML = `
+    <div id="reportBody">
+      <div class="card">
+        <h2>Your OLQ Readiness Profile</h2>
+        <p style="font-size:2.2rem; font-weight:700; color:${FACTOR_COLORS[profile.strongestFactor]}; margin:0.25rem 0;">${profile.readinessIndex} / 100</p>
+        <div class="disclaimer">${profile.disclaimer}</div>
+        ${factorBars}
+      </div>
+      <div class="card">
+        <h2>Your Improvement Plan</h2>
+        <p class="muted">Ordered from your most to least developed area — start with the top one.</p>
+        ${planHtml}
+      </div>
+    </div>
+    <button class="btn secondary" onclick="window.print()">🖨️ Print / Save as PDF</button>
+  `;
+}
+
+async function saveReportRecord(profile, plan) {
+  try {
+    const html = document.getElementById('reportBody').innerHTML;
+    await api('/reports', {
+      method: 'POST',
+      body: JSON.stringify({ assessmentId, planType: 'ssb_readiness', htmlContent: `<div style="font-family:Inter,Arial,sans-serif;">${html}</div>` })
+    });
+  } catch (e) { console.error('Could not save report record:', e.message); }
+}
+
+function renderAlreadySubmitted() {
+  document.getElementById('stepContainer').innerHTML = `
+    <div class="card">
+      <h2>You've already completed this assessment</h2>
+      <p class="muted">Your OLQ Readiness report has been saved. Contact NavaSetu if you'd like to retake it.</p>
+    </div>`;
+}
+</script>
+</body>
+</html>

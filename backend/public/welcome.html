@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NavaSetu — Choose Your Path</title>
+<style>
+  :root { --primary:#0a0e27; --gold:#D4A017; --bg:#F9FAFB; --border:#E5E7EB; }
+  * { box-sizing:border-box; }
+  body { font-family:-apple-system, Segoe UI, Inter, sans-serif; background:var(--bg); margin:0; color:#1F2937; min-height:100vh; display:flex; flex-direction:column; }
+  header { background:var(--primary); color:#fff; padding:1.25rem 1.5rem; display:flex; align-items:center; gap:1rem; }
+  header img { max-height:40px; }
+  header h1 { font-size:1.15rem; margin:0; font-weight:600; }
+  main { flex:1; display:flex; align-items:center; justify-content:center; padding:2rem 1.25rem; }
+  .intro { max-width:720px; margin:0 auto 2.5rem; text-align:center; }
+  .intro h2 { font-size:1.6rem; margin-bottom:0.5rem; }
+  .intro p { color:#6B7280; font-size:1rem; line-height:1.6; }
+  .wrap { max-width:960px; width:100%; }
+  .cards { display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; }
+  @media (max-width:720px) { .cards { grid-template-columns:1fr; } }
+  .card { background:#fff; border:1px solid var(--border); border-radius:14px; padding:2rem; text-align:center; text-decoration:none; color:inherit; transition:transform 0.15s, box-shadow 0.15s; display:flex; flex-direction:column; align-items:center; }
+  .card:hover { transform:translateY(-3px); box-shadow:0 10px 30px rgba(10,14,39,0.08); }
+  .card .icon { font-size:2.75rem; margin-bottom:0.75rem; }
+  .card h3 { font-size:1.25rem; margin:0 0 0.5rem; }
+  .card p { color:#6B7280; font-size:0.92rem; line-height:1.55; margin:0 0 1.25rem; }
+  .card .go { background:var(--primary); color:#fff; padding:0.65rem 1.4rem; border-radius:8px; font-size:0.9rem; font-weight:600; }
+  .card.ssb .go { background:#5B21B6; }
+  footer { text-align:center; padding:1.5rem; color:#9CA3AF; font-size:0.8rem; }
+</style>
+</head>
+<body>
+
+<header>
+  <img id="headerLogo" src="/api/settings/logo" onerror="this.style.display='none'" alt="">
+  <h1>NavaSetu</h1>
+</header>
+
+<main>
+  <div class="wrap">
+    <div class="intro">
+      <h2>What brings you here today?</h2>
+      <p>Choose the path that fits you — each leads to its own assessment, built around well-established psychometric scales, with a personalized report at the end.</p>
+    </div>
+    <div class="cards">
+      <a class="card ssb" href="/ssb.html">
+        <div class="icon">🎖️</div>
+        <h3>SSB Aspirants</h3>
+        <p>Get an OLQ Readiness Profile against the 15 Officer-Like Qualities the Services Selection Board looks for — plus WAT/SRT/GTO-style practice and a targeted improvement plan for your weaker areas.</p>
+        <span class="go">Start OLQ Assessment</span>
+      </a>
+      <a class="card wellness" href="/index.html">
+        <div class="icon">🌿</div>
+        <h3>Mental Wellness for Teachers</h3>
+        <p>Take NavaSetu's teacher wellness assessment — a confidential look at your emotional wellbeing, resilience, and work environment, with a personalized report and optional counselling.</p>
+        <span class="go">Start Wellness Assessment</span>
+      </a>
+    </div>
+  </div>
+</main>
+
+<footer>NavaSetu Initiatives</footer>
+
+</body>
+</html>
