@@ -105,6 +105,14 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    // Blocked accounts (admin-controlled via the HR Panel) can't log in to
+    // either app, since both share this same login route. Checked only after
+    // the password is confirmed correct, so a blocked user gets a clear
+    // reason rather than a generic "invalid credentials".
+    if (user.status === 'inactive') {
+      return res.status(403).json({ error: 'This account has been blocked. Please contact NavaSetu support for help.' });
+    }
+
     // Update last login
     await pool.query('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1', [user.id]);
 

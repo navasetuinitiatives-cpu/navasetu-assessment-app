@@ -643,6 +643,29 @@ async function restoreLead(userId) {
   } catch (e) { alert(e.message); }
 }
 
+async function blockLead(userId) {
+  if (!confirm('Block this user? They will not be able to log in to either the SSB or wellness app until you unblock them.')) return;
+  try {
+    await api(`/admin/leads/${userId}/block`, { method: 'PUT' });
+    refreshAfterLeadChange(userId);
+  } catch (e) { alert(e.message); }
+}
+
+async function unblockLead(userId) {
+  try {
+    await api(`/admin/leads/${userId}/unblock`, { method: 'PUT' });
+    refreshAfterLeadChange(userId);
+  } catch (e) { alert(e.message); }
+}
+
+async function resetLeadPassword(userId) {
+  if (!confirm('Reset this user\'s password? Their old password will stop working immediately.')) return;
+  try {
+    const result = await api(`/admin/leads/${userId}/reset-password`, { method: 'POST' });
+    alert(`New temporary password for ${result.email}:\n\n${result.temporaryPassword}\n\nShare this with the candidate directly — it won't be shown again.`);
+  } catch (e) { alert(e.message); }
+}
+
 function openAddLeadForm() {
   document.getElementById('addLeadForm').style.display = 'block';
   document.getElementById('addLeadError').textContent = '';
@@ -740,6 +763,13 @@ function renderLeadOverview() {
           </select>
           &nbsp; <button class="btn secondary danger" onclick="deleteLeadPrompt('${u.id}')">Delete Lead</button>
         </p>`}
+    ${isAdmin ? `
+      <p><strong>Login Access:</strong>
+        ${u.status === 'inactive'
+          ? `<span class="pill junked">Blocked</span> &nbsp; <button class="btn secondary" onclick="unblockLead('${u.id}')">Unblock</button>`
+          : `<span class="pill ok">Active</span> &nbsp; <button class="btn secondary danger" onclick="blockLead('${u.id}')">Block Access</button>`}
+        &nbsp; <button class="btn secondary" onclick="resetLeadPassword('${u.id}')">Reset Password</button>
+      </p>` : ''}
   `;
   if (!deleted) styleStatusSelect(document.getElementById('leadDetailStatus'), u.lead_status);
 }

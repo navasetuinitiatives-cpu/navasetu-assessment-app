@@ -48,6 +48,24 @@
   #authScreen { max-width:400px; margin:3rem auto; }
   .hidden { display:none !important; }
   .stepLabel { font-size:0.8rem; color:#9CA3AF; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:0.3rem; }
+  .voiceRow { display:flex; gap:0.5rem; align-items:flex-start; }
+  .voiceRow input, .voiceRow textarea { flex:1; }
+  .micBtn { flex:0 0 auto; background:#F3F4F6; border:1px solid var(--border); border-radius:8px; width:2.4rem; height:2.4rem; font-size:1rem; cursor:pointer; margin-top:0; }
+  .micBtn.recording { background:#FEE2E2; border-color:#FCA5A5; animation:micPulse 1s infinite; }
+  @keyframes micPulse { 0%, 100% { opacity:1; } 50% { opacity:0.5; } }
+  .tatImageWrap { margin-bottom:0.75rem; }
+  .tatImageBox { border:1px solid var(--border); border-radius:8px; overflow:hidden; background:#fff; display:flex; justify-content:center; }
+  .tatImageBox svg { width:100%; max-width:340px; height:auto; display:block; }
+  .tatImageHidden { border:1px dashed var(--border); border-radius:8px; padding:1.5rem; text-align:center; background:#F9FAFB; }
+  .plan-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:1rem; margin:1.25rem 0; }
+  @media (max-width:680px) { .plan-grid { grid-template-columns:1fr; } }
+  .plan-card { padding:1.25rem; border:2px solid var(--border); border-radius:8px; cursor:pointer; transition:all 0.15s; background:#fff; }
+  .plan-card:hover { border-color:var(--accent); background:#FAF9FF; }
+  .plan-card.selected { border-color:var(--accent); background:#F5F3FF; }
+  .plan-card .plan-name { font-weight:700; font-size:1.05rem; margin-bottom:0.2rem; }
+  .plan-card .plan-price { font-size:1.4rem; font-weight:700; color:var(--accent); margin-bottom:0.5rem; }
+  .plan-card .plan-desc { font-size:0.85rem; color:#6B7280; margin-bottom:0.75rem; }
+  .plan-card ul.plan-features { margin:0; padding-left:1.1rem; font-size:0.82rem; color:#374151; }
 </style>
 </head>
 <body>
@@ -90,8 +108,68 @@ let assessmentId = null;
 let responses = { bigFive: {}, traits: {}, wat: {}, srt: {}, gto: {}, tat: {}, sdt: {} };
 let isRegisterMode = false;
 
-const STEPS = ['bigFive', 'traits', 'wat', 'srt', 'gto', 'tat', 'sdt', 'report'];
+// This attempt's frozen random draw (set once at assessment creation, see
+// ssbScoring.js buildItemSelection). Falls back to the full bank if absent
+// (e.g. an attempt started before rotation was added).
+let itemSelection = null;
+let selectedWat = [];
+let selectedSrt = [];
+let selectedGto = [];
+let selectedTat = [];
+
+function applyItemSelection() {
+  selectedWat = (itemSelection && itemSelection.wat) || meta.watWords;
+  selectedSrt = (itemSelection && itemSelection.srt) || meta.srtSituations;
+  selectedGto = (itemSelection && itemSelection.gto)
+    ? itemSelection.gto.map((id) => meta.gtoScenarios.find((g) => g.id === id)).filter(Boolean)
+    : meta.gtoScenarios;
+  selectedTat = (itemSelection && itemSelection.tat)
+    ? itemSelection.tat.map((id) => meta.tatPrompts.find((t) => t.id === id)).filter(Boolean)
+    : meta.tatPrompts;
+}
+
+// --- Voice-to-text (Web Speech API), used across WAT/SRT/TAT/SDT fields ---
+// Typing is always the default/fallback; the mic button is purely additive.
+// Not every browser supports this (notably older Safari), so it's feature-
+// detected rather than assumed.
+function speechSupported() {
+  return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+}
+let activeRecognition = null;
+function toggleVoiceInput(btn, targetId) {
+  if (!speechSupported()) {
+    alert('Voice input is not supported in this browser. Please type your answer instead.');
+    return;
+  }
+  if (activeRecognition) {
+    activeRecognition.stop();
+    activeRecognition = null;
+    document.querySelectorAll('.micBtn.recording').forEach((b) => b.classList.remove('recording'));
+    return;
+  }
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const recognition = new SpeechRecognition();
+  recognition.lang = 'en-IN';
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+  recognition.onresult = (e) => {
+    const transcript = e.results[0][0].transcript;
+    const el = document.getElementById(targetId);
+    if (el) {
+      el.value = el.value ? `${el.value} ${transcript}` : transcript;
+      el.dispatchEvent(new Event('input'));
+    }
+  };
+  recognition.onend = () => { btn.classList.remove('recording'); activeRecognition = null; };
+  recognition.onerror = () => { btn.classList.remove('recording'); activeRecognition = null; };
+  btn.classList.add('recording');
+  activeRecognition = recognition;
+  recognition.start();
+}
+
+const STEPS = ['bigFive', 'traits', 'wat', 'srt', 'gto', 'tat', 'sdt', 'planSelection', 'report'];
 let currentStepIndex = 0;
+let selectedPlanType = null;
 
 async function api(path, options = {}) {
   const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
@@ -154,6 +232,8 @@ async function initAssessment() {
     ]);
     meta = metaData;
     assessmentId = startData.assessment.id;
+    itemSelection = startData.assessment.item_selection || null;
+    applyItemSelection();
     if (startData.assessment.status === 'submitted') {
       renderAlreadySubmitted();
       return;
@@ -189,7 +269,43 @@ function renderStep() {
   if (step === 'gto') return renderGtoStep(container);
   if (step === 'tat') return renderTatStep(container);
   if (step === 'sdt') return renderSdtStep(container);
+  if (step === 'planSelection') return renderPlanSelectionStep(container);
   if (step === 'report') return submitAndRenderReport(container);
+}
+
+function renderPlanSelectionStep(container) {
+  const plans = meta.plans || {};
+  container.innerHTML = `
+    <div class="stepLabel">Step ${currentStepIndex + 1} of ${STEPS.length}</div>
+    <div class="card">
+      <h2>Select Your Report Package</h2>
+      <p class="muted">Choose the package that fits what you need — your Readiness Index and factor scores are the same in all three; the depth of guidance and support differs.</p>
+      <div class="plan-grid">
+        ${Object.entries(plans).map(([key, plan]) => `
+          <div class="plan-card ${selectedPlanType === key ? 'selected' : ''}" onclick="selectPlan('${key}')">
+            <div class="plan-name">${plan.label}</div>
+            <div class="plan-price">${plan.priceLabel}</div>
+            <div class="plan-desc">${plan.desc}</div>
+            <ul class="plan-features">${plan.features.map((f) => `<li>${f}</li>`).join('')}</ul>
+          </div>`).join('')}
+      </div>
+      <button class="btn" ${selectedPlanType ? '' : 'disabled'} onclick="nextFromPlanSelection()">Generate My Report ➡️</button>
+      <p class="muted" id="planError" style="color:#B91C1C;"></p>
+    </div>`;
+}
+
+function selectPlan(key) {
+  selectedPlanType = key;
+  renderPlanSelectionStep(document.getElementById('stepContainer'));
+}
+
+function nextFromPlanSelection() {
+  if (!selectedPlanType) {
+    document.getElementById('planError').textContent = 'Please choose a package to continue.';
+    return;
+  }
+  currentStepIndex++;
+  renderStep();
 }
 
 function likertRow(item, sectionKey) {
@@ -235,15 +351,22 @@ function renderWatStep(container) {
     <div class="stepLabel">Step ${currentStepIndex + 1} of ${STEPS.length}</div>
     <div class="card">
       <h2>Part 2 — Word Association (WAT)</h2>
-      <p class="muted">For each word, write the <strong>first sentence</strong> that comes to mind — don't overthink it. This is a practice exercise: patterns like spontaneity and constructive tone are heuristically flagged, not clinically scored (see your report for what that means).</p>
-      ${meta.watWords.map((word) => `
+      <p class="muted">For each word, write the <strong>first sentence</strong> that comes to mind — don't overthink it. Type your answer, or tap 🎤 to speak it instead. This is a practice exercise: patterns like spontaneity and constructive tone are heuristically flagged, not clinically scored (see your report for what that means).</p>
+      ${selectedWat.map((word, i) => `
         <div class="watItem">
           <div class="word">${word}</div>
-          <input type="text" value="${(responses.wat[word] || '').replace(/"/g, '&quot;')}" oninput="responses.wat['${word}'] = this.value" placeholder="Your first-reaction sentence...">
+          <div class="voiceRow">
+            <input type="text" id="wat_${i}" value="${(responses.wat[word] || '').replace(/"/g, '&quot;')}" oninput="responses.wat['${word}'] = this.value" placeholder="Your first-reaction sentence...">
+            <button type="button" class="micBtn" onclick="toggleVoiceInput(this, 'wat_${i}')" title="Speak your answer">🎤</button>
+          </div>
         </div>`).join('')}
       <button class="btn secondary" onclick="skipStep()">Skip for now</button>
       <button class="btn" onclick="nextFromFreeText('wat')">Continue</button>
     </div>`;
+}
+
+function updateSrt(i, value) {
+  responses.srt[selectedSrt[i]] = value;
 }
 
 function renderSrtStep(container) {
@@ -251,11 +374,14 @@ function renderSrtStep(container) {
     <div class="stepLabel">Step ${currentStepIndex + 1} of ${STEPS.length}</div>
     <div class="card">
       <h2>Part 3 — Situation Reaction (SRT)</h2>
-      <p class="muted">Write how you would react to each situation, in a sentence or two. This is for your own practice and reflection — an admin/counsellor can review it with you, but it is not auto-scored.</p>
-      ${meta.srtSituations.map((situation, i) => `
+      <p class="muted">Write how you would react to each situation, in a sentence or two. Type it, or tap 🎤 to speak it instead. This is for your own practice and reflection — an admin/counsellor can review it with you, but it is not auto-scored.</p>
+      ${selectedSrt.map((situation, i) => `
         <div class="srtItem">
           <div class="situation">${i + 1}. ${situation}</div>
-          <textarea rows="2" oninput="responses.srt[${i}] = this.value">${responses.srt[i] || ''}</textarea>
+          <div class="voiceRow">
+            <textarea id="srt_${i}" rows="2" oninput="updateSrt(${i}, this.value)">${responses.srt[situation] || ''}</textarea>
+            <button type="button" class="micBtn" onclick="toggleVoiceInput(this, 'srt_${i}')" title="Speak your answer">🎤</button>
+          </div>
         </div>`).join('')}
       <button class="btn secondary" onclick="skipStep()">Skip for now</button>
       <button class="btn" onclick="nextFromFreeText('srt')">Continue</button>
@@ -268,7 +394,7 @@ function renderGtoStep(container) {
     <div class="card">
       <h2>Part 4 — GTO-Style Situational Judgment</h2>
       <p class="muted">For each scenario, choose the response closest to what you would actually do — not what sounds best.</p>
-      ${meta.gtoScenarios.map((scenario) => `
+      ${selectedGto.map((scenario) => `
         <div class="gtoScenario">
           <div class="prompt">${scenario.prompt}</div>
           ${scenario.options.map((opt, idx) => `
@@ -288,7 +414,7 @@ function selectGto(scenarioId, idx) {
 }
 
 async function nextFromGto() {
-  if (Object.keys(responses.gto).length < meta.gtoScenarios.length) {
+  if (Object.keys(responses.gto).length < selectedGto.length) {
     document.getElementById('gtoError').textContent = 'Please choose an option for every scenario.';
     return;
   }
@@ -302,16 +428,38 @@ function renderTatStep(container) {
     <div class="stepLabel">Step ${currentStepIndex + 1} of ${STEPS.length}</div>
     <div class="card">
       <h2>Part 5 — Picture Story Reflection (TAT-style)</h2>
-      <p class="muted"><strong>Not scored.</strong> Real TAT interpretation needs a trained psychologist reading it alongside your live behavior — this is offered purely as guided self-reflection practice.</p>
-      ${meta.tatPrompts.map((p) => `
+      <p class="muted"><strong>Not scored.</strong> Real TAT interpretation needs a trained psychologist reading it alongside your live behavior — this is offered purely as guided self-reflection practice. As in the real exam, each picture is shown briefly and then hidden — keep writing your story below even after it disappears. Type it, or tap 🎤 to speak it.</p>
+      ${selectedTat.map((p) => `
         <div class="srtItem">
-          <div class="situation">${p.description}</div>
+          <div class="tatImageWrap" id="tatImgWrap_${p.id}">
+            <div class="tatImageBox">${p.svg}</div>
+            <div class="muted" style="text-align:center; margin-top:0.3rem;">Image visible for <span id="tatCountdown_${p.id}">20</span>s</div>
+          </div>
           <div class="muted" style="margin-bottom:0.4rem;">${p.guidance}</div>
-          <textarea rows="3" oninput="responses.tat['${p.id}'] = this.value">${responses.tat[p.id] || ''}</textarea>
+          <div class="voiceRow">
+            <textarea id="tat_${p.id}" rows="4" placeholder="Write your story here..." oninput="responses.tat['${p.id}'] = this.value">${responses.tat[p.id] || ''}</textarea>
+            <button type="button" class="micBtn" onclick="toggleVoiceInput(this, 'tat_${p.id}')" title="Speak your story">🎤</button>
+          </div>
         </div>`).join('')}
       <button class="btn secondary" onclick="skipStep()">Skip for now</button>
       <button class="btn" onclick="nextFromFreeText('tat')">Continue</button>
     </div>`;
+  selectedTat.forEach((p) => startTatTimer(p.id));
+}
+
+function startTatTimer(id) {
+  let seconds = 20;
+  const interval = setInterval(() => {
+    seconds--;
+    const countdownEl = document.getElementById(`tatCountdown_${id}`);
+    if (!countdownEl) { clearInterval(interval); return; } // step navigated away
+    countdownEl.textContent = seconds;
+    if (seconds <= 0) {
+      clearInterval(interval);
+      const wrap = document.getElementById(`tatImgWrap_${id}`);
+      if (wrap) wrap.innerHTML = '<div class="tatImageHidden muted">Image hidden — continue writing your story from memory, as in the real exam.</div>';
+    }
+  }, 1000);
 }
 
 function renderSdtStep(container) {
@@ -319,12 +467,15 @@ function renderSdtStep(container) {
     <div class="stepLabel">Step ${currentStepIndex + 1} of ${STEPS.length}</div>
     <div class="card">
       <h2>Part 6 — Self Description (SDT)</h2>
-      <p class="muted"><strong>Not scored.</strong> The real SDT is cross-checked against interview and observation by trained assessors — this is for your own honest self-reflection.</p>
+      <p class="muted"><strong>Not scored.</strong> The real SDT is cross-checked against interview and observation by trained assessors — this is for your own honest self-reflection. Type it, or tap 🎤 to speak it.</p>
       ${meta.sdtPrompts.map((p) => `
         <div class="srtItem">
           <div class="situation">${p.label}</div>
           <div class="muted" style="margin-bottom:0.4rem;">${p.hint}</div>
-          <textarea rows="3" oninput="responses.sdt['${p.id}'] = this.value">${responses.sdt[p.id] || ''}</textarea>
+          <div class="voiceRow">
+            <textarea id="sdt_${p.id}" rows="3" oninput="responses.sdt['${p.id}'] = this.value">${responses.sdt[p.id] || ''}</textarea>
+            <button type="button" class="micBtn" onclick="toggleVoiceInput(this, 'sdt_${p.id}')" title="Speak your answer">🎤</button>
+          </div>
         </div>`).join('')}
       <button class="btn" onclick="nextFromFreeText('sdt')">Finish &amp; See My Readiness Profile</button>
     </div>`;
@@ -350,19 +501,24 @@ async function saveSection(sectionKey) {
   } catch (e) { console.error('Autosave failed for', sectionKey, e.message); }
 }
 
-const FACTOR_COLORS = {
-  'Planning & Organizing': '#2563EB',
-  'Social Adjustment': '#059669',
-  'Social Effectiveness': '#D97706',
-  'Dynamic Factor': '#DC2626'
-};
-
+// The report HTML is now generated entirely server-side (buildSsbReportHtml
+// in ssbScoring.js) at submit time and inserted straight into the `reports`
+// table there — this client just displays exactly what the server returns.
+// That's what makes the candidate's own view, the stored report, and what an
+// admin opens in the HR Panel guaranteed to be byte-identical: there is only
+// one place this HTML is ever built, and it isn't here.
 async function submitAndRenderReport(container) {
   container.innerHTML = `<div class="card"><p class="muted">Scoring your profile…</p></div>`;
   try {
-    const result = await api(`/ssb/assessments/${assessmentId}/submit`, { method: 'POST' });
-    renderReport(container, result.profile, result.improvementPlan);
-    saveReportRecord(result.profile, result.improvementPlan);
+    const result = await api(`/ssb/assessments/${assessmentId}/submit`, {
+      method: 'POST',
+      body: JSON.stringify({ planType: selectedPlanType })
+    });
+    if (result.report.locked) {
+      container.innerHTML = `<div class="card"><h2>Payment Pending</h2><p class="muted">Your ${result.report.planType} report has been generated and is waiting on payment confirmation. NavaSetu will release it to you shortly — contact us if you've already paid.</p></div>`;
+      return;
+    }
+    renderReport(container, result.report.htmlContent);
   } catch (e) {
     container.innerHTML = `<div class="card"><p class="muted" style="color:#B91C1C;">${e.message}</p>
       ${e.message.includes('complete the trait') ? `<button class="btn secondary" onclick="currentStepIndex=0; renderStep();">Go back to Part 1</button>` : ''}
@@ -370,46 +526,11 @@ async function submitAndRenderReport(container) {
   }
 }
 
-function renderReport(container, profile, plan) {
-  const factorBars = Object.entries(profile.factorScores).map(([factor, score]) => `
-    <div class="factorBar">
-      <div class="fLabel"><span>${factor}</span><span>${score.toFixed(1)} / 5 — ${profile.factorDetail[factor].label}</span></div>
-      <div class="track"><div class="fill" style="width:${(score / 5) * 100}%; background:${FACTOR_COLORS[factor]};"></div></div>
-      <div class="muted" style="margin-top:0.3rem;">OLQs: ${profile.factorDetail[factor].olqs.join(', ')}</div>
-    </div>`).join('');
-
-  const planHtml = plan.map((p) => `
-    <div class="planItem">
-      <h4>${p.factor} — ${p.label} (${p.score.toFixed(1)} / 5)</h4>
-      <ul>${p.actions.map((a) => `<li>${a}</li>`).join('')}</ul>
-    </div>`).join('');
-
-  document.getElementById('stepContainer').innerHTML = `
-    <div id="reportBody">
-      <div class="card">
-        <h2>Your OLQ Readiness Profile</h2>
-        <p style="font-size:2.2rem; font-weight:700; color:${FACTOR_COLORS[profile.strongestFactor]}; margin:0.25rem 0;">${profile.readinessIndex} / 100</p>
-        <div class="disclaimer">${profile.disclaimer}</div>
-        ${factorBars}
-      </div>
-      <div class="card">
-        <h2>Your Improvement Plan</h2>
-        <p class="muted">Ordered from your most to least developed area — start with the top one.</p>
-        ${planHtml}
-      </div>
-    </div>
+function renderReport(container, html) {
+  container.innerHTML = `
+    <div id="reportBody">${html}</div>
     <button class="btn secondary" onclick="window.print()">🖨️ Print / Save as PDF</button>
   `;
-}
-
-async function saveReportRecord(profile, plan) {
-  try {
-    const html = document.getElementById('reportBody').innerHTML;
-    await api('/reports', {
-      method: 'POST',
-      body: JSON.stringify({ assessmentId, planType: 'ssb_readiness', htmlContent: `<div style="font-family:Inter,Arial,sans-serif;">${html}</div>` })
-    });
-  } catch (e) { console.error('Could not save report record:', e.message); }
 }
 
 function renderAlreadySubmitted() {

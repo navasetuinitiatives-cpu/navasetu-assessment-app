@@ -354,7 +354,7 @@ router.get('/leads/:userId', requireStaff, async (req, res) => {
 
     const user = await pool.query(
       `SELECT u.id, u.lead_number, u.email, u.full_name, u.phone_number, u.role, u.client_type,
-              u.lead_status, u.created_at, u.last_login, u.assigned_to, u.deleted_at, u.delete_reason,
+              u.lead_status, u.status, u.created_at, u.last_login, u.assigned_to, u.deleted_at, u.delete_reason,
               ass.full_name AS assigned_to_name
        FROM users u LEFT JOIN users ass ON ass.id = u.assigned_to WHERE u.id = $1`,
       [userId]
@@ -535,7 +535,7 @@ router.get('/assessments/:assessmentId/responses', requireStaff, async (req, res
     // (see ssbScoring.js) — branch here rather than touching the wellness
     // mapping below, which stays exactly as it was.
     const items = assessment.track === 'ssb'
-      ? buildSsbResponseItems(responses)
+      ? buildSsbResponseItems(responses, assessment.item_selection || null)
       : questionBank.map((q) => {
           const answerIdx = responses[q.id];
           return {
@@ -554,6 +554,83 @@ router.get('/assessments/:assessmentId/responses', requireStaff, async (req, res
   } catch (error) {
     console.error('Fetch responses error:', error);
     res.status(500).json({ error: 'Failed to fetch responses' });
+  }
+});
+
+// Admin-only: block a lead's login access (works for both the wellness app
+// and the SSB app, since they share the same users table and the same
+// /api/auth/login route — see the status check added there). Never deletes
+// or touches any of the lead's data, just flips users.status to 'inactive'.
+router.put('/leads/:userId/block', requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const result = await pool.query(
+      `UPDATE users SET status = 'inactive' WHERE id = $1 AND role NOT IN ('platform_admin', 'counsellor')
+       RETURNING id, email, full_name, status`,
+      [userId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Lead not found' });
+    await pool.query(
+      `INSERT INTO audit_logs (actor_user_id, action, entity_type, entity_id) VALUES ($1, $2, $3, $4)`,
+      [req.user.userId, 'block_user', 'user', userId]
+    );
+    res.json({ success: true, lead: result.rows[0] });
+  } catch (error) {
+    console.error('Block lead error:', error);
+    res.status(500).json({ error: 'Failed to block this user' });
+  }
+});
+
+router.put('/leads/:userId/unblock', requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const result = await pool.query(
+      `UPDATE users SET status = 'active' WHERE id = $1 AND role NOT IN ('platform_admin', 'counsellor')
+       RETURNING id, email, full_name, status`,
+      [userId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Lead not found' });
+    await pool.query(
+      `INSERT INTO audit_logs (actor_user_id, action, entity_type, entity_id) VALUES ($1, $2, $3, $4)`,
+      [req.user.userId, 'unblock_user', 'user', userId]
+    );
+    res.json({ success: true, lead: result.rows[0] });
+  } catch (error) {
+    console.error('Unblock lead error:', error);
+    res.status(500).json({ error: 'Failed to unblock this user' });
+  }
+});
+
+// Admin-only: force-reset a candidate/lead's password without ever needing
+// (or storing) their old one. This is the safe alternative to capturing a
+// user's real password at registration — the admin never sees the old
+// password, and the new one is shown here exactly once for them to relay.
+// Mirrors the existing admin force-reset-password pattern already used for
+// staff accounts (see PUT /admins/:id) and Settings.
+router.post('/leads/:userId/reset-password', requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const target = await pool.query(`SELECT id, email, full_name FROM users WHERE id = $1 AND role NOT IN ('platform_admin', 'counsellor')`, [userId]);
+    if (target.rows.length === 0) return res.status(404).json({ error: 'Lead not found' });
+
+    // A short, readable temp password (avoids ambiguous characters) rather
+    // than a random UUID, since an admin has to read this over the phone or
+    // type it out for the candidate.
+    const CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    let tempPassword = '';
+    for (let i = 0; i < 10; i++) tempPassword += CHARS[Math.floor(Math.random() * CHARS.length)];
+
+    const passwordHash = await bcrypt.hash(tempPassword, 10);
+    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [passwordHash, userId]);
+    await pool.query(
+      `INSERT INTO audit_logs (actor_user_id, action, entity_type, entity_id) VALUES ($1, $2, $3, $4)`,
+      [req.user.userId, 'reset_user_password', 'user', userId]
+    );
+
+    res.json({ success: true, email: target.rows[0].email, temporaryPassword: tempPassword });
+  } catch (error) {
+    console.error('Reset lead password error:', error);
+    res.status(500).json({ error: 'Failed to reset password' });
   }
 });
 

@@ -4,10 +4,15 @@ import { pool } from '../config/database.js';
 import { requireAuth } from '../middleware/auth.js';
 import {
   bigFiveItems, traitItemBank, watWords, srtSituations, gtoScenarios, tatPrompts, sdtPrompts,
-  calculateOLQProfile, buildImprovementPlan
+  calculateOLQProfile, buildImprovementPlan, buildItemSelection, buildSsbReportHtml, SSB_PLANS
 } from '../utils/ssbScoring.js';
 
 const router = express.Router();
+
+// Same pilot switch as reports.js (Razorpay isn't wired up yet) — re-declared
+// here rather than imported so reports.js stays completely untouched. While
+// true, every SSB report package releases immediately without real payment.
+const PILOT_FREE_ACCESS = process.env.PILOT_FREE_ACCESS !== 'false';
 
 // Fully isolated from the wellness assessment routes/tables in every way
 // that matters for scoring (separate item banks, separate scoring module) —
@@ -19,7 +24,7 @@ const router = express.Router();
 
 // Public: the full item bank, so the frontend never hardcodes question text.
 router.get('/meta', (req, res) => {
-  res.json({ bigFiveItems, traitItemBank, watWords, srtSituations, gtoScenarios, tatPrompts, sdtPrompts });
+  res.json({ bigFiveItems, traitItemBank, watWords, srtSituations, gtoScenarios, tatPrompts, sdtPrompts, plans: SSB_PLANS });
 });
 
 // Start (or resume) the caller's current in-progress SSB assessment.
@@ -34,11 +39,17 @@ router.post('/assessments', requireAuth, async (req, res) => {
       return res.json({ success: true, assessment: existing.rows[0], resumed: true });
     }
 
+    // Fresh attempt: draw a brand-new random subset of WAT/SRT/GTO/TAT items
+    // and freeze it on the row, so this attempt always shows the same items
+    // on reload, but the *next* new attempt gets a different draw. Big Five +
+    // the 4 trait scales are never rotated (see ssbScoring.js header for why).
+    const itemSelection = buildItemSelection();
+
     const id = uuidv4();
     const result = await pool.query(
-      `INSERT INTO assessments (id, user_id, client_type, track, status, responses)
-       VALUES ($1, $2, 'b2c', 'ssb', 'in_progress', '{}'::jsonb) RETURNING *`,
-      [id, userId]
+      `INSERT INTO assessments (id, user_id, client_type, track, status, responses, item_selection)
+       VALUES ($1, $2, 'b2c', 'ssb', 'in_progress', '{}'::jsonb, $3) RETURNING *`,
+      [id, userId, JSON.stringify(itemSelection)]
     );
     res.status(201).json({ success: true, assessment: result.rows[0], resumed: false });
   } catch (error) {
@@ -112,6 +123,9 @@ router.put('/assessments/:id', requireAuth, async (req, res) => {
 // for why — real projective-test interpretation needs a trained assessor).
 router.post('/assessments/:id/submit', requireAuth, async (req, res) => {
   try {
+    const requestedPlan = req.body?.planType;
+    const planType = SSB_PLANS[requestedPlan] ? requestedPlan : 'ssb_basic';
+
     const existing = await pool.query(`SELECT * FROM assessments WHERE id = $1 AND track = 'ssb'`, [req.params.id]);
     if (existing.rows.length === 0) return res.status(404).json({ error: 'Assessment not found' });
     const assessment = existing.rows[0];
@@ -125,11 +139,17 @@ router.post('/assessments/:id/submit', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Please complete the trait scale (Big Five + the 4 SSB-specific scales) before submitting.' });
     }
 
+    // itemSelection is this attempt's frozen random draw (older attempts made
+    // before rotation was added won't have one — calculateOLQProfile/
+    // buildSsbReportHtml fall back to the full bank in that case).
+    const itemSelection = assessment.item_selection || null;
+
     const profile = calculateOLQProfile({
       wellnessResponses: responses.bigFive || {},
       traitResponses: responses.traits || {},
       watResponses: responses.wat || {},
-      gtoResponses: responses.gto || {}
+      gtoResponses: responses.gto || {},
+      itemSelection
     });
     const improvementPlan = buildImprovementPlan(profile.factorDetail);
 
@@ -139,7 +159,37 @@ router.post('/assessments/:id/submit', requireAuth, async (req, res) => {
       [JSON.stringify({ profile, improvementPlan }), req.params.id]
     );
 
-    res.json({ success: true, assessment: result.rows[0], profile, improvementPlan });
+    // Report HTML is now built here, server-side, from the same profile/plan
+    // just computed — never trusted from (or rebuilt by) the browser. This is
+    // the one and only place SSB report HTML is generated, so the candidate's
+    // own view, the copy stored in `reports`, and what an admin opens in the
+    // HR Panel are byte-identical by construction.
+    const userRow = await pool.query('SELECT full_name FROM users WHERE id = $1', [req.user.userId]);
+    const candidateName = userRow.rows[0]?.full_name || null;
+    const reportHtml = buildSsbReportHtml(profile, improvementPlan, candidateName, planType);
+
+    // Same pilot behavior as the wellness Explore/Navigate tiers: while
+    // PILOT_FREE_ACCESS is on (Razorpay isn't wired up yet), every paid
+    // package releases immediately rather than blocking on payment. plan_type
+    // and price are still recorded correctly for the CRM/admin view and for
+    // when real payment collection goes live.
+    const paymentStatus = PILOT_FREE_ACCESS ? 'admin_released' : 'pending';
+
+    const reportId = uuidv4();
+    const reportResult = await pool.query(
+      `INSERT INTO reports (id, assessment_id, user_id, plan_type, html_content, payment_status, released_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, plan_type, payment_status, created_at`,
+      [reportId, req.params.id, req.user.userId, planType, reportHtml, paymentStatus, paymentStatus === 'admin_released' ? new Date() : null]
+    );
+
+    res.json({
+      success: true,
+      assessment: result.rows[0],
+      profile,
+      improvementPlan,
+      report: { id: reportResult.rows[0].id, planType, htmlContent: reportHtml, locked: paymentStatus === 'pending' }
+    });
   } catch (error) {
     console.error('Submit SSB assessment error:', error);
     res.status(500).json({ error: 'Failed to submit your SSB assessment' });
