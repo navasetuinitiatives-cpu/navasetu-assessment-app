@@ -4,7 +4,8 @@ import { pool } from '../config/database.js';
 import { requireAuth } from '../middleware/auth.js';
 import {
   bigFiveItems, traitItemBank, watWords, srtSituations, gtoScenarios, tatPrompts, sdtPrompts,
-  calculateOLQProfile, buildImprovementPlan, buildItemSelection, buildSsbReportHtml, SSB_PLANS
+  calculateOLQProfile, buildImprovementPlan, buildItemSelection, buildSsbReportHtml, SSB_PLANS,
+  buildTeaserSelection, computeTeaserScore
 } from '../utils/ssbScoring.js';
 
 const router = express.Router();
@@ -90,24 +91,40 @@ router.get('/assessments-mine/list', requireAuth, async (req, res) => {
 // Responses are stored as { [section]: { [itemId]: answer } } in the same
 // JSONB `responses` column the wellness flow uses — just namespaced by
 // section so nothing collides with wellness's flat item-id keys.
+//
+// BUG FIX: this used to read the whole `responses` column, splice in this
+// section, and write the whole column back (read-modify-write in JS). Fill
+// Sample fires all 7 section saves at once (Promise.all) — under that
+// concurrency, several requests would read the same stale `responses` before
+// any of them had written back, so each one's UPDATE clobbered whatever the
+// others had just saved. In practice that silently dropped the bigFive
+// and/or traits sections, which then made submit fail with "please complete
+// the trait scale" even though the user (or Fill Sample) had answered
+// everything. Fixed by merging only this section's key at the database level
+// via jsonb `||`, which Postgres applies against the row's value *at UPDATE
+// time* (not the earlier SELECT), so concurrent saves to different sections
+// can no longer overwrite each other.
 router.put('/assessments/:id', requireAuth, async (req, res) => {
   try {
     const { section, answers } = req.body;
     const validSections = ['bigFive', 'traits', 'wat', 'srt', 'gto', 'tat', 'sdt'];
     if (!validSections.includes(section)) return res.status(400).json({ error: `section must be one of: ${validSections.join(', ')}` });
 
-    const existing = await pool.query(`SELECT * FROM assessments WHERE id = $1 AND track = 'ssb'`, [req.params.id]);
+    const existing = await pool.query(`SELECT id, user_id, status, responses FROM assessments WHERE id = $1 AND track = 'ssb'`, [req.params.id]);
     if (existing.rows.length === 0) return res.status(404).json({ error: 'Assessment not found' });
     const assessment = existing.rows[0];
     if (assessment.user_id !== req.user.userId) return res.status(403).json({ error: 'Not your assessment' });
     if (assessment.status !== 'in_progress') return res.status(409).json({ error: 'This assessment has already been submitted' });
 
-    const responses = assessment.responses || {};
-    responses[section] = Object.assign({}, responses[section] || {}, answers || {});
+    const existingSection = (assessment.responses && assessment.responses[section]) || {};
+    const mergedSection = Object.assign({}, existingSection, answers || {});
 
     const result = await pool.query(
-      `UPDATE assessments SET responses = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id, responses`,
-      [JSON.stringify(responses), req.params.id]
+      `UPDATE assessments
+       SET responses = COALESCE(responses, '{}'::jsonb) || jsonb_build_object($1::text, $2::jsonb),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $3 RETURNING id, responses`,
+      [section, JSON.stringify(mergedSection), req.params.id]
     );
     res.json({ success: true, responses: result.rows[0].responses });
   } catch (error) {
@@ -193,6 +210,93 @@ router.post('/assessments/:id/submit', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('Submit SSB assessment error:', error);
     res.status(500).json({ error: 'Failed to submit your SSB assessment' });
+  }
+});
+
+// Upgrade an already-submitted assessment's report to a higher paid tier —
+// the SSB equivalent of the wellness Explore/Navigate "Upgrade" flow. Doesn't
+// need new answers: the underlying trait/exercise responses don't change on
+// an upgrade, only which sections the report includes, so this just re-runs
+// buildSsbReportHtml against the profile/plan already stored on the
+// assessment row at submit time and inserts one more `reports` row for the
+// new tier. Same PILOT_FREE_ACCESS pilot behavior as everywhere else.
+router.post('/assessments/:id/upgrade-report', requireAuth, async (req, res) => {
+  try {
+    const requestedPlan = req.body?.planType;
+    if (!SSB_PLANS[requestedPlan]) return res.status(400).json({ error: 'Unknown report package' });
+    const planType = requestedPlan;
+
+    const existing = await pool.query(`SELECT * FROM assessments WHERE id = $1 AND track = 'ssb'`, [req.params.id]);
+    if (existing.rows.length === 0) return res.status(404).json({ error: 'Assessment not found' });
+    const assessment = existing.rows[0];
+    if (assessment.user_id !== req.user.userId) return res.status(403).json({ error: 'Not your assessment' });
+    if (assessment.status !== 'submitted' || !assessment.scores?.profile) {
+      return res.status(409).json({ error: 'Submit your assessment before upgrading your report' });
+    }
+
+    const { profile, improvementPlan } = assessment.scores;
+    const userRow = await pool.query('SELECT full_name FROM users WHERE id = $1', [req.user.userId]);
+    const candidateName = userRow.rows[0]?.full_name || null;
+    const reportHtml = buildSsbReportHtml(profile, improvementPlan, candidateName, planType);
+
+    const paymentStatus = PILOT_FREE_ACCESS ? 'admin_released' : 'pending';
+    const reportId = uuidv4();
+    const reportResult = await pool.query(
+      `INSERT INTO reports (id, assessment_id, user_id, plan_type, html_content, payment_status, released_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, plan_type, payment_status, created_at`,
+      [reportId, req.params.id, req.user.userId, planType, reportHtml, paymentStatus, paymentStatus === 'admin_released' ? new Date() : null]
+    );
+
+    res.json({
+      success: true,
+      report: { id: reportResult.rows[0].id, planType, htmlContent: reportHtml, locked: paymentStatus === 'pending' }
+    });
+  } catch (error) {
+    console.error('Upgrade SSB report error:', error);
+    res.status(500).json({ error: 'Failed to upgrade your report' });
+  }
+});
+
+// --- Free "teaser" funnel test --------------------------------------------
+// A short, ungated marketing exercise (5 quick trait items + 1 SRT + 1 TAT)
+// for visitors who aren't ready to commit to the full assessment. Completely
+// isolated from the `users`/`assessments` tables the real test uses — no
+// login, no assessment row, just a lead captured in its own
+// `ssb_teaser_leads` table — so it can never collide with or corrupt a real
+// candidate's data. Every /teaser/meta call draws a fresh random subset, so
+// a repeat visitor always gets new questions and a fresh score.
+router.get('/teaser/meta', (req, res) => {
+  const selection = buildTeaserSelection();
+  res.json(Object.assign({}, selection, { plans: SSB_PLANS }));
+});
+
+router.post('/teaser/submit', async (req, res) => {
+  try {
+    const { name, email, phone, traitItemIds, traitResponses, srtText, tatText } = req.body || {};
+    if (!name || !email) return res.status(400).json({ error: 'Name and email are required' });
+    if (!Array.isArray(traitItemIds) || traitItemIds.length === 0) {
+      return res.status(400).json({ error: 'Missing trait responses' });
+    }
+    const traitItems = traitItemIds.map((id) => traitItemBank.find((t) => t.id === id)).filter(Boolean);
+    const { score, gradeBand } = computeTeaserScore({
+      traitItems,
+      traitResponses: traitResponses || {},
+      srtText: srtText || '',
+      tatText: tatText || ''
+    });
+
+    const id = uuidv4();
+    await pool.query(
+      `INSERT INTO ssb_teaser_leads (id, name, email, phone, responses, score, grade_label)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [id, name, email, phone || null, JSON.stringify({ traitItemIds, traitResponses, srtText, tatText }), score, gradeBand.label]
+    );
+
+    res.json({ success: true, score, gradeBand, plans: SSB_PLANS });
+  } catch (error) {
+    console.error('Submit SSB teaser error:', error);
+    res.status(500).json({ error: 'Failed to score your free test' });
   }
 });
 

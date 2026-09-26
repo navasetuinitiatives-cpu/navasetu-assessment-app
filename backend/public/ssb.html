@@ -54,8 +54,8 @@
   .micBtn.recording { background:#FEE2E2; border-color:#FCA5A5; animation:micPulse 1s infinite; }
   @keyframes micPulse { 0%, 100% { opacity:1; } 50% { opacity:0.5; } }
   .tatImageWrap { margin-bottom:0.75rem; }
-  .tatImageBox { border:1px solid var(--border); border-radius:8px; overflow:hidden; background:#fff; display:flex; justify-content:center; }
-  .tatImageBox svg { width:100%; max-width:340px; height:auto; display:block; }
+  .tatImageBox { border:1px solid var(--border); border-radius:8px; overflow:hidden; background:#fff; display:flex; justify-content:center; padding:0.6rem; box-shadow:0 1px 4px rgba(0,0,0,0.08) inset; }
+  .tatImageBox svg { width:100%; max-width:340px; height:auto; display:block; border-radius:2px; }
   .tatImageHidden { border:1px dashed var(--border); border-radius:8px; padding:1.5rem; text-align:center; background:#F9FAFB; }
   .plan-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:1rem; margin:1.25rem 0; }
   @media (max-width:680px) { .plan-grid { grid-template-columns:1fr; } }
@@ -78,7 +78,27 @@
 
 <main>
 
-  <div id="authScreen" class="card">
+  <div id="pathChoiceScreen" class="card" style="text-align:center;">
+    <h2 style="margin-top:0;">How would you like to start?</h2>
+    <p class="muted">Pick whichever fits you right now — you're welcome to try the other one afterwards.</p>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-top:1.25rem; text-align:left;">
+      <div style="border:2px solid var(--border); border-radius:10px; padding:1.5rem 1.25rem; cursor:pointer; transition:border-color 0.15s;" onclick="window.location.href='/ssb-teaser.html'">
+        <div style="font-size:1.9rem; margin-bottom:0.4rem;">🆓</div>
+        <h3 style="margin:0 0 0.4rem; font-size:1.05rem;">Take a Free Test</h3>
+        <p class="muted" style="font-size:0.85rem; margin-bottom:0.9rem;">A quick 2-3 minute taste — a few questions and one TAT image. No sign-up, no payment.</p>
+        <span class="btn secondary" style="margin-top:0; display:inline-block;">Start Free Test</span>
+      </div>
+      <div style="border:2px solid var(--accent); border-radius:10px; padding:1.5rem 1.25rem; cursor:pointer; background:#FAF9FF;" onclick="showFullAssessment()">
+        <div style="font-size:1.9rem; margin-bottom:0.4rem;">🎯</div>
+        <h3 style="margin:0 0 0.4rem; font-size:1.05rem;">Do I Have IT in Me?</h3>
+        <p class="muted" style="font-size:0.85rem; margin-bottom:0.9rem;">The full OLQ Readiness Assessment — Big Five, all 4 trait scales, WAT/SRT/GTO/TAT, and a personalized report.</p>
+        <span class="btn" style="margin-top:0; display:inline-block;">Start Full Assessment</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="authScreen" class="card hidden">
+    <button class="btn secondary" style="margin-top:0; float:right; font-size:0.8rem; padding:0.45rem 0.9rem;" onclick="backToPathChoice()">← Back</button>
     <h2 id="authTitle">Sign in to begin</h2>
     <p class="muted">Your account is the same one used across NavaSetu — if you already have a wellness assessment account, log in with it.</p>
     <div id="authRegisterFields" class="hidden">
@@ -86,11 +106,11 @@
     </div>
     <label>Email</label><input id="authEmail" type="email">
     <label>Password</label><input id="authPassword" type="password">
-    <button class="btn" id="authSubmitBtn" onclick="authLogin()">Log In</button>
-    <p class="muted" style="margin-top:0.75rem;">
-      <a href="#" id="authToggleLink" onclick="toggleAuthMode(); return false;">New here? Create an account instead</a>
-    </p>
-    <p class="muted" id="authError" style="color:#B91C1C;"></p>
+    <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+      <button class="btn" id="authSubmitBtn" onclick="authLogin()">Log In</button>
+      <button class="btn secondary" id="authToggleBtn" onclick="toggleAuthMode()">New to NavaSetu? Register</button>
+    </div>
+    <p class="muted" id="authError" style="color:#B91C1C; margin-top:0.75rem;"></p>
   </div>
 
   <div id="appScreen" class="hidden">
@@ -190,7 +210,17 @@ function toggleAuthMode() {
   document.getElementById('authTitle').textContent = isRegisterMode ? 'Create your account' : 'Sign in to begin';
   document.getElementById('authSubmitBtn').textContent = isRegisterMode ? 'Create Account & Continue' : 'Log In';
   document.getElementById('authSubmitBtn').setAttribute('onclick', isRegisterMode ? 'authRegister()' : 'authLogin()');
-  document.getElementById('authToggleLink').textContent = isRegisterMode ? 'Already have an account? Log in instead' : 'New here? Create an account instead';
+  document.getElementById('authToggleBtn').textContent = isRegisterMode ? 'Already have an account? Log in instead' : 'New to NavaSetu? Register';
+}
+
+function showFullAssessment() {
+  document.getElementById('pathChoiceScreen').classList.add('hidden');
+  document.getElementById('authScreen').classList.remove('hidden');
+}
+
+function backToPathChoice() {
+  document.getElementById('authScreen').classList.add('hidden');
+  document.getElementById('pathChoiceScreen').classList.remove('hidden');
 }
 
 async function authLogin() {
@@ -226,6 +256,7 @@ async function authRegister() {
 }
 
 async function initAssessment() {
+  document.getElementById('pathChoiceScreen').classList.add('hidden');
   document.getElementById('authScreen').classList.add('hidden');
   document.getElementById('appScreen').classList.remove('hidden');
   try {
@@ -534,6 +565,43 @@ function renderReport(container, html) {
     <div id="reportBody">${html}</div>
     <button class="btn secondary" onclick="window.print()">🖨️ Print / Save as PDF</button>
   `;
+}
+
+// Called from onclick attributes embedded directly in the server-rendered
+// report HTML ("Upgrade to ..." buttons in the "Unlock More Insights"
+// section — see buildSsbReportHtml). Mirrors the wellness app.upgradePlan
+// flow: show a differential-price confirmation, then regenerate the report
+// at the new tier without needing to re-answer anything.
+async function upgradeSsbPlan(newPlanType) {
+  const plans = meta.plans || {};
+  const currentPrice = plans[selectedPlanType] ? plans[selectedPlanType].price : 0;
+  const newPlan = plans[newPlanType];
+  if (!newPlan) return;
+  const differential = Math.max(newPlan.price - currentPrice, 0);
+  const proceed = confirm(
+    `Upgrade to ${newPlan.label}?\n\n` +
+    `Current plan: ₹${currentPrice}\n` +
+    `New plan (${newPlan.label}): ₹${newPlan.price}\n` +
+    `Amount due: ₹${differential}\n\n` +
+    `Payment isn't wired up yet for this pilot — your ${newPlan.label} report will unlock immediately.`
+  );
+  if (!proceed) return;
+  try {
+    const result = await api(`/ssb/assessments/${assessmentId}/upgrade-report`, {
+      method: 'POST',
+      body: JSON.stringify({ planType: newPlanType })
+    });
+    selectedPlanType = newPlanType;
+    const container = document.getElementById('stepContainer');
+    if (result.report.locked) {
+      container.innerHTML = `<div class="card"><h2>Payment Pending</h2><p class="muted">Your ${result.report.planType} report has been generated and is waiting on payment confirmation.</p></div>`;
+      return;
+    }
+    renderReport(container, result.report.htmlContent);
+    window.scrollTo(0, 0);
+  } catch (e) {
+    alert('Could not upgrade your report: ' + e.message);
+  }
 }
 
 function renderAlreadySubmitted() {

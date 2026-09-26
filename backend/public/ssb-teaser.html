@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NavaSetu — Free SSB Readiness Test</title>
+<style>
+  :root { --primary:#0a0e27; --gold:#D4A017; --bg:#F9FAFB; --border:#E5E7EB; --accent:#5B21B6; }
+  * { box-sizing:border-box; }
+  body { font-family:-apple-system, Segoe UI, Inter, sans-serif; background:var(--bg); margin:0; color:#1F2937; }
+  header { background:var(--primary); color:#fff; padding:1rem 1.5rem; display:flex; align-items:center; gap:1rem; }
+  header img { max-height:36px; }
+  header h1 { font-size:1.1rem; margin:0; font-weight:600; }
+  header a.home { color:#D1D5DB; text-decoration:none; margin-left:auto; font-size:0.85rem; }
+  main { max-width:640px; margin:0 auto; padding:1.5rem 1.25rem 4rem; }
+  .card { background:#fff; border:1px solid var(--border); border-radius:10px; padding:1.75rem; margin-bottom:1.25rem; }
+  .card h2 { margin-top:0; font-size:1.2rem; }
+  .muted { color:#6B7280; font-size:0.88rem; line-height:1.5; }
+  label { display:block; font-size:0.88rem; font-weight:600; margin:0.85rem 0 0.3rem; }
+  input, textarea { width:100%; padding:0.6rem; border:1px solid var(--border); border-radius:6px; font-size:0.92rem; font-family:inherit; }
+  textarea { resize:vertical; }
+  button.btn { background:var(--accent); color:#fff; border:none; padding:0.7rem 1.4rem; border-radius:8px; cursor:pointer; font-size:0.92rem; font-weight:600; margin-top:1rem; }
+  button.btn.secondary { background:#fff; color:var(--accent); border:1px solid var(--accent); }
+  button.btn:disabled { opacity:0.5; cursor:not-allowed; }
+  .progressBar { height:6px; background:var(--border); border-radius:999px; overflow:hidden; margin-bottom:1.5rem; }
+  .progressBar > div { height:100%; background:var(--accent); transition:width 0.3s; }
+  .likertItem { padding:0.9rem 0; border-bottom:1px solid var(--border); }
+  .likertItem:last-child { border-bottom:none; }
+  .likertItem .qtext { font-size:0.94rem; margin-bottom:0.5rem; }
+  .likertOptions { display:flex; gap:0.4rem; flex-wrap:wrap; }
+  .likertOptions label { display:flex; align-items:center; gap:0.3rem; font-weight:400; font-size:0.8rem; background:#F3F4F6; padding:0.35rem 0.6rem; border-radius:999px; cursor:pointer; margin:0; }
+  .likertOptions input { width:auto; }
+  .hidden { display:none !important; }
+  .voiceRow { display:flex; gap:0.5rem; align-items:flex-start; }
+  .voiceRow input, .voiceRow textarea { flex:1; }
+  .micBtn { flex:0 0 auto; background:#F3F4F6; border:1px solid var(--border); border-radius:8px; width:2.4rem; height:2.4rem; font-size:1rem; cursor:pointer; margin-top:0; }
+  .micBtn.recording { background:#FEE2E2; border-color:#FCA5A5; animation:micPulse 1s infinite; }
+  @keyframes micPulse { 0%, 100% { opacity:1; } 50% { opacity:0.5; } }
+  .tatImageBox { border:1px solid var(--border); border-radius:8px; overflow:hidden; background:#fff; display:flex; justify-content:center; padding:0.6rem; box-shadow:0 1px 4px rgba(0,0,0,0.08) inset; margin-bottom:0.75rem; }
+  .tatImageBox svg { width:100%; max-width:340px; height:auto; display:block; border-radius:2px; }
+  .disclaimer { background:#FFFBEB; border:1px solid #FDE68A; border-radius:8px; padding:1rem; font-size:0.85rem; color:#92400E; margin:1rem 0; }
+  .scoreCircle { text-align:center; padding:1rem 0 1.5rem; }
+  .scoreCircle .num { font-size:3.2rem; font-weight:800; color:var(--accent); margin:0.25rem 0; }
+  .scoreCircle .num span { font-size:1.2rem; color:#9CA3AF; font-weight:600; }
+  .scoreCircle .grade { font-weight:700; font-size:1.05rem; color:#1F2937; }
+  .plan-grid { display:grid; grid-template-columns:1fr; gap:1rem; margin:1.25rem 0; }
+  .plan-card { padding:1.25rem; border:2px solid var(--border); border-radius:8px; background:#fff; }
+  .plan-card .plan-name { font-weight:700; font-size:1.05rem; margin-bottom:0.2rem; }
+  .plan-card .plan-price { font-size:1.3rem; font-weight:700; color:var(--accent); margin-bottom:0.5rem; }
+  .plan-card .plan-desc { font-size:0.85rem; color:#6B7280; margin-bottom:0.75rem; }
+  .plan-card ul.plan-features { margin:0 0 0.75rem; padding-left:1.1rem; font-size:0.82rem; color:#374151; }
+</style>
+</head>
+<body>
+
+<header>
+  <img src="/api/settings/logo" onerror="this.style.display='none'" alt="">
+  <h1>NavaSetu — Free SSB Readiness Test</h1>
+  <a class="home" href="/ssb.html">← Back to SSB</a>
+</header>
+
+<main>
+  <div id="stepContainer"></div>
+</main>
+
+<script>
+const API = '/api';
+let meta = null;
+let leadInfo = { name: '', email: '', phone: '' };
+let traitResponses = {};
+let srtText = '';
+let tatText = '';
+
+async function api(path, options = {}) {
+  const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
+  const res = await fetch(`${API}${path}`, Object.assign({}, options, { headers }));
+  let data = null;
+  try { data = await res.json(); } catch (e) {}
+  if (!res.ok) throw new Error((data && data.error) || `Request failed (${res.status})`);
+  return data;
+}
+
+function speechSupported() {
+  return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+}
+let activeRecognition = null;
+function toggleVoiceInput(btn, targetId) {
+  if (!speechSupported()) {
+    alert('Voice input is not supported in this browser. Please type your answer instead.');
+    return;
+  }
+  if (activeRecognition) {
+    activeRecognition.stop();
+    activeRecognition = null;
+    document.querySelectorAll('.micBtn.recording').forEach((b) => b.classList.remove('recording'));
+    return;
+  }
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const recognition = new SpeechRecognition();
+  recognition.lang = 'en-IN';
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+  recognition.onresult = (e) => {
+    const transcript = e.results[0][0].transcript;
+    const el = document.getElementById(targetId);
+    if (el) {
+      el.value = el.value ? `${el.value} ${transcript}` : transcript;
+      el.dispatchEvent(new Event('input'));
+    }
+  };
+  recognition.onend = () => { btn.classList.remove('recording'); activeRecognition = null; };
+  recognition.onerror = () => { btn.classList.remove('recording'); activeRecognition = null; };
+  btn.classList.add('recording');
+  activeRecognition = recognition;
+  recognition.start();
+}
+
+function renderIntro() {
+  document.getElementById('stepContainer').innerHTML = `
+    <div class="card">
+      <h2>Free SSB Readiness Test</h2>
+      <p class="muted">A quick, 2-3 minute taste of the full OLQ Readiness Assessment — 5 short questions and one TAT-style image. No payment, and you can take it again with a fresh set of questions any time.</p>
+      <label>Your Name</label><input id="leadName">
+      <label>Email</label><input id="leadEmail" type="email">
+      <label>Phone (optional)</label><input id="leadPhone" type="tel">
+      <p class="muted" id="introError" style="color:#B91C1C;"></p>
+      <button class="btn" onclick="startTeaser()">Start Free Test</button>
+    </div>
+  `;
+}
+
+async function startTeaser() {
+  const name = document.getElementById('leadName').value.trim();
+  const email = document.getElementById('leadEmail').value.trim();
+  const phone = document.getElementById('leadPhone').value.trim();
+  const errEl = document.getElementById('introError');
+  if (!name || !email) { errEl.textContent = 'Please enter your name and email to continue.'; return; }
+  leadInfo = { name, email, phone };
+  document.getElementById('stepContainer').innerHTML = `<div class="card"><p class="muted">Loading your questions…</p></div>`;
+  try {
+    meta = await api('/ssb/teaser/meta');
+    traitResponses = {};
+    srtText = '';
+    tatText = '';
+    renderQuestions();
+  } catch (e) {
+    document.getElementById('stepContainer').innerHTML = `<div class="card"><p class="muted" style="color:#B91C1C;">${e.message}</p></div>`;
+  }
+}
+
+function renderQuestions() {
+  const traitsHtml = meta.traits.map((q) => `
+    <div class="likertItem">
+      <div class="qtext">${q.text}</div>
+      <div class="likertOptions">
+        ${q.options.map((opt, i) => `
+          <label><input type="radio" name="trait_${q.id}" value="${i}" onchange="traitResponses['${q.id}']=${i}"> ${opt}</label>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  document.getElementById('stepContainer').innerHTML = `
+    <div class="card">
+      <h2>A Few Quick Questions</h2>
+      <p class="muted">Answer honestly — there's no right or wrong answer.</p>
+      ${traitsHtml}
+    </div>
+    <div class="card">
+      <h2>Situation Reaction</h2>
+      <p class="muted"><strong>${meta.srt}</strong></p>
+      <p class="muted">In a sentence or two, what would you do?</p>
+      <div class="voiceRow">
+        <textarea id="srtInput" rows="3" oninput="srtText=this.value"></textarea>
+        <button type="button" class="micBtn" onclick="toggleVoiceInput(this, 'srtInput')" title="Speak your answer">🎤</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Picture Story</h2>
+      <p class="muted">Look at the image below and write a short story about what's happening and what happens next.</p>
+      <div class="tatImageBox">${meta.tat.svg}</div>
+      <p class="muted">${meta.tat.description}</p>
+      <div class="voiceRow">
+        <textarea id="tatInput" rows="4" oninput="tatText=this.value"></textarea>
+        <button type="button" class="micBtn" onclick="toggleVoiceInput(this, 'tatInput')" title="Speak your answer">🎤</button>
+      </div>
+    </div>
+    <button class="btn" onclick="submitTeaser()">See My Score</button>
+    <p class="muted" id="submitError" style="color:#B91C1C;"></p>
+  `;
+}
+
+async function submitTeaser() {
+  const traitItemIds = meta.traits.map((q) => q.id);
+  if (Object.keys(traitResponses).length < traitItemIds.length) {
+    document.getElementById('submitError').textContent = 'Please answer all 5 quick questions before continuing.';
+    return;
+  }
+  document.getElementById('stepContainer').innerHTML = `<div class="card"><p class="muted">Scoring your answers…</p></div>`;
+  try {
+    const result = await api('/ssb/teaser/submit', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: leadInfo.name,
+        email: leadInfo.email,
+        phone: leadInfo.phone,
+        traitItemIds,
+        traitResponses,
+        srtText,
+        tatText
+      })
+    });
+    renderResult(result);
+  } catch (e) {
+    document.getElementById('stepContainer').innerHTML = `<div class="card"><p class="muted" style="color:#B91C1C;">${e.message}</p></div>`;
+  }
+}
+
+function renderResult(result) {
+  const plans = result.plans || {};
+  const planCards = Object.keys(plans).map((key) => {
+    const p = plans[key];
+    return `
+      <div class="plan-card">
+        <div class="plan-name">${p.label}</div>
+        <div class="plan-price">${p.priceLabel}</div>
+        <div class="plan-desc">${p.desc}</div>
+        <ul class="plan-features">${p.features.map((f) => `<li>${f}</li>`).join('')}</ul>
+      </div>
+    `;
+  }).join('');
+
+  document.getElementById('stepContainer').innerHTML = `
+    <div class="card">
+      <div class="scoreCircle">
+        <p class="muted" style="text-transform:uppercase; letter-spacing:0.05em; font-size:0.8rem;">Your Free Snapshot Score</p>
+        <div class="num">${result.score}<span>/100</span></div>
+        <div class="grade">${result.gradeBand.label}</div>
+      </div>
+      <div class="disclaimer">This is a directional snapshot from just 7 quick responses — not a readiness grade. The full OLQ Readiness Assessment (Big Five + 4 trait scales, 40 WAT words, 30 SRTs, 8 GTO scenarios, 4 TAT plates) produces a proper OLQ-mapped Readiness Index and a DIPR-style grade band across all 15 Officer-Like Qualities.</div>
+    </div>
+    <div class="card">
+      <h2>Get Your Full OLQ Readiness Report</h2>
+      <div class="plan-grid">${planCards}</div>
+      <button class="btn" onclick="window.location.href='/ssb.html'">Take the Full Assessment →</button>
+      <button class="btn secondary" onclick="renderIntro()">Try Again with New Questions</button>
+    </div>
+  `;
+}
+
+renderIntro();
+</script>
+
+</body>
+</html>
