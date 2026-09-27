@@ -4,24 +4,46 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NavaSetu — Choose Your Path</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="alternate icon" href="/favicon.svg">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Crimson+Text:wght@400;600;700&family=Inter:wght@300;400;500;600;700&display=swap">
 <style>
   :root { --primary:#0a0e27; --gold:#D4A017; --bg:#F9FAFB; --border:#E5E7EB; }
   * { box-sizing:border-box; }
-  body { font-family:-apple-system, Segoe UI, Inter, sans-serif; background:var(--bg); margin:0; color:#1F2937; min-height:100vh; display:flex; flex-direction:column; }
-  header { background:var(--primary); color:#fff; padding:1.25rem 1.5rem; display:flex; align-items:center; gap:1rem; }
-  header img { max-height:40px; }
-  header h1 { font-size:1.15rem; margin:0; font-weight:600; }
-  main { flex:1; display:flex; align-items:center; justify-content:center; padding:2rem 1.25rem; }
+  body { font-family:'Inter', -apple-system, Segoe UI, sans-serif; background:var(--bg); margin:0; color:#1F2937; min-height:100vh; display:flex; flex-direction:column; }
+
+  /* Header — same treatment as the wellness assessment page */
+  .header { background:linear-gradient(135deg, var(--primary) 0%, rgba(10,14,39,0.95) 100%); color:#fff; padding:2rem 0; border-bottom:3px solid var(--gold); position:relative; }
+  .header::after { content:'© NavaSetu Initiatives'; position:absolute; bottom:0.5rem; right:1.5rem; font-size:0.7rem; opacity:0.5; }
+  .header-content { max-width:1000px; margin:0 auto; padding:0 1.5rem; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; row-gap:1rem; column-gap:1.5rem; }
+  .header-left { display:flex; align-items:center; gap:1.25rem; min-width:0; }
+  .crest-img { width:140px; height:140px; flex-shrink:0; object-fit:contain; }
+  .header-info h1 { font-family:'Crimson Text', serif; font-size:2.1rem; margin:0; letter-spacing:0.5px; line-height:1.15; color:#fff; }
+  .header-info p { font-size:0.95rem; opacity:0.9; margin:0.35rem 0 0 0; }
+  .header-contacts { display:flex; flex-direction:column; align-items:flex-end; gap:0.45rem; font-size:0.9rem; opacity:0.9; }
+  .contact-item { display:flex; align-items:center; gap:0.4rem; white-space:nowrap; }
+  @media (max-width:640px) {
+    .header-content { justify-content:center; text-align:center; }
+    .header-left { flex-direction:column; text-align:center; }
+    .header-contacts { align-items:center; }
+    .crest-img { width:100px; height:100px; }
+  }
+
+  main { flex:1; padding:2rem 1.25rem 3rem; }
+  .container { max-width:960px; margin:0 auto; }
+
+  .hero-banner { margin-bottom:2rem; border-radius:10px; overflow:hidden; box-shadow:0 4px 16px rgba(10,14,39,0.25); }
+  .hero-banner img { display:block; width:100%; height:auto; }
+
   .intro { max-width:720px; margin:0 auto 2.5rem; text-align:center; }
-  .intro h2 { font-size:1.6rem; margin-bottom:0.5rem; }
+  .intro h2 { font-family:'Crimson Text', serif; font-size:1.8rem; margin-bottom:0.5rem; color:var(--primary); }
   .intro p { color:#6B7280; font-size:1rem; line-height:1.6; }
-  .wrap { max-width:960px; width:100%; }
   .cards { display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; }
   @media (max-width:720px) { .cards { grid-template-columns:1fr; } }
   .card { background:#fff; border:1px solid var(--border); border-radius:14px; padding:2rem; text-align:center; text-decoration:none; color:inherit; transition:transform 0.15s, box-shadow 0.15s; display:flex; flex-direction:column; align-items:center; }
   .card:hover { transform:translateY(-3px); box-shadow:0 10px 30px rgba(10,14,39,0.08); }
   .card .icon { font-size:2.75rem; margin-bottom:0.75rem; }
-  .card h3 { font-size:1.25rem; margin:0 0 0.5rem; }
+  .card h3 { font-family:'Crimson Text', serif; font-size:1.3rem; margin:0 0 0.5rem; color:var(--primary); }
   .card p { color:#6B7280; font-size:0.92rem; line-height:1.55; margin:0 0 1.25rem; }
   .card .go { background:var(--primary); color:#fff; padding:0.65rem 1.4rem; border-radius:8px; font-size:0.9rem; font-weight:600; }
   .card.ssb .go { background:#5B21B6; }
@@ -30,13 +52,29 @@
 </head>
 <body>
 
-<header>
-  <img id="headerLogo" src="/api/settings/logo" onerror="this.style.display='none'" alt="">
-  <h1>NavaSetu</h1>
-</header>
+<div class="header">
+  <div class="header-content">
+    <div class="header-left">
+      <img class="crest-img" id="headerLogo" src="/api/settings/logo" onerror="this.style.display='none'" alt="NavaSetu">
+      <div class="header-info">
+        <h1>NavaSetu</h1>
+        <p>Career Readiness &amp; Wellness Assessments</p>
+      </div>
+    </div>
+    <div class="header-contacts">
+      <div class="contact-item">📱 8556840001</div>
+      <div class="contact-item">📧 navasetuinitiatives@gmail.com</div>
+      <div class="contact-item">🌐 www.navasetu.online</div>
+    </div>
+  </div>
+</div>
 
 <main>
-  <div class="wrap">
+  <div class="container">
+    <div class="hero-banner">
+      <img src="/hero-banner.jpg" alt="Every journey needs a Setu — NavaSetu">
+    </div>
+
     <div class="intro">
       <h2>What brings you here today?</h2>
       <p>Choose the path that fits you — each leads to its own assessment, built around well-established psychometric scales, with a personalized report at the end.</p>
