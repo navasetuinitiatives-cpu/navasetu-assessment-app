@@ -31,11 +31,6 @@
   .likertOptions label { display:flex; align-items:center; gap:0.3rem; font-weight:400; font-size:0.8rem; background:#F3F4F6; padding:0.35rem 0.6rem; border-radius:999px; cursor:pointer; margin:0; }
   .likertOptions input { width:auto; }
   .hidden { display:none !important; }
-  .voiceRow { display:flex; gap:0.5rem; align-items:flex-start; }
-  .voiceRow input, .voiceRow textarea { flex:1; }
-  .micBtn { flex:0 0 auto; background:#F3F4F6; border:1px solid var(--border); border-radius:8px; width:2.4rem; height:2.4rem; font-size:1rem; cursor:pointer; margin-top:0; }
-  .micBtn.recording { background:#FEE2E2; border-color:#FCA5A5; animation:micPulse 1s infinite; }
-  @keyframes micPulse { 0%, 100% { opacity:1; } 50% { opacity:0.5; } }
   .disclaimer { background:#FFFBEB; border:1px solid #FDE68A; border-radius:8px; padding:1rem; font-size:0.85rem; color:#92400E; margin:1rem 0; }
   .scoreCircle { text-align:center; padding:1rem 0 1.5rem; }
   .scoreCircle .num { font-size:3.2rem; font-weight:800; color:var(--accent); margin:0.25rem 0; }
@@ -68,9 +63,15 @@ let leadInfo = { name: '', email: '', phone: '' };
 let traitResponses = {};
 let srtTexts = [];
 let watTexts = [];
+// Same localStorage key /ssb.html uses — registering here logs the
+// candidate in across the whole SSB app, so if they come back later to take
+// the full assessment or upgrade a report, they're already signed in and
+// never have to register a second time.
+let token = localStorage.getItem('navasetu_ssb_token');
 
 async function api(path, options = {}) {
   const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
+  if (token) headers['Authorization'] = `Bearer ${token}`;
   const res = await fetch(`${API}${path}`, Object.assign({}, options, { headers }));
   let data = null;
   try { data = await res.json(); } catch (e) {}
@@ -78,51 +79,26 @@ async function api(path, options = {}) {
   return data;
 }
 
-function speechSupported() {
-  return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
-}
-let activeRecognition = null;
-function toggleVoiceInput(btn, targetId) {
-  if (!speechSupported()) {
-    alert('Voice input is not supported in this browser. Please type your answer instead.');
-    return;
-  }
-  if (activeRecognition) {
-    activeRecognition.stop();
-    activeRecognition = null;
-    document.querySelectorAll('.micBtn.recording').forEach((b) => b.classList.remove('recording'));
-    return;
-  }
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const recognition = new SpeechRecognition();
-  recognition.lang = 'en-IN';
-  recognition.interimResults = false;
-  recognition.maxAlternatives = 1;
-  recognition.onresult = (e) => {
-    const transcript = e.results[0][0].transcript;
-    const el = document.getElementById(targetId);
-    if (el) {
-      el.value = el.value ? `${el.value} ${transcript}` : transcript;
-      el.dispatchEvent(new Event('input'));
-    }
-  };
-  recognition.onend = () => { btn.classList.remove('recording'); activeRecognition = null; };
-  recognition.onerror = () => { btn.classList.remove('recording'); activeRecognition = null; };
-  btn.classList.add('recording');
-  activeRecognition = recognition;
-  recognition.start();
+function isValidIndianMobile(raw) {
+  const digits = String(raw || '').replace(/[^\d]/g, '');
+  const normalized = digits.replace(/^91/, '').replace(/^0/, '');
+  return /^[6-9]\d{9}$/.test(normalized);
 }
 
 function renderIntro() {
   document.getElementById('stepContainer').innerHTML = `
     <div class="card">
       <h2>Free SSB Readiness Test</h2>
-      <p class="muted">A quick, few-minute taste of the full OLQ Readiness Assessment — trait questions, a couple of situation reactions, and a few word-association prompts. No payment, and you can take it again with a fresh set of questions any time.</p>
+      <p class="muted">A quick, few-minute taste of the full OLQ Readiness Assessment — trait questions, a couple of situation reactions, and a few word-association prompts. Takes a moment to register (free, no payment) so you can come back to the same account later — including to take the full assessment without registering again.</p>
       <label>Your Name</label><input id="leadName">
-      <label>Email</label><input id="leadEmail" type="email">
-      <label>Phone (optional)</label><input id="leadPhone" type="tel">
+      <label>Mobile Number</label><input id="leadPhone" type="tel" inputmode="numeric" maxlength="13" placeholder="10-digit mobile number" autocomplete="tel">
+      <label>Email</label><input id="leadEmail" type="email" autocomplete="email">
+      <label>Password</label><input id="leadPassword" type="password" autocomplete="new-password">
       <p class="muted" id="introError" style="color:#B91C1C;"></p>
-      <button class="btn" onclick="startTeaser()">Start Free Test</button>
+      <button class="btn" onclick="startTeaser()">Register &amp; Start Free Test</button>
+    </div>
+    <div class="card" style="background:#FAF9FF; border-color:#DDD6FE;">
+      <p class="muted" style="margin:0;"><strong>Before you dive in —</strong> a quick honest question: is SSB/Defence something you're <em>sure</em> about, or one option among a few you're still weighing? A lot of people who take this test are still deciding. If that's you, a short career counselling conversation (free, no obligation) can help you look at this alongside your other options rather than in isolation — you'll get the chance to request one right after your result.</p>
     </div>
   `;
 }
@@ -131,9 +107,46 @@ async function startTeaser() {
   const name = document.getElementById('leadName').value.trim();
   const email = document.getElementById('leadEmail').value.trim();
   const phone = document.getElementById('leadPhone').value.trim();
+  const password = document.getElementById('leadPassword').value;
   const errEl = document.getElementById('introError');
-  if (!name || !email) { errEl.textContent = 'Please enter your name and email to continue.'; return; }
+  if (!name || !email || !phone || !password) { errEl.textContent = 'Please fill in your name, mobile number, email, and a password to continue.'; return; }
+  if (!isValidIndianMobile(phone)) { errEl.textContent = 'Please enter a valid 10-digit mobile number.'; return; }
+  errEl.textContent = '';
   leadInfo = { name, email, phone };
+  document.getElementById('stepContainer').innerHTML = `<div class="card"><p class="muted">Setting up your account…</p></div>`;
+  try {
+    let authResult;
+    try {
+      authResult = await api('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({ email, password, fullName: name, phoneNumber: phone })
+      });
+    } catch (registerErr) {
+      // Already has a real account — try logging in with what they just
+      // typed instead of hard-failing (this is common on a repeat visit).
+      if (/already registered/i.test(registerErr.message || '')) {
+        try {
+          authResult = await api('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+        } catch (loginErr) {
+          document.getElementById('stepContainer').innerHTML = `<div class="card"><p class="muted" style="color:#B91C1C;">This email is already registered. Please enter its correct password to continue, or use a different email.</p><button class="btn secondary" onclick="renderIntro()">← Back</button></div>`;
+          return;
+        }
+      } else {
+        throw registerErr;
+      }
+    }
+    token = authResult.accessToken;
+    localStorage.setItem('navasetu_ssb_token', token);
+    await loadQuestions();
+  } catch (e) {
+    document.getElementById('stepContainer').innerHTML = `<div class="card"><p class="muted" style="color:#B91C1C;">${e.message}</p></div>`;
+  }
+}
+
+// Shared by both a fresh registration/login and "Try Again with New
+// Questions" for an already-signed-in candidate — draws a new random
+// question set without asking them to register a second time.
+async function loadQuestions() {
   document.getElementById('stepContainer').innerHTML = `<div class="card"><p class="muted">Loading your questions…</p></div>`;
   try {
     meta = await api('/ssb/teaser/meta');
@@ -144,6 +157,24 @@ async function startTeaser() {
   } catch (e) {
     document.getElementById('stepContainer').innerHTML = `<div class="card"><p class="muted" style="color:#B91C1C;">${e.message}</p></div>`;
   }
+}
+
+// On load, a candidate who registered here before (or is already logged
+// into the full SSB app) goes straight to the questions — registering once
+// is enough, per the "no need to register again" rule.
+async function init() {
+  if (token) {
+    try {
+      const me = await api('/auth/me');
+      leadInfo = { name: me.user.full_name, email: me.user.email, phone: me.user.phone_number || '' };
+      await loadQuestions();
+      return;
+    } catch (e) {
+      token = null;
+      localStorage.removeItem('navasetu_ssb_token');
+    }
+  }
+  renderIntro();
 }
 
 function renderQuestions() {
@@ -163,20 +194,14 @@ function renderQuestions() {
       <h2>Situation Reaction ${meta.srt.length > 1 ? i + 1 : ''}</h2>
       <p class="muted"><strong>${situation}</strong></p>
       <p class="muted">In a sentence or two, what would you do?</p>
-      <div class="voiceRow">
-        <textarea id="srtInput_${i}" rows="3" oninput="srtTexts[${i}]=this.value"></textarea>
-        <button type="button" class="micBtn" onclick="toggleVoiceInput(this, 'srtInput_${i}')" title="Speak your answer">🎤</button>
-      </div>
+      <textarea id="srtInput_${i}" rows="3" oninput="srtTexts[${i}]=this.value"></textarea>
     </div>
   `).join('');
 
   const watHtml = (meta.wat || []).map((word, i) => `
     <div class="likertItem">
       <div class="qtext">${word}</div>
-      <div class="voiceRow">
-        <input id="watInput_${i}" placeholder="First complete sentence that comes to mind…" oninput="watTexts[${i}]=this.value">
-        <button type="button" class="micBtn" onclick="toggleVoiceInput(this, 'watInput_${i}')" title="Speak your answer">🎤</button>
-      </div>
+      <input id="watInput_${i}" placeholder="First complete sentence that comes to mind…" oninput="watTexts[${i}]=this.value">
     </div>
   `).join('');
 
@@ -185,6 +210,10 @@ function renderQuestions() {
       <h2>A Few Quick Questions</h2>
       <p class="muted">Answer honestly — there's no right or wrong answer.</p>
       ${traitsHtml}
+    </div>
+    <div class="card" style="background:#FAF9FF; border-color:#DDD6FE;">
+      <p class="muted" style="margin:0 0 0.6rem;"><strong>Quick gut check:</strong> are you doing SSB because you're genuinely sure, or because it feels like the safe/expected choice? Either answer is fine — but if you're even a little unsure, it's worth exploring before you sink more time into prep.</p>
+      <button class="btn secondary" id="midCounsellingBtn" style="margin-top:0;" onclick="requestCounsellingInterest(this)">🎯 Yes, I'd like a free career counselling call</button>
     </div>
     ${srtHtml}
     <div class="card">
@@ -195,6 +224,20 @@ function renderQuestions() {
     <button class="btn" onclick="submitTeaser()">See My Score</button>
     <p class="muted" id="submitError" style="color:#B91C1C;"></p>
   `;
+}
+
+async function requestCounsellingInterest(btn) {
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  try {
+    await api('/ssb/teaser/career-interest', { method: 'POST' });
+    btn.textContent = '✓ Noted — a NavaSetu counsellor will reach out';
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = originalText;
+    alert(e.message || 'Could not save your request — please email navasetuinitiatives@gmail.com directly.');
+  }
 }
 
 async function submitTeaser() {
@@ -246,16 +289,21 @@ function renderResult(result) {
       </div>
       <div class="disclaimer">This is a directional snapshot from a small number of quick responses — not a readiness grade. It is a psychometric depiction only and does not guarantee the same result in an actual SSB, which is a far more intensive, multi-day process. The full OLQ Readiness Assessment (Big Five + 4 trait scales, 40 WAT words, 30 SRTs, 8 GTO scenarios) produces a proper OLQ-mapped Readiness Index and grade band across all 15 Officer-Like Qualities.</div>
     </div>
+    <div class="card" style="background:#FAF9FF; border-color:#DDD6FE;">
+      <h2>Before You Go Further — Is SSB Really Your Path?</h2>
+      <p class="muted">Whatever your score just now, it says nothing about whether SSB/Defence is actually the right fit for <em>you</em> among everything else you could do. A lot of people prepare for years before pausing to ask that question properly. A free, no-obligation career counselling conversation can help you weigh this honestly, alongside your other options — before you commit more time and money to prep.</p>
+      <button class="btn secondary" id="resultCounsellingBtn" style="margin-top:0;" onclick="requestCounsellingInterest(this)">🎯 Yes, I'd like a free career counselling call</button>
+    </div>
     <div class="card">
       <h2>Get Your Full OLQ Readiness Report</h2>
       <div class="plan-grid">${planCards}</div>
       <button class="btn" onclick="window.location.href='/ssb.html'">Take the Full Assessment →</button>
-      <button class="btn secondary" onclick="renderIntro()">Try Again with New Questions</button>
+      <button class="btn secondary" onclick="loadQuestions()">Try Again with New Questions</button>
     </div>
   `;
 }
 
-renderIntro();
+init();
 </script>
 
 </body>

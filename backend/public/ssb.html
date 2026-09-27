@@ -49,11 +49,6 @@
   #authScreen { max-width:400px; margin:3rem auto; }
   .hidden { display:none !important; }
   .stepLabel { font-size:0.8rem; color:#9CA3AF; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:0.3rem; }
-  .voiceRow { display:flex; gap:0.5rem; align-items:flex-start; }
-  .voiceRow input, .voiceRow textarea { flex:1; }
-  .micBtn { flex:0 0 auto; background:#F3F4F6; border:1px solid var(--border); border-radius:8px; width:2.75rem; height:2.75rem; font-size:1.1rem; cursor:pointer; margin-top:0; }
-  .micBtn.recording { background:#FEE2E2; border-color:#FCA5A5; animation:micPulse 1s infinite; }
-  @keyframes micPulse { 0%, 100% { opacity:1; } 50% { opacity:0.5; } }
   .plan-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:1rem; margin:1.25rem 0; }
   @media (max-width:680px) { .plan-grid { grid-template-columns:1fr; } }
   .plan-card { padding:1.25rem; border:2px solid var(--border); border-radius:8px; cursor:pointer; transition:all 0.15s; background:#fff; }
@@ -165,45 +160,6 @@ function applyItemSelection() {
   selectedGto = (itemSelection && itemSelection.gto)
     ? itemSelection.gto.map((id) => meta.gtoScenarios.find((g) => g.id === id)).filter(Boolean)
     : meta.gtoScenarios;
-}
-
-// --- Voice-to-text (Web Speech API), used across WAT/SRT/SDT fields ---
-// Typing is always the default/fallback; the mic button is purely additive.
-// Not every browser supports this (notably older Safari), so it's feature-
-// detected rather than assumed.
-function speechSupported() {
-  return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
-}
-let activeRecognition = null;
-function toggleVoiceInput(btn, targetId) {
-  if (!speechSupported()) {
-    alert('Voice input is not supported in this browser. Please type your answer instead.');
-    return;
-  }
-  if (activeRecognition) {
-    activeRecognition.stop();
-    activeRecognition = null;
-    document.querySelectorAll('.micBtn.recording').forEach((b) => b.classList.remove('recording'));
-    return;
-  }
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const recognition = new SpeechRecognition();
-  recognition.lang = 'en-IN';
-  recognition.interimResults = false;
-  recognition.maxAlternatives = 1;
-  recognition.onresult = (e) => {
-    const transcript = e.results[0][0].transcript;
-    const el = document.getElementById(targetId);
-    if (el) {
-      el.value = el.value ? `${el.value} ${transcript}` : transcript;
-      el.dispatchEvent(new Event('input'));
-    }
-  };
-  recognition.onend = () => { btn.classList.remove('recording'); activeRecognition = null; };
-  recognition.onerror = () => { btn.classList.remove('recording'); activeRecognition = null; };
-  btn.classList.add('recording');
-  activeRecognition = recognition;
-  recognition.start();
 }
 
 const STEPS = ['bigFive', 'traits', 'wat', 'srt', 'gto', 'sdt', 'planSelection', 'report'];
@@ -542,14 +498,11 @@ function renderWatStep(container) {
     <div class="stepLabel">Step ${currentStepIndex + 1} of ${STEPS.length}</div>
     <div class="card">
       <h2>Part 2 — Word Association (WAT)</h2>
-      <p class="muted">For each word, write the <strong>first sentence</strong> that comes to mind — don't overthink it. Type your answer, or tap 🎤 to speak it instead. This is a practice exercise: patterns like spontaneity and constructive tone are heuristically flagged, not clinically scored (see your report for what that means).</p>
+      <p class="muted">For each word, write the <strong>first sentence</strong> that comes to mind — don't overthink it. This is a practice exercise: patterns like spontaneity and constructive tone are heuristically flagged, not clinically scored (see your report for what that means).</p>
       ${selectedWat.map((word, i) => `
         <div class="watItem">
           <div class="word">${word}</div>
-          <div class="voiceRow">
-            <input type="text" id="wat_${i}" value="${(responses.wat[word] || '').replace(/"/g, '&quot;')}" oninput="responses.wat['${word}'] = this.value" placeholder="Your first-reaction sentence...">
-            <button type="button" class="micBtn" onclick="toggleVoiceInput(this, 'wat_${i}')" title="Speak your answer">🎤</button>
-          </div>
+          <input type="text" id="wat_${i}" value="${(responses.wat[word] || '').replace(/"/g, '&quot;')}" oninput="responses.wat['${word}'] = this.value" placeholder="Your first-reaction sentence...">
         </div>`).join('')}
       <button class="btn secondary" onclick="skipStep()">Skip for now</button>
       <button class="btn" onclick="nextFromFreeText('wat')">Continue</button>
@@ -565,14 +518,11 @@ function renderSrtStep(container) {
     <div class="stepLabel">Step ${currentStepIndex + 1} of ${STEPS.length}</div>
     <div class="card">
       <h2>Part 3 — Situation Reaction (SRT)</h2>
-      <p class="muted">Write how you would react to each situation, in a sentence or two. Type it, or tap 🎤 to speak it instead. This is for your own practice and reflection — an admin/counsellor can review it with you, but it is not auto-scored.</p>
+      <p class="muted">Write how you would react to each situation, in a sentence or two. This is for your own practice and reflection — an admin/counsellor can review it with you, but it is not auto-scored.</p>
       ${selectedSrt.map((situation, i) => `
         <div class="srtItem">
           <div class="situation">${i + 1}. ${situation}</div>
-          <div class="voiceRow">
-            <textarea id="srt_${i}" rows="2" oninput="updateSrt(${i}, this.value)">${responses.srt[situation] || ''}</textarea>
-            <button type="button" class="micBtn" onclick="toggleVoiceInput(this, 'srt_${i}')" title="Speak your answer">🎤</button>
-          </div>
+          <textarea id="srt_${i}" rows="2" oninput="updateSrt(${i}, this.value)">${responses.srt[situation] || ''}</textarea>
         </div>`).join('')}
       <button class="btn secondary" onclick="skipStep()">Skip for now</button>
       <button class="btn" onclick="nextFromFreeText('srt')">Continue</button>
@@ -619,15 +569,12 @@ function renderSdtStep(container) {
     <div class="stepLabel">Step ${currentStepIndex + 1} of ${STEPS.length}</div>
     <div class="card">
       <h2>Part 6 — Self Description (SDT)</h2>
-      <p class="muted"><strong>Not scored.</strong> The real SDT is cross-checked against interview and observation by trained assessors — this is for your own honest self-reflection. Type it, or tap 🎤 to speak it.</p>
+      <p class="muted"><strong>Not scored.</strong> The real SDT is cross-checked against interview and observation by trained assessors — this is for your own honest self-reflection.</p>
       ${meta.sdtPrompts.map((p) => `
         <div class="srtItem">
           <div class="situation">${p.label}</div>
           <div class="muted" style="margin-bottom:0.4rem;">${p.hint}</div>
-          <div class="voiceRow">
-            <textarea id="sdt_${p.id}" rows="3" oninput="responses.sdt['${p.id}'] = this.value">${responses.sdt[p.id] || ''}</textarea>
-            <button type="button" class="micBtn" onclick="toggleVoiceInput(this, 'sdt_${p.id}')" title="Speak your answer">🎤</button>
-          </div>
+          <textarea id="sdt_${p.id}" rows="3" oninput="responses.sdt['${p.id}'] = this.value">${responses.sdt[p.id] || ''}</textarea>
         </div>`).join('')}
       <button class="btn" onclick="nextFromFreeText('sdt')">Finish &amp; See My Readiness Profile</button>
     </div>`;

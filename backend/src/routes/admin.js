@@ -182,7 +182,7 @@ router.get('/leads', requireStaff, async (req, res) => {
     const isCounsellor = req.user.role === 'counsellor';
     const result = await pool.query(
       `SELECT u.id, u.lead_number, u.email, u.full_name, u.phone_number, u.pincode, u.city, u.state, u.role, u.client_type,
-              u.lead_status, u.created_at, u.last_login, u.assigned_to, u.deleted_at, u.delete_reason,
+              u.lead_status, u.created_at, u.last_login, u.assigned_to, u.deleted_at, u.delete_reason, u.wants_career_counselling,
               ass.full_name AS assigned_to_name,
               a.id AS latest_assessment_id, a.status AS assessment_status, a.submitted_at, a.track AS latest_track,
               COALESCE(d.institution, s.name) AS institution,
@@ -373,7 +373,7 @@ router.get('/leads/:userId', requireStaff, async (req, res) => {
 
     const user = await pool.query(
       `SELECT u.id, u.lead_number, u.email, u.full_name, u.phone_number, u.pincode, u.city, u.state, u.role, u.client_type,
-              u.lead_status, u.status, u.created_at, u.last_login, u.assigned_to, u.deleted_at, u.delete_reason,
+              u.lead_status, u.status, u.created_at, u.last_login, u.assigned_to, u.deleted_at, u.delete_reason, u.wants_career_counselling,
               ass.full_name AS assigned_to_name
        FROM users u LEFT JOIN users ass ON ass.id = u.assigned_to WHERE u.id = $1`,
       [userId]

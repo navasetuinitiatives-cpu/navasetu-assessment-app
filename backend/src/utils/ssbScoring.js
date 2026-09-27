@@ -440,8 +440,8 @@ export function buildItemSelection() {
 }
 
 // --- Free "teaser" funnel test --------------------------------------------
-// A deliberately small, ungated exercise (8 trait items + 2 SRT situations +
-// 3 WAT words) shown to visitors who aren't ready to commit to the full
+// A deliberately small, ungated exercise (8 trait items + 4 SRT situations +
+// 6 WAT words) shown to visitors who aren't ready to commit to the full
 // assessment. It exists to give a curious visitor something in a few minutes
 // and a nudge toward the paid plans — NOT a measurement instrument. Its
 // scoring is intentionally separate from calculateOLQProfile/
@@ -454,8 +454,8 @@ export function buildItemSelection() {
 export function buildTeaserSelection() {
   return {
     traits: pickRandomSubset(traitItemBank, 8),
-    srt: pickRandomSubset(srtSituations, 2),
-    wat: pickRandomSubset(watWords, 3)
+    srt: pickRandomSubset(srtSituations, 4),
+    wat: pickRandomSubset(watWords, 6)
   };
 }
 

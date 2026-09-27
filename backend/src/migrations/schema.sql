@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS users (
   pincode VARCHAR(10), -- collected at registration, used to auto-fill city/state
   city VARCHAR(100),
   state VARCHAR(100),
+  wants_career_counselling BOOLEAN DEFAULT false, -- opted in via a free-test lead-gen touchpoint (SSB teaser)
   role VARCHAR(50) DEFAULT 'individual', -- individual, teacher, platform_admin
   client_type VARCHAR(20) DEFAULT 'b2c', -- b2c, b2b
   status VARCHAR(50) DEFAULT 'active', -- active, inactive

@@ -405,4 +405,21 @@ router.post('/teaser/submit', async (req, res) => {
   }
 });
 
+// A free-test candidate opting in to a career counselling call — separate
+// from the SSB report's bundled counselling sessions. This is the second,
+// broader lead this whole free test exists to generate (many candidates
+// exploring SSB haven't actually settled on it as a career yet), so it's
+// flagged directly on the `users` row created at registration — the same
+// row the CRM/HR Panel leads list already reads from — rather than buried
+// in the isolated ssb_teaser_leads table.
+router.post('/teaser/career-interest', requireAuth, async (req, res) => {
+  try {
+    await pool.query('UPDATE users SET wants_career_counselling = true WHERE id = $1', [req.user.userId]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Career interest opt-in error:', error);
+    res.status(500).json({ error: 'Could not save your request — please email navasetuinitiatives@gmail.com directly.' });
+  }
+});
+
 export default router;
