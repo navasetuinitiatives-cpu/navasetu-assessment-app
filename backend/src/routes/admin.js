@@ -382,7 +382,7 @@ router.get('/leads/:userId', requireStaff, async (req, res) => {
 
     const demographics = await pool.query('SELECT * FROM user_demographics WHERE user_id = $1', [userId]);
     const assessments = await pool.query('SELECT * FROM assessments WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
-    const reports = await pool.query('SELECT id, plan_type, payment_status, created_at, released_at FROM reports WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
+    const reports = await pool.query('SELECT id, plan_type, payment_status, created_at, released_at, is_test FROM reports WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
     const orders = req.user.role === 'platform_admin'
       ? (await pool.query('SELECT * FROM orders WHERE user_id = $1 ORDER BY created_at DESC', [userId])).rows
       : []; // payment/order detail stays admin-only, even for a counsellor's own lead

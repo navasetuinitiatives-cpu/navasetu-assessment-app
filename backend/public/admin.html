@@ -816,7 +816,7 @@ function renderLeadReports() {
   const reportsHtml = reports.length
     ? reports.map(r => `
         <tr>
-          <td>${r.plan_type}</td>
+          <td>${r.plan_type}${r.is_test ? ' <span class="pill" style="background:#DC2626;color:#fff;">TEST</span>' : ''}</td>
           <td>${new Date(r.created_at).toLocaleDateString()}</td>
           <td><span class="pill ${r.payment_status === 'paid' || r.payment_status === 'free' ? 'ok' : 'pending'}">${r.payment_status}</span></td>
           <td><button class="btn secondary" onclick="viewLeadReport('${r.id}')">View / Download</button></td>
@@ -826,7 +826,7 @@ function renderLeadReports() {
   const assessmentsHtml = assessments.length
     ? assessments.map(a => `
         <tr>
-          <td>${a.status}</td>
+          <td>${a.status}${a.is_test ? ' <span class="pill" style="background:#DC2626;color:#fff;">TEST</span>' : ''}</td>
           <td>${a.submitted_at ? new Date(a.submitted_at).toLocaleDateString() : '—'}</td>
           <td><button class="btn secondary" onclick="viewLeadResponses('${a.id}')">View / Download Responses</button></td>
         </tr>`).join('')

@@ -853,7 +853,14 @@ const FACTOR_COLORS = {
   'Dynamic Factor': '#DC2626'
 };
 
-export function buildSsbReportHtml(profile, improvementPlan, candidateName, planType = 'ssb_comprehensive') {
+export function buildSsbReportHtml(profile, improvementPlan, candidateName, planType = 'ssb_comprehensive', isTest = false) {
+  // TEST REPORT banner — shown top and bottom for the pilot "Fill Sample"
+  // flow only. Purely additive: it never overlaps or replaces any report
+  // content, so nothing becomes illegible.
+  const testBanner = isTest ? `
+    <div style="background:#DC2626; color:#fff; text-align:center; font-weight:700; font-size:0.92rem; padding:0.75rem 1rem; border-radius:8px; margin-bottom:1.25rem; letter-spacing:0.2px;">
+      🧪 TEST REPORT — Sample data generated for pilot review. This is not a real candidate assessment.
+    </div>` : '';
   const plan = SSB_PLANS[planType] || SSB_PLANS.ssb_comprehensive;
   const includesImprovementPlan = planType !== 'ssb_basic';
   const includesExtendedSuggestions = planType === 'ssb_comprehensive';
@@ -919,6 +926,7 @@ export function buildSsbReportHtml(profile, improvementPlan, candidateName, plan
     </div>` : '';
 
   return `<div style="font-family:Inter,Arial,sans-serif; color:#1F2937;">
+    ${testBanner}
     <div style="background:#fff; border:1px solid #E5E7EB; border-radius:10px; padding:1.75rem; margin-bottom:1.25rem;">
       <h2 style="margin-top:0;">OLQ Readiness Profile${candidateName ? ` — ${candidateName}` : ''}</h2>
       <div style="display:inline-block; background:#F5F3FF; color:#5B21B6; font-size:0.78rem; font-weight:600; padding:0.25rem 0.7rem; border-radius:999px; margin-bottom:0.5rem;">${plan.label} (${plan.priceLabel})</div>
@@ -944,5 +952,6 @@ export function buildSsbReportHtml(profile, improvementPlan, candidateName, plan
       ${extendedHtml}
     </div>` : ''}
     ${upsellHtml}
+    ${testBanner}
   </div>`;
 }

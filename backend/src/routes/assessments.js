@@ -17,7 +17,7 @@ router.get('/questions', (req, res) => {
 // the caller's email has been matched against that school's roster.
 router.post('/', requireAuth, async (req, res) => {
   try {
-    const { schoolId, schoolTeacherId, clientType } = req.body;
+    const { schoolId, schoolTeacherId, clientType, isTest } = req.body;
     const userId = req.user.userId;
 
     // BUG FIX: the same `assessments` table also holds SSB attempts (added
@@ -37,9 +37,9 @@ router.post('/', requireAuth, async (req, res) => {
 
     const id = uuidv4();
     const result = await pool.query(
-      `INSERT INTO assessments (id, user_id, school_id, school_teacher_id, client_type, status, responses)
-       VALUES ($1, $2, $3, $4, $5, 'in_progress', '{}'::jsonb) RETURNING *`,
-      [id, userId, schoolId || null, schoolTeacherId || null, clientType === 'b2b' ? 'b2b' : 'b2c']
+      `INSERT INTO assessments (id, user_id, school_id, school_teacher_id, client_type, status, responses, is_test)
+       VALUES ($1, $2, $3, $4, $5, 'in_progress', '{}'::jsonb, $6) RETURNING *`,
+      [id, userId, schoolId || null, schoolTeacherId || null, clientType === 'b2b' ? 'b2b' : 'b2c', !!isTest]
     );
 
     // Reflect real progress on the school roster row as soon as she actually

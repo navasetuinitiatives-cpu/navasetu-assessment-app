@@ -38,12 +38,18 @@ router.post('/', requireAuth, async (req, res) => {
       paymentStatus = PILOT_FREE_ACCESS ? 'admin_released' : 'pending';
     }
 
+    // TEST REPORT marking: inherited from the parent assessment's own is_test
+    // flag (set only by the pilot "Fill Sample" feature), never trusted from
+    // the client directly here — so a real teacher's report can never be
+    // mismarked and a sample one can never slip through unmarked.
+    const isTest = !!assessment.is_test;
+
     const id = uuidv4();
     const result = await pool.query(
-      `INSERT INTO reports (id, assessment_id, user_id, plan_type, html_content, payment_status, released_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, plan_type, payment_status, created_at`,
+      `INSERT INTO reports (id, assessment_id, user_id, plan_type, html_content, payment_status, released_at, is_test)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, plan_type, payment_status, created_at, is_test`,
       [id, assessmentId, req.user.userId, effectivePlan, htmlContent || null, paymentStatus,
-       paymentStatus === 'not_required' || paymentStatus === 'admin_released' ? new Date() : null]
+       paymentStatus === 'not_required' || paymentStatus === 'admin_released' ? new Date() : null, isTest]
     );
 
     res.status(201).json({ success: true, report: result.rows[0], locked: paymentStatus === 'pending' });
@@ -66,7 +72,7 @@ router.post('/', requireAuth, async (req, res) => {
 router.get('/mine', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT r.id, r.assessment_id, r.plan_type, r.payment_status, r.created_at, r.released_at
+      `SELECT r.id, r.assessment_id, r.plan_type, r.payment_status, r.created_at, r.released_at, r.is_test
        FROM reports r
        JOIN assessments a ON a.id = r.assessment_id
        WHERE r.user_id = $1 AND a.track = 'wellness'

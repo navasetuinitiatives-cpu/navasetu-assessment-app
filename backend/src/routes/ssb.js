@@ -32,6 +32,7 @@ router.get('/meta', (req, res) => {
 router.post('/assessments', requireAuth, async (req, res) => {
   try {
     const userId = req.user.userId;
+    const { isTest } = req.body || {};
     const existing = await pool.query(
       `SELECT * FROM assessments WHERE user_id = $1 AND track = 'ssb' AND status = 'in_progress' ORDER BY created_at DESC LIMIT 1`,
       [userId]
@@ -48,9 +49,9 @@ router.post('/assessments', requireAuth, async (req, res) => {
 
     const id = uuidv4();
     const result = await pool.query(
-      `INSERT INTO assessments (id, user_id, client_type, track, status, responses, item_selection)
-       VALUES ($1, $2, 'b2c', 'ssb', 'in_progress', '{}'::jsonb, $3) RETURNING *`,
-      [id, userId, JSON.stringify(itemSelection)]
+      `INSERT INTO assessments (id, user_id, client_type, track, status, responses, item_selection, is_test)
+       VALUES ($1, $2, 'b2c', 'ssb', 'in_progress', '{}'::jsonb, $3, $4) RETURNING *`,
+      [id, userId, JSON.stringify(itemSelection), !!isTest]
     );
     res.status(201).json({ success: true, assessment: result.rows[0], resumed: false });
   } catch (error) {
@@ -183,7 +184,11 @@ router.post('/assessments/:id/submit', requireAuth, async (req, res) => {
     // HR Panel are byte-identical by construction.
     const userRow = await pool.query('SELECT full_name FROM users WHERE id = $1', [req.user.userId]);
     const candidateName = userRow.rows[0]?.full_name || null;
-    const reportHtml = buildSsbReportHtml(profile, improvementPlan, candidateName, planType);
+    // TEST REPORT marking: inherited from the assessment's own is_test flag
+    // (set only by the pilot "Fill Sample" feature at /assessments start),
+    // never re-derived from anything the client sends at submit time.
+    const isTest = !!assessment.is_test;
+    const reportHtml = buildSsbReportHtml(profile, improvementPlan, candidateName, planType, isTest);
 
     // Same pilot behavior as the wellness Explore/Navigate tiers: while
     // PILOT_FREE_ACCESS is on (Razorpay isn't wired up yet), every paid
@@ -194,10 +199,10 @@ router.post('/assessments/:id/submit', requireAuth, async (req, res) => {
 
     const reportId = uuidv4();
     const reportResult = await pool.query(
-      `INSERT INTO reports (id, assessment_id, user_id, plan_type, html_content, payment_status, released_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, plan_type, payment_status, created_at`,
-      [reportId, req.params.id, req.user.userId, planType, reportHtml, paymentStatus, paymentStatus === 'admin_released' ? new Date() : null]
+      `INSERT INTO reports (id, assessment_id, user_id, plan_type, html_content, payment_status, released_at, is_test)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id, plan_type, payment_status, created_at, is_test`,
+      [reportId, req.params.id, req.user.userId, planType, reportHtml, paymentStatus, paymentStatus === 'admin_released' ? new Date() : null, isTest]
     );
 
     res.json({
@@ -237,15 +242,17 @@ router.post('/assessments/:id/upgrade-report', requireAuth, async (req, res) => 
     const { profile, improvementPlan } = assessment.scores;
     const userRow = await pool.query('SELECT full_name FROM users WHERE id = $1', [req.user.userId]);
     const candidateName = userRow.rows[0]?.full_name || null;
-    const reportHtml = buildSsbReportHtml(profile, improvementPlan, candidateName, planType);
+    // Same inherited TEST REPORT marking as the submit route above.
+    const isTest = !!assessment.is_test;
+    const reportHtml = buildSsbReportHtml(profile, improvementPlan, candidateName, planType, isTest);
 
     const paymentStatus = PILOT_FREE_ACCESS ? 'admin_released' : 'pending';
     const reportId = uuidv4();
     const reportResult = await pool.query(
-      `INSERT INTO reports (id, assessment_id, user_id, plan_type, html_content, payment_status, released_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, plan_type, payment_status, created_at`,
-      [reportId, req.params.id, req.user.userId, planType, reportHtml, paymentStatus, paymentStatus === 'admin_released' ? new Date() : null]
+      `INSERT INTO reports (id, assessment_id, user_id, plan_type, html_content, payment_status, released_at, is_test)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id, plan_type, payment_status, created_at, is_test`,
+      [reportId, req.params.id, req.user.userId, planType, reportHtml, paymentStatus, paymentStatus === 'admin_released' ? new Date() : null, isTest]
     );
 
     res.json({

@@ -666,7 +666,7 @@ async function fillSampleSSB() {
     // Always fetches/creates via the normal start endpoint: if the previous
     // sample was submitted (or nothing was started yet), this creates a
     // brand-new row with a brand-new random item draw.
-    const startData = await api('/ssb/assessments', { method: 'POST' });
+    const startData = await api('/ssb/assessments', { method: 'POST', body: JSON.stringify({ isTest: true }) });
     assessmentId = startData.assessment.id;
     itemSelection = startData.assessment.item_selection || null;
     applyItemSelection();

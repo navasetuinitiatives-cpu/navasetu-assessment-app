@@ -106,6 +106,7 @@ CREATE TABLE IF NOT EXISTS assessments (
   retake_of UUID REFERENCES assessments(id), -- points to the prior attempt, if any
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  is_test BOOLEAN NOT NULL DEFAULT FALSE, -- true for "Fill Sample" pilot-demo attempts, never a real candidate
   CONSTRAINT valid_client_type CHECK (client_type IN ('b2c', 'b2b'))
 );
 
@@ -125,6 +126,7 @@ CREATE TABLE IF NOT EXISTS reports (
   payment_status VARCHAR(50) DEFAULT 'not_required', -- not_required, pending, paid, admin_released
   released_at TIMESTAMP, -- when the report actually became viewable
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  is_test BOOLEAN NOT NULL DEFAULT FALSE, -- inherited from the parent assessment's is_test flag
   CONSTRAINT valid_plan_type CHECK (plan_type IN ('discover', 'explore', 'navigate')),
   CONSTRAINT valid_payment_status CHECK (payment_status IN ('not_required', 'pending', 'paid', 'admin_released'))
 );
