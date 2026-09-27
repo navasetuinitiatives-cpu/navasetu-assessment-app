@@ -38,7 +38,24 @@ router.post('/assessments', requireAuth, async (req, res) => {
       [userId]
     );
     if (existing.rows.length > 0) {
-      return res.json({ success: true, assessment: existing.rows[0], resumed: true });
+      let row = existing.rows[0];
+      // BUG FIX: fillSampleSSB() always passes isTest:true, expecting to
+      // always start a genuinely fresh (and therefore correctly test-marked)
+      // attempt — but the page's own auto-resume check (on login/page load)
+      // can silently create an in-progress row first, with no isTest flag.
+      // When that happens this endpoint used to just hand back that row as
+      // "resumed", so the sample run would submit against a non-test row and
+      // its report would never get the TEST REPORT banner. Only ever
+      // escalates false -> true here (never demotes a real candidate's own
+      // in-progress draft), and only for a row that hasn't been submitted yet.
+      if (isTest && !row.is_test) {
+        const updated = await pool.query(
+          `UPDATE assessments SET is_test = true WHERE id = $1 AND status = 'in_progress' RETURNING *`,
+          [row.id]
+        );
+        if (updated.rows.length > 0) row = updated.rows[0];
+      }
+      return res.json({ success: true, assessment: row, resumed: true });
     }
 
     // Fresh attempt: draw a brand-new random subset of WAT/SRT/GTO/TAT items
