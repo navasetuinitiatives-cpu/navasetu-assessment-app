@@ -116,7 +116,8 @@
         <div style="flex:1;"><label>State</label><input id="authState" placeholder="Auto-filled from PIN code"></div>
       </div>
     </div>
-    <label>Email</label><input id="authEmail" type="email" inputmode="email" autocomplete="email">
+    <label>Email</label><input id="authEmail" type="email" inputmode="email" autocomplete="email" oninput="checkEmailDomainTypo(this.value, 'authEmailStatus', 'authEmail')">
+    <p id="authEmailStatus" class="muted" style="font-size:0.78rem; margin:0.2rem 0 0.6rem;"></p>
     <label>Password</label><input id="authPassword" type="password">
     <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
       <button class="btn" id="authSubmitBtn" onclick="authLogin()">Log In</button>
@@ -250,6 +251,47 @@ function autofillCityState(pincode, cityFieldId, stateFieldId, statusFieldId) {
       if (statusEl) { statusEl.textContent = e.message || 'Could not look up this PIN code — please enter city/state manually.'; statusEl.style.color = '#6B7280'; }
     }
   }, 500);
+}
+
+// Soft, non-blocking "did you mean...?" check against common email
+// providers, mirrors the same helper in index.html (wellness app). A
+// Levenshtein-distance check catches an obvious typo (gmial.com, yaho.com)
+// without a hard whitelist, which would incorrectly reject a legitimate
+// institutional/work domain. Never blocks submission — one-click fix only.
+const COMMON_EMAIL_DOMAINS = ['gmail.com', 'yahoo.com', 'yahoo.co.in', 'hotmail.com', 'outlook.com', 'live.com', 'rediffmail.com', 'icloud.com', 'protonmail.com'];
+function levenshteinDistance(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({ length: m + 1 }, (_, i) => [i, ...new Array(n).fill(0)]);
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j - 1], dp[i - 1][j], dp[i][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+function applyEmailSuggestion(fieldId, statusFieldId, suggestedEmail) {
+  document.getElementById(fieldId).value = suggestedEmail;
+  document.getElementById(statusFieldId).textContent = '';
+}
+function checkEmailDomainTypo(email, statusFieldId, fieldId) {
+  const statusEl = document.getElementById(statusFieldId);
+  if (!statusEl) return;
+  const at = email.lastIndexOf('@');
+  if (at === -1 || at === email.length - 1) { statusEl.innerHTML = ''; return; }
+  const domain = email.slice(at + 1).toLowerCase().trim();
+  if (COMMON_EMAIL_DOMAINS.includes(domain) || domain.length < 4) { statusEl.innerHTML = ''; return; }
+  let best = null, bestDist = Infinity;
+  COMMON_EMAIL_DOMAINS.forEach((d) => {
+    const dist = levenshteinDistance(domain, d);
+    if (dist < bestDist) { bestDist = dist; best = d; }
+  });
+  if (best && bestDist > 0 && bestDist <= 2) {
+    const suggested = email.slice(0, at + 1) + best;
+    statusEl.innerHTML = `Did you mean <strong>${suggested}</strong>? <a href="#" onclick="event.preventDefault(); applyEmailSuggestion('${fieldId}','${statusFieldId}','${suggested}')" style="color:var(--accent);">Use this</a>`;
+  } else {
+    statusEl.innerHTML = '';
+  }
 }
 
 function toggleAuthMode() {
