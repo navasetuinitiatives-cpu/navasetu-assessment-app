@@ -15,6 +15,9 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash VARCHAR(255), -- NULL until a B2B teacher sets a password / registers
   full_name VARCHAR(255) NOT NULL,
   phone_number VARCHAR(20),
+  pincode VARCHAR(10), -- collected at registration, used to auto-fill city/state
+  city VARCHAR(100),
+  state VARCHAR(100),
   role VARCHAR(50) DEFAULT 'individual', -- individual, teacher, platform_admin
   client_type VARCHAR(20) DEFAULT 'b2c', -- b2c, b2b
   status VARCHAR(50) DEFAULT 'active', -- active, inactive

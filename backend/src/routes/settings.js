@@ -16,6 +16,42 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Public: PIN code -> city/state lookup, used to auto-fill the registration
+// forms on both apps. Proxied server-side (rather than called directly from
+// the browser) so we're not depending on India Post's CORS policy staying
+// permissive, and so a failure/slowdown on their end is one place to handle,
+// not two frontends. Read-only, no auth needed — this runs before a person
+// has an account.
+router.get('/pincode/:code', async (req, res) => {
+  try {
+    const code = String(req.params.code || '').trim();
+    if (!/^\d{6}$/.test(code)) {
+      return res.status(400).json({ error: 'PIN code must be exactly 6 digits' });
+    }
+
+    const upstream = await fetch(`https://api.postalpincode.in/pincode/${code}`, {
+      signal: AbortSignal.timeout(5000)
+    });
+    const data = await upstream.json();
+    const result = Array.isArray(data) ? data[0] : null;
+    const postOffice = result && result.Status === 'Success' && Array.isArray(result.PostOffice) ? result.PostOffice[0] : null;
+
+    if (!postOffice) {
+      return res.status(404).json({ error: 'Could not find a city/state for this PIN code — please enter them manually.' });
+    }
+
+    res.json({
+      city: postOffice.District || postOffice.Block || '',
+      state: postOffice.State || ''
+    });
+  } catch (error) {
+    console.error('Pincode lookup error:', error);
+    // Never a hard failure for the caller — the frontend falls back to
+    // letting the person type city/state in by hand.
+    res.status(502).json({ error: 'PIN code lookup is temporarily unavailable — please enter your city/state manually.' });
+  }
+});
+
 // Staff: full org profile (name, address, GST) — shown on the HR Panel
 // Settings tab. Any logged-in staff member can view; only admins can edit.
 router.get('/org', requireAuth, requireStaff, async (req, res) => {

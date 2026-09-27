@@ -109,6 +109,12 @@
     <div id="authRegisterFields" class="hidden">
       <label>Full Name</label><input id="authName">
       <label>Mobile Number</label><input id="authMobile" type="tel" inputmode="numeric" maxlength="13" placeholder="10-digit mobile number" autocomplete="tel">
+      <label>PIN Code</label><input id="authPincode" type="text" inputmode="numeric" maxlength="6" placeholder="6-digit PIN code" autocomplete="postal-code" oninput="autofillCityState(this.value, 'authCity', 'authState', 'authPincodeStatus')">
+      <p id="authPincodeStatus" class="muted" style="font-size:0.78rem; margin:0.2rem 0 0.6rem;"></p>
+      <div style="display:flex; gap:0.6rem;">
+        <div style="flex:1;"><label>City</label><input id="authCity" placeholder="Auto-filled from PIN code"></div>
+        <div style="flex:1;"><label>State</label><input id="authState" placeholder="Auto-filled from PIN code"></div>
+      </div>
     </div>
     <label>Email</label><input id="authEmail" type="email" inputmode="email" autocomplete="email">
     <label>Password</label><input id="authPassword" type="password">
@@ -221,6 +227,31 @@ async function api(path, options = {}) {
   return data;
 }
 
+// PIN code -> city/state autofill, mirrors the same helper in index.html
+// (wellness app) — debounced, and City/State stay editable since a wrong
+// post-office match or an unrecognized code should never block registration.
+let _pincodeLookupTimer = null;
+function autofillCityState(pincode, cityFieldId, stateFieldId, statusFieldId) {
+  clearTimeout(_pincodeLookupTimer);
+  const statusEl = document.getElementById(statusFieldId);
+  const digits = (pincode || '').replace(/\D/g, '');
+  if (digits.length !== 6) {
+    if (statusEl) statusEl.textContent = '';
+    return;
+  }
+  if (statusEl) { statusEl.textContent = 'Looking up city/state…'; statusEl.style.color = '#6B7280'; }
+  _pincodeLookupTimer = setTimeout(async () => {
+    try {
+      const result = await api(`/settings/pincode/${digits}`);
+      document.getElementById(cityFieldId).value = result.city || '';
+      document.getElementById(stateFieldId).value = result.state || '';
+      if (statusEl) { statusEl.textContent = '✓ City/State filled in — edit them if this looks wrong.'; statusEl.style.color = '#15803D'; }
+    } catch (e) {
+      if (statusEl) { statusEl.textContent = e.message || 'Could not look up this PIN code — please enter city/state manually.'; statusEl.style.color = '#6B7280'; }
+    }
+  }, 500);
+}
+
 function toggleAuthMode() {
   isRegisterMode = !isRegisterMode;
   document.getElementById('authRegisterFields').classList.toggle('hidden', !isRegisterMode);
@@ -271,6 +302,11 @@ async function authRegister() {
     errEl.textContent = 'Please enter a valid 10-digit mobile number.';
     return;
   }
+  const pincode = document.getElementById('authPincode').value.trim();
+  if (!/^\d{6}$/.test(pincode)) {
+    errEl.textContent = 'Please enter a valid 6-digit PIN code.';
+    return;
+  }
   try {
     const data = await api('/auth/register', {
       method: 'POST',
@@ -278,7 +314,10 @@ async function authRegister() {
         fullName: document.getElementById('authName').value,
         email,
         password: document.getElementById('authPassword').value,
-        phoneNumber: mobile
+        phoneNumber: mobile,
+        pincode,
+        city: document.getElementById('authCity').value.trim(),
+        state: document.getElementById('authState').value.trim()
       })
     });
     token = data.accessToken;

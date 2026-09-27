@@ -404,6 +404,26 @@
                         </div>
                     </div>
 
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>PIN Code <span class="required">*</span></label>
+                            <input type="text" id="regPincode" required inputmode="numeric" maxlength="6" placeholder="6-digit PIN code" autocomplete="postal-code" oninput="autofillCityState(this.value, 'regCity', 'regState', 'regPincodeStatus')">
+                            <p id="regPincodeStatus" style="font-size: 0.78rem; color: var(--text-light); margin: 0.3rem 0 0;"></p>
+                        </div>
+                        <div class="form-group">
+                            <div style="display:flex; gap:0.75rem;">
+                                <div style="flex:1;">
+                                    <label>City</label>
+                                    <input type="text" id="regCity" placeholder="Auto-filled from PIN code">
+                                </div>
+                                <div style="flex:1;">
+                                    <label>State</label>
+                                    <input type="text" id="regState" placeholder="Auto-filled from PIN code">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <p style="margin-bottom: 1rem;">
                         <a href="#" onclick="event.preventDefault(); document.getElementById('regSchoolCodeBox').style.display = document.getElementById('regSchoolCodeBox').style.display === 'none' ? 'block' : 'none';" style="color: var(--primary-light); font-size: 0.9rem;">Have a school code from NavaSetu?</a>
                     </p>
@@ -877,6 +897,34 @@
             return data;
         }
 
+        // PIN code -> city/state autofill, shared by the registration form.
+        // Debounced so it only fires once the person has actually stopped
+        // typing a full 6-digit code, not on every keystroke. City/State
+        // stay editable — a wrong post-office match, or a code the lookup
+        // doesn't recognize, should never block someone from just typing
+        // their own city/state in by hand.
+        let _pincodeLookupTimer = null;
+        function autofillCityState(pincode, cityFieldId, stateFieldId, statusFieldId) {
+            clearTimeout(_pincodeLookupTimer);
+            const statusEl = document.getElementById(statusFieldId);
+            const digits = (pincode || '').replace(/\D/g, '');
+            if (digits.length !== 6) {
+                if (statusEl) statusEl.textContent = '';
+                return;
+            }
+            if (statusEl) { statusEl.textContent = 'Looking up city/state…'; statusEl.style.color = 'var(--text-light)'; }
+            _pincodeLookupTimer = setTimeout(async () => {
+                try {
+                    const result = await apiFetch(`/settings/pincode/${digits}`);
+                    document.getElementById(cityFieldId).value = result.city || '';
+                    document.getElementById(stateFieldId).value = result.state || '';
+                    if (statusEl) { statusEl.textContent = '✓ City/State filled in — edit them if this looks wrong.'; statusEl.style.color = 'var(--success)'; }
+                } catch (e) {
+                    if (statusEl) { statusEl.textContent = e.message || 'Could not look up this PIN code — please enter city/state manually.'; statusEl.style.color = 'var(--text-light)'; }
+                }
+            }, 500);
+        }
+
         class AssessmentApp {
             constructor() {
                 this.currentUser = null;
@@ -1008,8 +1056,11 @@
                 const password = document.getElementById('regPassword').value;
                 const name = document.getElementById('regName').value;
                 const mobile = document.getElementById('regMobile').value;
+                const pincode = document.getElementById('regPincode').value.trim();
+                const city = document.getElementById('regCity').value.trim();
+                const state = document.getElementById('regState').value.trim();
 
-                if (!email || !password || !name || !mobile) {
+                if (!email || !password || !name || !mobile || !pincode) {
                     showModal('Please fill in all required fields before continuing.', 'error');
                     return;
                 }
@@ -1023,6 +1074,10 @@
                 const mobileDigits = mobile.replace(/[^\d]/g, '').replace(/^(91)/, '').replace(/^0/, '');
                 if (!/^[6-9]\d{9}$/.test(mobileDigits)) {
                     showModal('Please enter a valid 10-digit mobile number.', 'error');
+                    return;
+                }
+                if (!/^\d{6}$/.test(pincode)) {
+                    showModal('Please enter a valid 6-digit PIN code.', 'error');
                     return;
                 }
 
@@ -1046,7 +1101,7 @@
                     } else {
                         data = await apiFetch('/auth/register', {
                             method: 'POST',
-                            body: JSON.stringify({ email, password, fullName: name, phoneNumber: mobile })
+                            body: JSON.stringify({ email, password, fullName: name, phoneNumber: mobile, pincode, city, state })
                         });
                     }
 

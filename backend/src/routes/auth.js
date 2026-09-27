@@ -22,7 +22,7 @@ function isValidIndianMobile(raw) {
 // Register
 router.post('/register', async (req, res) => {
   try {
-    let { email, password, fullName, phoneNumber } = req.body;
+    let { email, password, fullName, phoneNumber, pincode, city, state } = req.body;
 
     if (!email || !password || !fullName) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -43,6 +43,13 @@ router.post('/register', async (req, res) => {
     if (phoneNumber && !isValidIndianMobile(phoneNumber)) {
       return res.status(400).json({ error: 'Please enter a valid 10-digit mobile number.' });
     }
+    // PIN code is likewise optional (older/legacy callers, B2B join flow
+    // don't send one) but has to be a real 6-digit code if supplied — the
+    // frontend already validated it against the lookup, this just guards
+    // direct API callers.
+    if (pincode && !/^\d{6}$/.test(String(pincode).trim())) {
+      return res.status(400).json({ error: 'PIN code must be exactly 6 digits.' });
+    }
 
     // Check if user exists
     const userExists = await pool.query('SELECT id, has_registered FROM users WHERE email = $1', [email]);
@@ -60,16 +67,18 @@ router.post('/register', async (req, res) => {
       // person registering for real, so claim the existing row rather than
       // erroring out or creating a duplicate account.
       const claimed = await pool.query(
-        `UPDATE users SET password_hash = $1, full_name = $2, phone_number = COALESCE($3, phone_number), has_registered = true
+        `UPDATE users SET password_hash = $1, full_name = $2, phone_number = COALESCE($3, phone_number),
+                pincode = COALESCE($5, pincode), city = COALESCE($6, city), state = COALESCE($7, state), has_registered = true
          WHERE id = $4 RETURNING id, email, full_name, role`,
-        [passwordHash, fullName, phoneNumber || null, userExists.rows[0].id]
+        [passwordHash, fullName, phoneNumber || null, userExists.rows[0].id, pincode || null, city || null, state || null]
       );
       user = claimed.rows[0];
     } else {
       const userId = uuidv4();
       const result = await pool.query(
-        'INSERT INTO users (id, email, password_hash, full_name, phone_number, role) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, email, full_name, role',
-        [userId, email, passwordHash, fullName, phoneNumber || null, 'individual']
+        `INSERT INTO users (id, email, password_hash, full_name, phone_number, role, pincode, city, state)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, email, full_name, role`,
+        [userId, email, passwordHash, fullName, phoneNumber || null, 'individual', pincode || null, city || null, state || null]
       );
       user = result.rows[0];
     }
