@@ -33,6 +33,15 @@ router.post('/assessments', requireAuth, async (req, res) => {
   try {
     const userId = req.user.userId;
     const { isTest } = req.body || {};
+
+    // Pilot "Fill Sample" hygiene — same as the wellness start route: each
+    // run used to just stack another report on top of the last one with no
+    // way to tell which sample was current. Purges this account's previous
+    // test attempts (cascades to their reports) before starting a new one.
+    if (isTest) {
+      await pool.query(`DELETE FROM assessments WHERE user_id = $1 AND track = 'ssb' AND is_test = true`, [userId]);
+    }
+
     const existing = await pool.query(
       `SELECT * FROM assessments WHERE user_id = $1 AND track = 'ssb' AND status = 'in_progress' ORDER BY created_at DESC LIMIT 1`,
       [userId]

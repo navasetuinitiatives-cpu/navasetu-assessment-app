@@ -20,6 +20,18 @@ router.post('/', requireAuth, async (req, res) => {
     const { schoolId, schoolTeacherId, clientType, isTest } = req.body;
     const userId = req.user.userId;
 
+    // Pilot "Fill Sample" hygiene: each run used to just add another 3 reports
+    // on top of whatever the last run left behind, so a tester who clicked it
+    // twice saw two full sets of Discover/Explore/Navigate stacked on their
+    // home page with no way to tell which was current. Since these are only
+    // ever throwaway samples (never a real teacher's data), a fresh run
+    // purges any of this account's *previous* test assessments first — the
+    // cascade on reports.assessment_id takes their reports with them — so the
+    // dashboard always shows exactly one, current sample set.
+    if (isTest) {
+      await pool.query(`DELETE FROM assessments WHERE user_id = $1 AND track = 'wellness' AND is_test = true`, [userId]);
+    }
+
     // BUG FIX: the same `assessments` table also holds SSB attempts (added
     // later, distinguished by the `track` column, default 'wellness' so every
     // pre-existing row already has it). This query used to have no track

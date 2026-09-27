@@ -1190,7 +1190,11 @@
 
             logout() {
                 localStorage.removeItem('navasetu_token');
-                window.location.reload();
+                // Back to the two-test landing page, not this app's own login
+                // screen — wellness and SSB are separate, unrelated clients,
+                // so logging out of one should land you where you choose
+                // which one to use next, not straight back into either.
+                window.location.href = '/welcome.html';
             }
 
             renderQuestions() {

@@ -73,7 +73,7 @@
 <header>
   <img src="/api/settings/logo" onerror="this.style.display='none'" alt="">
   <h1>NavaSetu — SSB OLQ Readiness</h1>
-  <a class="home" href="/welcome.html">← Choose a different path</a>
+  <a class="home hidden" id="headerLogoutLink" href="#" onclick="ssbLogout(); return false;">🚪 Logout</a>
 </header>
 
 <main>
@@ -121,11 +121,22 @@
     <div id="stepContainer"></div>
   </div>
 
+  <div id="dashboardScreen" class="hidden"></div>
+
+  <div id="reportViewScreen" class="hidden">
+    <div id="reportViewBody"></div>
+  </div>
+
 </main>
 
 <script>
 const API = '/api';
-let token = localStorage.getItem('navasetu_token');
+// Deliberately a different localStorage key from the wellness app (index.html
+// uses 'navasetu_token'). SSB and wellness are two completely separate,
+// unrelated clients — being signed into one must never silently sign you
+// into the other, even though both happen to run on the same origin and the
+// same underlying users table.
+let token = localStorage.getItem('navasetu_ssb_token');
 let meta = null;
 let assessmentId = null;
 let responses = { bigFive: {}, traits: {}, wat: {}, srt: {}, gto: {}, tat: {}, sdt: {} };
@@ -232,8 +243,8 @@ async function authLogin() {
       body: JSON.stringify({ email: document.getElementById('authEmail').value, password: document.getElementById('authPassword').value })
     });
     token = data.accessToken;
-    localStorage.setItem('navasetu_token', token);
-    await initAssessment();
+    localStorage.setItem('navasetu_ssb_token', token);
+    await afterAuth();
   } catch (e) { errEl.textContent = e.message; }
 }
 
@@ -250,40 +261,76 @@ async function authRegister() {
       })
     });
     token = data.accessToken;
-    localStorage.setItem('navasetu_token', token);
-    await initAssessment();
+    localStorage.setItem('navasetu_ssb_token', token);
+    await afterAuth();
   } catch (e) { errEl.textContent = e.message; }
 }
 
+function ssbLogout() {
+  localStorage.removeItem('navasetu_ssb_token');
+  window.location.href = '/welcome.html';
+}
+
+// Runs once right after a successful login/register (and again on page load
+// if a valid session already exists). Decides where to land the candidate:
+// resume an in-progress attempt, show the "My Reports" home dashboard if
+// she's already submitted one before, or start a brand-new attempt if this
+// is her first time — instead of the old behavior of always silently
+// creating (and submitting into) a fresh attempt on every single login.
+async function afterAuth() {
+  document.getElementById('pathChoiceScreen').classList.add('hidden');
+  document.getElementById('authScreen').classList.add('hidden');
+  document.getElementById('headerLogoutLink').classList.remove('hidden');
+  try {
+    if (!meta) meta = await api('/ssb/meta');
+    const list = await api('/ssb/assessments-mine/list');
+    const attempts = list.assessments || [];
+    const hasInProgress = attempts.some((a) => a.status === 'in_progress');
+    const submitted = attempts.filter((a) => a.status === 'submitted');
+    if (!hasInProgress && submitted.length > 0) {
+      await renderSsbDashboard(submitted);
+    } else {
+      await initAssessment();
+    }
+  } catch (e) {
+    document.getElementById('appScreen').classList.remove('hidden');
+    document.getElementById('stepContainer').innerHTML = `<div class="card"><p class="muted" style="color:#B91C1C;">${e.message}</p></div>`;
+  }
+}
+
+// Starts (or resumes) the stepper — used for a brand-new candidate, for
+// resuming an in-progress attempt, and for "Take Another Assessment" from
+// the dashboard.
 async function initAssessment() {
+  document.getElementById('dashboardScreen').classList.add('hidden');
+  document.getElementById('reportViewScreen').classList.add('hidden');
   document.getElementById('pathChoiceScreen').classList.add('hidden');
   document.getElementById('authScreen').classList.add('hidden');
   document.getElementById('appScreen').classList.remove('hidden');
   try {
-    const [metaData, startData] = await Promise.all([
-      api('/ssb/meta'),
-      api('/ssb/assessments', { method: 'POST' })
-    ]);
-    meta = metaData;
+    if (!meta) meta = await api('/ssb/meta');
+    const startData = await api('/ssb/assessments', { method: 'POST' });
     assessmentId = startData.assessment.id;
     itemSelection = startData.assessment.item_selection || null;
     applyItemSelection();
-    if (startData.assessment.status === 'submitted') {
-      renderAlreadySubmitted();
-      return;
-    }
+    responses = { bigFive: {}, traits: {}, wat: {}, srt: {}, gto: {}, tat: {}, sdt: {} };
     if (startData.resumed && startData.assessment.responses) {
       responses = Object.assign(responses, startData.assessment.responses);
     }
+    currentStepIndex = 0;
     renderStep();
   } catch (e) {
     document.getElementById('stepContainer').innerHTML = `<div class="card"><p class="muted" style="color:#B91C1C;">${e.message}</p></div>`;
   }
 }
 
+async function startNewSsbAssessment() {
+  await initAssessment();
+}
+
 if (token) {
-  api('/auth/me').then(() => initAssessment()).catch(() => {
-    localStorage.removeItem('navasetu_token');
+  api('/auth/me').then(() => afterAuth()).catch(() => {
+    localStorage.removeItem('navasetu_ssb_token');
     token = null;
   });
 }
@@ -563,7 +610,10 @@ async function submitAndRenderReport(container) {
 function renderReport(container, html) {
   container.innerHTML = `
     <div id="reportBody">${html}</div>
-    <button class="btn secondary" onclick="window.print()">🖨️ Print / Save as PDF</button>
+    <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-top:1rem;">
+      <button class="btn secondary" onclick="window.print()">🖨️ Print / Save as PDF</button>
+      <button class="btn secondary" onclick="backToSsbDashboard()">🏠 My Reports</button>
+    </div>
   `;
 }
 
@@ -592,7 +642,14 @@ async function upgradeSsbPlan(newPlanType) {
       body: JSON.stringify({ planType: newPlanType })
     });
     selectedPlanType = newPlanType;
-    const container = document.getElementById('stepContainer');
+    // The "Upgrade" button is embedded in report HTML that can be showing
+    // either inline mid-assessment (appScreen/stepContainer) or reopened from
+    // the dashboard (reportViewScreen/reportViewBody) — target whichever is
+    // actually on screen so the upgraded report doesn't silently render into
+    // a hidden container.
+    const container = document.getElementById('appScreen').classList.contains('hidden')
+      ? document.getElementById('reportViewBody')
+      : document.getElementById('stepContainer');
     if (result.report.locked) {
       container.innerHTML = `<div class="card"><h2>Payment Pending</h2><p class="muted">Your ${result.report.planType} report has been generated and is waiting on payment confirmation.</p></div>`;
       return;
@@ -604,12 +661,82 @@ async function upgradeSsbPlan(newPlanType) {
   }
 }
 
-function renderAlreadySubmitted() {
-  document.getElementById('stepContainer').innerHTML = `
+// --- Home dashboard: every past attempt's reports, view/download-able ------
+// This is the SSB equivalent of the wellness app's "My Reports" home screen —
+// previously missing entirely, so a returning candidate had no way to see a
+// report she'd already generated; logging back in just silently started a
+// brand-new attempt every time.
+const SSB_PLAN_LABELS = {
+  ssb_basic: '📋 Readiness Snapshot',
+  ssb_detailed: '📊 Detailed Readiness',
+  ssb_comprehensive: '🎯 Comprehensive Readiness + Coaching'
+};
+
+async function renderSsbDashboard(submittedAttempts) {
+  document.getElementById('appScreen').classList.add('hidden');
+  document.getElementById('reportViewScreen').classList.add('hidden');
+  const dash = document.getElementById('dashboardScreen');
+  dash.classList.remove('hidden');
+  dash.innerHTML = `<div class="card"><p class="muted">Loading your reports…</p></div>`;
+
+  const perAttempt = await Promise.all(submittedAttempts.map(async (a) => {
+    try {
+      const r = await api(`/reports/by-assessment/${a.id}`);
+      return r.reports || [];
+    } catch (e) { return []; }
+  }));
+  const allReports = perAttempt.flat().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  const reportsHtml = allReports.length
+    ? allReports.map((r) => `
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; padding:1rem 1.25rem; border-left:4px solid ${r.is_test ? '#DC2626' : 'var(--accent)'}; background:#FAFAFA; border-radius:6px; margin-bottom:0.75rem;">
+        <div>
+          <div style="font-weight:600;">${SSB_PLAN_LABELS[r.plan_type] || r.plan_type}${r.is_test ? ' <span style="background:#DC2626;color:#fff;font-size:0.68rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:999px;margin-left:0.4rem;">TEST</span>' : ''}</div>
+          <div style="font-size:0.8rem; color:#6B7280; margin-top:0.15rem;">Generated ${new Date(r.created_at).toLocaleDateString()}${r.payment_status === 'pending' ? ' — payment pending' : ''}</div>
+        </div>
+        <button class="btn secondary" style="margin-top:0;" onclick="viewSsbReport('${r.id}')" ${r.payment_status === 'pending' ? 'disabled' : ''}>👁️ View / Download</button>
+      </div>`).join('')
+    : `<p class="muted">No reports yet.</p>`;
+
+  dash.innerHTML = `
     <div class="card">
-      <h2>You've already completed this assessment</h2>
-      <p class="muted">Your OLQ Readiness report has been saved. Contact NavaSetu if you'd like to retake it. Or use "🧪 Fill Sample & Generate Report" above to generate a fresh sample.</p>
+      <h2 style="margin-top:0;">My OLQ Readiness Reports</h2>
+      <p class="muted">Every report you generate stays here — reopen or download any of them, anytime.</p>
+      ${reportsHtml}
+      <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-top:1.25rem;">
+        <button class="btn" onclick="startNewSsbAssessment()">🎯 Take Another Assessment</button>
+        <button class="btn secondary" onclick="fillSampleSSB()">🧪 Fill Sample &amp; Generate Report</button>
+        <button class="btn secondary" onclick="ssbLogout()">🚪 Logout</button>
+      </div>
     </div>`;
+}
+
+async function viewSsbReport(reportId) {
+  try {
+    const report = await api(`/reports/${reportId}`);
+    document.getElementById('dashboardScreen').classList.add('hidden');
+    document.getElementById('reportViewScreen').classList.remove('hidden');
+    document.getElementById('reportViewBody').innerHTML = `
+      ${report.html_content || '<p>This report has no saved content.</p>'}
+      <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-top:1rem;">
+        <button class="btn secondary" onclick="backToSsbDashboard()">⬅️ Back to My Reports</button>
+        <button class="btn secondary" onclick="window.print()">🖨️ Print / Save as PDF</button>
+      </div>`;
+  } catch (e) {
+    alert('Could not open this report: ' + e.message);
+  }
+}
+
+async function backToSsbDashboard() {
+  document.getElementById('appScreen').classList.add('hidden');
+  document.getElementById('reportViewScreen').classList.add('hidden');
+  try {
+    const list = await api('/ssb/assessments-mine/list');
+    const submitted = (list.assessments || []).filter((a) => a.status === 'submitted');
+    await renderSsbDashboard(submitted);
+  } catch (e) {
+    alert('Could not load your reports: ' + e.message);
+  }
 }
 
 // --- Pilot demo: Fill Sample Answers ---------------------------------------
@@ -685,9 +812,15 @@ async function fillSampleSSB() {
     const planKeys = Object.keys(meta.plans || {});
     selectedPlanType = planKeys.length ? planKeys[randInt(0, planKeys.length - 1)] : null;
 
-    currentStepIndex = STEPS.length - 1;
-    document.getElementById('progressFill').style.width = '100%';
-    await submitAndRenderReport(document.getElementById('stepContainer'));
+    await api(`/ssb/assessments/${assessmentId}/submit`, {
+      method: 'POST',
+      body: JSON.stringify({ planType: selectedPlanType })
+    });
+
+    // Land on the home dashboard, where the freshly generated (TEST-marked)
+    // report is listed under "My OLQ Readiness Reports" — mirrors the
+    // wellness app's Fill Sample behavior.
+    await backToSsbDashboard();
   } catch (e) {
     alert('Could not generate a sample: ' + e.message);
   } finally {

@@ -109,13 +109,20 @@ router.get('/:reportId', requireAuth, async (req, res) => {
   }
 });
 
-// All reports generated for one assessment (used by the "My Reports" list / plan switcher)
+// All reports generated for one assessment (used by the "My Reports" list / plan
+// switcher, in both wellness and SSB — this route is shared/generic). Scoped to
+// the caller's own reports (or any admin) — was previously missing an ownership
+// filter, so any authenticated user who guessed/observed an assessment UUID
+// could read another user's report metadata (not the report HTML itself, but
+// still more than they should see).
 router.get('/by-assessment/:assessmentId', requireAuth, async (req, res) => {
   try {
     const { assessmentId } = req.params;
     const result = await pool.query(
-      'SELECT id, plan_type, payment_status, created_at, released_at FROM reports WHERE assessment_id = $1 ORDER BY created_at DESC',
-      [assessmentId]
+      `SELECT id, plan_type, payment_status, created_at, released_at, is_test FROM reports
+       WHERE assessment_id = $1 AND (user_id = $2 OR $3 = 'platform_admin')
+       ORDER BY created_at DESC`,
+      [assessmentId, req.user.userId, req.user.role]
     );
     res.json({ reports: result.rows });
   } catch (error) {
