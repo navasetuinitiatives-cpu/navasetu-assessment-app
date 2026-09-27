@@ -7,6 +7,18 @@ import { requireAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
+// Basic format checks only — no OTP/SMS/email verification, per instruction.
+// These just catch obvious typos/junk before they land in the CRM as a lead
+// (a mistyped email means a report/lead nobody can ever follow up on).
+const EMAIL_FORMAT = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Accepts a plain 10-digit Indian mobile number (starts 6-9), tolerating a
+// leading +91/91/0 and any spaces/dashes a person might type or paste in.
+function isValidIndianMobile(raw) {
+  const digits = String(raw).replace(/[^\d]/g, '');
+  const normalized = digits.replace(/^(91)/, '').replace(/^0/, '');
+  return /^[6-9]\d{9}$/.test(normalized);
+}
+
 // Register
 router.post('/register', async (req, res) => {
   try {
@@ -20,6 +32,17 @@ router.post('/register', async (req, res) => {
     // for the same person could silently be created (and only one of them
     // would carry any role change made later, e.g. promoting to admin).
     email = email.trim().toLowerCase();
+
+    if (!EMAIL_FORMAT.test(email)) {
+      return res.status(400).json({ error: 'Please enter a valid email address.' });
+    }
+    // Mobile is optional at the DB level (some legacy/B2B paths don't collect
+    // it), but if one is supplied it has to actually look like a phone
+    // number — this is the field counsellors call back on, so a junk value
+    // here is worse than a blank one.
+    if (phoneNumber && !isValidIndianMobile(phoneNumber)) {
+      return res.status(400).json({ error: 'Please enter a valid 10-digit mobile number.' });
+    }
 
     // Check if user exists
     const userExists = await pool.query('SELECT id, has_registered FROM users WHERE email = $1', [email]);

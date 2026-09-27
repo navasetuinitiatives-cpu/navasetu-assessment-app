@@ -382,7 +382,7 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label>Email Address <span class="required">*</span></label>
-                            <input type="email" id="regEmail" required>
+                            <input type="email" id="regEmail" required inputmode="email" autocomplete="email">
                         </div>
                         <div class="form-group">
                             <label>Password <span class="required">*</span></label>
@@ -400,7 +400,7 @@
                         </div>
                         <div class="form-group">
                             <label>Mobile Number <span class="required">*</span></label>
-                            <input type="tel" id="regMobile" required>
+                            <input type="tel" id="regMobile" required inputmode="numeric" maxlength="13" placeholder="10-digit mobile number" autocomplete="tel">
                         </div>
                     </div>
 
@@ -1011,6 +1011,18 @@
 
                 if (!email || !password || !name || !mobile) {
                     showModal('Please fill in all required fields before continuing.', 'error');
+                    return;
+                }
+                // Basic format checks only — no OTP/SMS verification — just enough
+                // to catch a typo'd email/number before it becomes an uncontactable
+                // CRM lead. Mirrors the same check the server applies either way.
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                    showModal('Please enter a valid email address.', 'error');
+                    return;
+                }
+                const mobileDigits = mobile.replace(/[^\d]/g, '').replace(/^(91)/, '').replace(/^0/, '');
+                if (!/^[6-9]\d{9}$/.test(mobileDigits)) {
+                    showModal('Please enter a valid 10-digit mobile number.', 'error');
                     return;
                 }
 

@@ -108,8 +108,9 @@
     <p class="muted">Your account is the same one used across NavaSetu — if you already have a wellness assessment account, log in with it.</p>
     <div id="authRegisterFields" class="hidden">
       <label>Full Name</label><input id="authName">
+      <label>Mobile Number</label><input id="authMobile" type="tel" inputmode="numeric" maxlength="13" placeholder="10-digit mobile number" autocomplete="tel">
     </div>
-    <label>Email</label><input id="authEmail" type="email">
+    <label>Email</label><input id="authEmail" type="email" inputmode="email" autocomplete="email">
     <label>Password</label><input id="authPassword" type="password">
     <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
       <button class="btn" id="authSubmitBtn" onclick="authLogin()">Log In</button>
@@ -256,13 +257,28 @@ async function authLogin() {
 async function authRegister() {
   const errEl = document.getElementById('authError');
   errEl.textContent = '';
+  const email = document.getElementById('authEmail').value;
+  const mobile = document.getElementById('authMobile').value;
+  // Basic format checks only — no OTP/SMS verification — same rule the
+  // server applies either way, just enough to catch a typo before it
+  // becomes an uncontactable CRM lead.
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errEl.textContent = 'Please enter a valid email address.';
+    return;
+  }
+  const mobileDigits = mobile.replace(/[^\d]/g, '').replace(/^(91)/, '').replace(/^0/, '');
+  if (!/^[6-9]\d{9}$/.test(mobileDigits)) {
+    errEl.textContent = 'Please enter a valid 10-digit mobile number.';
+    return;
+  }
   try {
     const data = await api('/auth/register', {
       method: 'POST',
       body: JSON.stringify({
         fullName: document.getElementById('authName').value,
-        email: document.getElementById('authEmail').value,
-        password: document.getElementById('authPassword').value
+        email,
+        password: document.getElementById('authPassword').value,
+        phoneNumber: mobile
       })
     });
     token = data.accessToken;
