@@ -36,8 +36,6 @@
   .micBtn { flex:0 0 auto; background:#F3F4F6; border:1px solid var(--border); border-radius:8px; width:2.4rem; height:2.4rem; font-size:1rem; cursor:pointer; margin-top:0; }
   .micBtn.recording { background:#FEE2E2; border-color:#FCA5A5; animation:micPulse 1s infinite; }
   @keyframes micPulse { 0%, 100% { opacity:1; } 50% { opacity:0.5; } }
-  .tatImageBox { border:1px solid var(--border); border-radius:8px; overflow:hidden; background:#fff; display:flex; justify-content:center; padding:0.6rem; box-shadow:0 1px 4px rgba(0,0,0,0.08) inset; margin-bottom:0.75rem; }
-  .tatImageBox svg { width:100%; max-width:340px; height:auto; display:block; border-radius:2px; }
   .disclaimer { background:#FFFBEB; border:1px solid #FDE68A; border-radius:8px; padding:1rem; font-size:0.85rem; color:#92400E; margin:1rem 0; }
   .scoreCircle { text-align:center; padding:1rem 0 1.5rem; }
   .scoreCircle .num { font-size:3.2rem; font-weight:800; color:var(--accent); margin:0.25rem 0; }
@@ -68,8 +66,8 @@ const API = '/api';
 let meta = null;
 let leadInfo = { name: '', email: '', phone: '' };
 let traitResponses = {};
-let srtText = '';
-let tatText = '';
+let srtTexts = [];
+let watTexts = [];
 
 async function api(path, options = {}) {
   const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
@@ -119,7 +117,7 @@ function renderIntro() {
   document.getElementById('stepContainer').innerHTML = `
     <div class="card">
       <h2>Free SSB Readiness Test</h2>
-      <p class="muted">A quick, 2-3 minute taste of the full OLQ Readiness Assessment — 5 short questions and one TAT-style image. No payment, and you can take it again with a fresh set of questions any time.</p>
+      <p class="muted">A quick, few-minute taste of the full OLQ Readiness Assessment — trait questions, a couple of situation reactions, and a few word-association prompts. No payment, and you can take it again with a fresh set of questions any time.</p>
       <label>Your Name</label><input id="leadName">
       <label>Email</label><input id="leadEmail" type="email">
       <label>Phone (optional)</label><input id="leadPhone" type="tel">
@@ -140,8 +138,8 @@ async function startTeaser() {
   try {
     meta = await api('/ssb/teaser/meta');
     traitResponses = {};
-    srtText = '';
-    tatText = '';
+    srtTexts = (meta.srt || []).map(() => '');
+    watTexts = (meta.wat || []).map(() => '');
     renderQuestions();
   } catch (e) {
     document.getElementById('stepContainer').innerHTML = `<div class="card"><p class="muted" style="color:#B91C1C;">${e.message}</p></div>`;
@@ -160,30 +158,39 @@ function renderQuestions() {
     </div>
   `).join('');
 
+  const srtHtml = (meta.srt || []).map((situation, i) => `
+    <div class="card">
+      <h2>Situation Reaction ${meta.srt.length > 1 ? i + 1 : ''}</h2>
+      <p class="muted"><strong>${situation}</strong></p>
+      <p class="muted">In a sentence or two, what would you do?</p>
+      <div class="voiceRow">
+        <textarea id="srtInput_${i}" rows="3" oninput="srtTexts[${i}]=this.value"></textarea>
+        <button type="button" class="micBtn" onclick="toggleVoiceInput(this, 'srtInput_${i}')" title="Speak your answer">🎤</button>
+      </div>
+    </div>
+  `).join('');
+
+  const watHtml = (meta.wat || []).map((word, i) => `
+    <div class="likertItem">
+      <div class="qtext">${word}</div>
+      <div class="voiceRow">
+        <input id="watInput_${i}" placeholder="First complete sentence that comes to mind…" oninput="watTexts[${i}]=this.value">
+        <button type="button" class="micBtn" onclick="toggleVoiceInput(this, 'watInput_${i}')" title="Speak your answer">🎤</button>
+      </div>
+    </div>
+  `).join('');
+
   document.getElementById('stepContainer').innerHTML = `
     <div class="card">
       <h2>A Few Quick Questions</h2>
       <p class="muted">Answer honestly — there's no right or wrong answer.</p>
       ${traitsHtml}
     </div>
+    ${srtHtml}
     <div class="card">
-      <h2>Situation Reaction</h2>
-      <p class="muted"><strong>${meta.srt}</strong></p>
-      <p class="muted">In a sentence or two, what would you do?</p>
-      <div class="voiceRow">
-        <textarea id="srtInput" rows="3" oninput="srtText=this.value"></textarea>
-        <button type="button" class="micBtn" onclick="toggleVoiceInput(this, 'srtInput')" title="Speak your answer">🎤</button>
-      </div>
-    </div>
-    <div class="card">
-      <h2>Picture Story</h2>
-      <p class="muted">Look at the image below and write a short story about what's happening and what happens next.</p>
-      <div class="tatImageBox">${meta.tat.svg}</div>
-      <p class="muted">${meta.tat.description}</p>
-      <div class="voiceRow">
-        <textarea id="tatInput" rows="4" oninput="tatText=this.value"></textarea>
-        <button type="button" class="micBtn" onclick="toggleVoiceInput(this, 'tatInput')" title="Speak your answer">🎤</button>
-      </div>
+      <h2>Word Reaction</h2>
+      <p class="muted">For each word below, write the first complete sentence that comes to mind — don't overthink it.</p>
+      ${watHtml}
     </div>
     <button class="btn" onclick="submitTeaser()">See My Score</button>
     <p class="muted" id="submitError" style="color:#B91C1C;"></p>
@@ -193,7 +200,7 @@ function renderQuestions() {
 async function submitTeaser() {
   const traitItemIds = meta.traits.map((q) => q.id);
   if (Object.keys(traitResponses).length < traitItemIds.length) {
-    document.getElementById('submitError').textContent = 'Please answer all 5 quick questions before continuing.';
+    document.getElementById('submitError').textContent = 'Please answer all the quick questions before continuing.';
     return;
   }
   document.getElementById('stepContainer').innerHTML = `<div class="card"><p class="muted">Scoring your answers…</p></div>`;
@@ -206,8 +213,8 @@ async function submitTeaser() {
         phone: leadInfo.phone,
         traitItemIds,
         traitResponses,
-        srtText,
-        tatText
+        srtTexts,
+        watTexts
       })
     });
     renderResult(result);
@@ -237,7 +244,7 @@ function renderResult(result) {
         <div class="num">${result.score}<span>/100</span></div>
         <div class="grade">${result.gradeBand.label}</div>
       </div>
-      <div class="disclaimer">This is a directional snapshot from just 7 quick responses — not a readiness grade. The full OLQ Readiness Assessment (Big Five + 4 trait scales, 40 WAT words, 30 SRTs, 8 GTO scenarios, 4 TAT plates) produces a proper OLQ-mapped Readiness Index and a DIPR-style grade band across all 15 Officer-Like Qualities.</div>
+      <div class="disclaimer">This is a directional snapshot from a small number of quick responses — not a readiness grade. It is a psychometric depiction only and does not guarantee the same result in an actual SSB, which is a far more intensive, multi-day process. The full OLQ Readiness Assessment (Big Five + 4 trait scales, 40 WAT words, 30 SRTs, 8 GTO scenarios) produces a proper OLQ-mapped Readiness Index and grade band across all 15 Officer-Like Qualities.</div>
     </div>
     <div class="card">
       <h2>Get Your Full OLQ Readiness Report</h2>

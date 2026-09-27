@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { pool } from '../config/database.js';
 import { requireAuth } from '../middleware/auth.js';
 import {
-  bigFiveItems, traitItemBank, watWords, srtSituations, gtoScenarios, tatPrompts, sdtPrompts,
+  bigFiveItems, traitItemBank, watWords, srtSituations, gtoScenarios, sdtPrompts,
   calculateOLQProfile, buildImprovementPlan, buildItemSelection, buildSsbReportHtml, SSB_PLANS,
   buildTeaserSelection, computeTeaserScore
 } from '../utils/ssbScoring.js';
@@ -25,7 +25,7 @@ const PILOT_FREE_ACCESS = process.env.PILOT_FREE_ACCESS !== 'false';
 
 // Public: the full item bank, so the frontend never hardcodes question text.
 router.get('/meta', (req, res) => {
-  res.json({ bigFiveItems, traitItemBank, watWords, srtSituations, gtoScenarios, tatPrompts, sdtPrompts, plans: SSB_PLANS });
+  res.json({ bigFiveItems, traitItemBank, watWords, srtSituations, gtoScenarios, sdtPrompts, plans: SSB_PLANS });
 });
 
 // Start (or resume) the caller's current in-progress SSB assessment.
@@ -79,7 +79,7 @@ router.post('/assessments', requireAuth, async (req, res) => {
       }
     }
 
-    // Fresh attempt: draw a brand-new random subset of WAT/SRT/GTO/TAT items
+    // Fresh attempt: draw a brand-new random subset of WAT/SRT/GTO items
     // and freeze it on the row, so this attempt always shows the same items
     // on reload, but the *next* new attempt gets a different draw. Big Five +
     // the 4 trait scales are never rotated (see ssbScoring.js header for why).
@@ -164,7 +164,7 @@ router.delete('/assessments/:id', requireAuth, async (req, res) => {
   }
 });
 
-// Autosave one section's answers (bigFive, traits, wat, srt, gto, tat, sdt).
+// Autosave one section's answers (bigFive, traits, wat, srt, gto, sdt).
 // Responses are stored as { [section]: { [itemId]: answer } } in the same
 // JSONB `responses` column the wellness flow uses — just namespaced by
 // section so nothing collides with wellness's flat item-id keys.
@@ -184,7 +184,7 @@ router.delete('/assessments/:id', requireAuth, async (req, res) => {
 router.put('/assessments/:id', requireAuth, async (req, res) => {
   try {
     const { section, answers } = req.body;
-    const validSections = ['bigFive', 'traits', 'wat', 'srt', 'gto', 'tat', 'sdt'];
+    const validSections = ['bigFive', 'traits', 'wat', 'srt', 'gto', 'sdt'];
     if (!validSections.includes(section)) return res.status(400).json({ error: `section must be one of: ${validSections.join(', ')}` });
 
     const existing = await pool.query(`SELECT id, user_id, status, responses FROM assessments WHERE id = $1 AND track = 'ssb'`, [req.params.id]);
@@ -212,7 +212,7 @@ router.put('/assessments/:id', requireAuth, async (req, res) => {
 
 // Submit: scores the trait battery + WAT + GTO into the OLQ Readiness
 // Profile, builds a per-factor improvement plan, and freezes the attempt.
-// SRT/TAT/SDT are preserved verbatim for the candidate's own review and for
+// SRT/SDT are preserved verbatim for the candidate's own review and for
 // an admin/counsellor to read, but are never auto-scored (see ssbScoring.js
 // for why — real projective-test interpretation needs a trained assessor).
 router.post('/assessments/:id/submit', requireAuth, async (req, res) => {
@@ -361,13 +361,16 @@ router.post('/assessments/:id/upgrade-report', requireAuth, async (req, res) => 
 });
 
 // --- Free "teaser" funnel test --------------------------------------------
-// A short, ungated marketing exercise (5 quick trait items + 1 SRT + 1 TAT)
-// for visitors who aren't ready to commit to the full assessment. Completely
-// isolated from the `users`/`assessments` tables the real test uses — no
-// login, no assessment row, just a lead captured in its own
-// `ssb_teaser_leads` table — so it can never collide with or corrupt a real
-// candidate's data. Every /teaser/meta call draws a fresh random subset, so
-// a repeat visitor always gets new questions and a fresh score.
+// A short, ungated marketing exercise (8 quick trait items + 2 SRT situations
+// + 3 WAT words) for visitors who aren't ready to commit to the full
+// assessment. Completely isolated from the `users`/`assessments` tables the
+// real test uses — no login, no assessment row, just a lead captured in its
+// own `ssb_teaser_leads` table — so it can never collide with or corrupt a
+// real candidate's data. Every /teaser/meta call draws a fresh random
+// subset, so a repeat visitor always gets new questions and a fresh score.
+// (The TAT picture-story exercise that used to be part of this teaser has
+// been removed altogether, along with the full assessment's TAT step — see
+// ssbScoring.js.)
 router.get('/teaser/meta', (req, res) => {
   const selection = buildTeaserSelection();
   res.json(Object.assign({}, selection, { plans: SSB_PLANS }));
@@ -375,7 +378,7 @@ router.get('/teaser/meta', (req, res) => {
 
 router.post('/teaser/submit', async (req, res) => {
   try {
-    const { name, email, phone, traitItemIds, traitResponses, srtText, tatText } = req.body || {};
+    const { name, email, phone, traitItemIds, traitResponses, srtTexts, watTexts } = req.body || {};
     if (!name || !email) return res.status(400).json({ error: 'Name and email are required' });
     if (!Array.isArray(traitItemIds) || traitItemIds.length === 0) {
       return res.status(400).json({ error: 'Missing trait responses' });
@@ -384,15 +387,15 @@ router.post('/teaser/submit', async (req, res) => {
     const { score, gradeBand } = computeTeaserScore({
       traitItems,
       traitResponses: traitResponses || {},
-      srtText: srtText || '',
-      tatText: tatText || ''
+      srtTexts: Array.isArray(srtTexts) ? srtTexts : [],
+      watTexts: Array.isArray(watTexts) ? watTexts : []
     });
 
     const id = uuidv4();
     await pool.query(
       `INSERT INTO ssb_teaser_leads (id, name, email, phone, responses, score, grade_label)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [id, name, email, phone || null, JSON.stringify({ traitItemIds, traitResponses, srtText, tatText }), score, gradeBand.label]
+      [id, name, email, phone || null, JSON.stringify({ traitItemIds, traitResponses, srtTexts, watTexts }), score, gradeBand.label]
     );
 
     res.json({ success: true, score, gradeBand, plans: SSB_PLANS });

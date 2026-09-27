@@ -54,10 +54,6 @@
   .micBtn { flex:0 0 auto; background:#F3F4F6; border:1px solid var(--border); border-radius:8px; width:2.75rem; height:2.75rem; font-size:1.1rem; cursor:pointer; margin-top:0; }
   .micBtn.recording { background:#FEE2E2; border-color:#FCA5A5; animation:micPulse 1s infinite; }
   @keyframes micPulse { 0%, 100% { opacity:1; } 50% { opacity:0.5; } }
-  .tatImageWrap { margin-bottom:0.75rem; }
-  .tatImageBox { border:1px solid var(--border); border-radius:8px; overflow:hidden; background:#fff; display:flex; justify-content:center; padding:0.6rem; box-shadow:0 1px 4px rgba(0,0,0,0.08) inset; }
-  .tatImageBox svg { width:100%; max-width:340px; height:auto; display:block; border-radius:2px; }
-  .tatImageHidden { border:1px dashed var(--border); border-radius:8px; padding:1.5rem; text-align:center; background:#F9FAFB; }
   .plan-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:1rem; margin:1.25rem 0; }
   @media (max-width:680px) { .plan-grid { grid-template-columns:1fr; } }
   .plan-card { padding:1.25rem; border:2px solid var(--border); border-radius:8px; cursor:pointer; transition:all 0.15s; background:#fff; }
@@ -90,13 +86,13 @@
       <div style="border:2px solid var(--border); border-radius:10px; padding:1.5rem 1.25rem; cursor:pointer; transition:border-color 0.15s;" onclick="window.location.href='/ssb-teaser.html'">
         <div style="font-size:1.9rem; margin-bottom:0.4rem;">🆓</div>
         <h3 style="margin:0 0 0.4rem; font-size:1.05rem;">Take a Free Test</h3>
-        <p class="muted" style="font-size:0.85rem; margin-bottom:0.9rem;">A quick 2-3 minute taste — a few questions and one TAT image. No sign-up, no payment.</p>
+        <p class="muted" style="font-size:0.85rem; margin-bottom:0.9rem;">A quick few-minute taste — a handful of trait, situation, and word-response questions. No sign-up, no payment.</p>
         <span class="btn secondary" style="margin-top:0; display:inline-block;">Start Free Test</span>
       </div>
       <div style="border:2px solid var(--accent); border-radius:10px; padding:1.5rem 1.25rem; cursor:pointer; background:#FAF9FF;" onclick="showFullAssessment()">
         <div style="font-size:1.9rem; margin-bottom:0.4rem;">🎯</div>
         <h3 style="margin:0 0 0.4rem; font-size:1.05rem;">Do I Have IT in Me?</h3>
-        <p class="muted" style="font-size:0.85rem; margin-bottom:0.9rem;">The full OLQ Readiness Assessment — Big Five, all 4 trait scales, WAT/SRT/GTO/TAT, and a personalized report.</p>
+        <p class="muted" style="font-size:0.85rem; margin-bottom:0.9rem;">The full OLQ Readiness Assessment — Big Five, all 4 trait scales, WAT/SRT/GTO, and a personalized report.</p>
         <span class="btn" style="margin-top:0; display:inline-block;">Start Full Assessment</span>
       </div>
     </div>
@@ -152,7 +148,7 @@ const API = '/api';
 let token = localStorage.getItem('navasetu_ssb_token');
 let meta = null;
 let assessmentId = null;
-let responses = { bigFive: {}, traits: {}, wat: {}, srt: {}, gto: {}, tat: {}, sdt: {} };
+let responses = { bigFive: {}, traits: {}, wat: {}, srt: {}, gto: {}, sdt: {} };
 let isRegisterMode = false;
 
 // This attempt's frozen random draw (set once at assessment creation, see
@@ -162,7 +158,6 @@ let itemSelection = null;
 let selectedWat = [];
 let selectedSrt = [];
 let selectedGto = [];
-let selectedTat = [];
 
 function applyItemSelection() {
   selectedWat = (itemSelection && itemSelection.wat) || meta.watWords;
@@ -170,12 +165,9 @@ function applyItemSelection() {
   selectedGto = (itemSelection && itemSelection.gto)
     ? itemSelection.gto.map((id) => meta.gtoScenarios.find((g) => g.id === id)).filter(Boolean)
     : meta.gtoScenarios;
-  selectedTat = (itemSelection && itemSelection.tat)
-    ? itemSelection.tat.map((id) => meta.tatPrompts.find((t) => t.id === id)).filter(Boolean)
-    : meta.tatPrompts;
 }
 
-// --- Voice-to-text (Web Speech API), used across WAT/SRT/TAT/SDT fields ---
+// --- Voice-to-text (Web Speech API), used across WAT/SRT/SDT fields ---
 // Typing is always the default/fallback; the mic button is purely additive.
 // Not every browser supports this (notably older Safari), so it's feature-
 // detected rather than assumed.
@@ -214,7 +206,7 @@ function toggleVoiceInput(btn, targetId) {
   recognition.start();
 }
 
-const STEPS = ['bigFive', 'traits', 'wat', 'srt', 'gto', 'tat', 'sdt', 'planSelection', 'report'];
+const STEPS = ['bigFive', 'traits', 'wat', 'srt', 'gto', 'sdt', 'planSelection', 'report'];
 let currentStepIndex = 0;
 let selectedPlanType = null;
 
@@ -418,7 +410,7 @@ async function initAssessment(rethrow) {
     assessmentId = startData.assessment.id;
     itemSelection = startData.assessment.item_selection || null;
     applyItemSelection();
-    responses = { bigFive: {}, traits: {}, wat: {}, srt: {}, gto: {}, tat: {}, sdt: {} };
+    responses = { bigFive: {}, traits: {}, wat: {}, srt: {}, gto: {}, sdt: {} };
     if (startData.resumed && startData.assessment.responses) {
       responses = Object.assign(responses, startData.assessment.responses);
     }
@@ -467,7 +459,6 @@ function renderStep() {
   if (step === 'wat') return renderWatStep(container);
   if (step === 'srt') return renderSrtStep(container);
   if (step === 'gto') return renderGtoStep(container);
-  if (step === 'tat') return renderTatStep(container);
   if (step === 'sdt') return renderSdtStep(container);
   if (step === 'planSelection') return renderPlanSelectionStep(container);
   if (step === 'report') return submitAndRenderReport(container);
@@ -621,45 +612,6 @@ async function nextFromGto() {
   await saveSection('gto');
   currentStepIndex++;
   renderStep();
-}
-
-function renderTatStep(container) {
-  container.innerHTML = `
-    <div class="stepLabel">Step ${currentStepIndex + 1} of ${STEPS.length}</div>
-    <div class="card">
-      <h2>Part 5 — Picture Story Reflection (TAT-style)</h2>
-      <p class="muted"><strong>Not scored.</strong> Real TAT interpretation needs a trained psychologist reading it alongside your live behavior — this is offered purely as guided self-reflection practice. As in the real exam, each picture is shown briefly and then hidden — keep writing your story below even after it disappears. Type it, or tap 🎤 to speak it.</p>
-      ${selectedTat.map((p) => `
-        <div class="srtItem">
-          <div class="tatImageWrap" id="tatImgWrap_${p.id}">
-            <div class="tatImageBox">${p.svg}</div>
-            <div class="muted" style="text-align:center; margin-top:0.3rem;">Image visible for <span id="tatCountdown_${p.id}">20</span>s</div>
-          </div>
-          <div class="muted" style="margin-bottom:0.4rem;">${p.guidance}</div>
-          <div class="voiceRow">
-            <textarea id="tat_${p.id}" rows="4" placeholder="Write your story here..." oninput="responses.tat['${p.id}'] = this.value">${responses.tat[p.id] || ''}</textarea>
-            <button type="button" class="micBtn" onclick="toggleVoiceInput(this, 'tat_${p.id}')" title="Speak your story">🎤</button>
-          </div>
-        </div>`).join('')}
-      <button class="btn secondary" onclick="skipStep()">Skip for now</button>
-      <button class="btn" onclick="nextFromFreeText('tat')">Continue</button>
-    </div>`;
-  selectedTat.forEach((p) => startTatTimer(p.id));
-}
-
-function startTatTimer(id) {
-  let seconds = 20;
-  const interval = setInterval(() => {
-    seconds--;
-    const countdownEl = document.getElementById(`tatCountdown_${id}`);
-    if (!countdownEl) { clearInterval(interval); return; } // step navigated away
-    countdownEl.textContent = seconds;
-    if (seconds <= 0) {
-      clearInterval(interval);
-      const wrap = document.getElementById(`tatImgWrap_${id}`);
-      if (wrap) wrap.innerHTML = '<div class="tatImageHidden muted">Image hidden — continue writing your story from memory, as in the real exam.</div>';
-    }
-  }, 1000);
 }
 
 function renderSdtStep(container) {
@@ -930,11 +882,9 @@ async function downloadSsbResponses(assessmentId) {
       ${freeTextSection(r.srt)}
       <h3>Group Testing (GTO)</h3>
       ${gtoRows}
-      <h3>Thematic Apperception Test (TAT)</h3>
-      ${freeTextSection(r.tat)}
       <h3>Self-Description (SDT)</h3>
       ${freeTextSection(r.sdt)}
-      <div class="disclaimer"><strong>Note:</strong> This is a self-assessment practice tool, not an official DIPR/SSB Board evaluation.</div>
+      <div class="disclaimer"><strong>Note:</strong> This is a psychometric self-assessment practice tool, not an official Services Selection Board evaluation, and does not guarantee the same result in an actual SSB, which is a far more intensive, multi-day, multi-assessor process.</div>
       ${isTestAttempt ? `<div class="test-banner">🧪 TEST RESPONSES — Sample data generated for pilot review. This is not a real submission.</div>` : ''}
       <script>window.onload = function() { window.print(); };<\/script>
     </body></html>`;
@@ -981,7 +931,7 @@ async function backToSsbDashboard() {
 // starts from a *new* assessment: since POST /ssb/assessments only resumes an
 // 'in_progress' row, and this flow immediately submits (freezing the row),
 // the very next click naturally gets a brand-new row + a brand-new random
-// draw of WAT/SRT/GTO/TAT — so every run is a genuinely new sample with its
+// draw of WAT/SRT/GTO — so every run is a genuinely new sample with its
 // own report, never a repeat of the last one. No backend changes needed:
 // this reuses the exact same start/save/submit endpoints real candidates use,
 // so the report it produces is scored by the same real pipeline, not a mock.
@@ -1008,12 +958,6 @@ const SAMPLE_SRT_REACTIONS = [
   'I would wait and see what the group decides before doing anything.',
   'I would think it through calmly and then act on the best option.'
 ];
-const SAMPLE_TAT_STORIES = [
-  'The person in the picture decides to take the harder path because they know it will help them grow. They plan carefully, ask a friend for advice, and reach their goal despite the difficulty, feeling proud of the effort.',
-  'The character hesitates for a while, unsure what to do next. They eventually choose the easier option, avoiding the challenge, and later wish they had tried harder when they see others succeed.',
-  'Seeing the situation, the person quickly organizes the people around them, gives each one a clear task, and leads the group to solve the problem calmly and efficiently.',
-  'The person feels overwhelmed at first but takes a moment to think, remembers a similar situation from before, and slowly works out a practical plan that helps everyone involved.'
-];
 const SAMPLE_SDT_ANSWERS = [
   'I am a disciplined, hardworking person who likes to plan ahead. I sometimes get impatient when things do not go as planned, and I am working on being more flexible.',
   'People describe me as friendly and easy to talk to. I enjoy working in teams, though I can be a little indecisive when there are too many options.',
@@ -1034,16 +978,15 @@ async function fillSampleSSB() {
     itemSelection = startData.assessment.item_selection || null;
     applyItemSelection();
 
-    responses = { bigFive: {}, traits: {}, wat: {}, srt: {}, gto: {}, tat: {}, sdt: {} };
+    responses = { bigFive: {}, traits: {}, wat: {}, srt: {}, gto: {}, sdt: {} };
     meta.bigFiveItems.forEach((q) => { responses.bigFive[q.id] = randInt(0, q.options.length - 1); });
     meta.traitItemBank.forEach((q) => { responses.traits[q.id] = randInt(0, q.options.length - 1); });
     selectedWat.forEach((word) => { responses.wat[word] = `${word} — ${SAMPLE_WAT_REACTIONS[randInt(0, SAMPLE_WAT_REACTIONS.length - 1)]}`; });
     selectedSrt.forEach((situation) => { responses.srt[situation] = SAMPLE_SRT_REACTIONS[randInt(0, SAMPLE_SRT_REACTIONS.length - 1)]; });
     selectedGto.forEach((scenario) => { responses.gto[scenario.id] = randInt(0, scenario.options.length - 1); });
-    selectedTat.forEach((p) => { responses.tat[p.id] = SAMPLE_TAT_STORIES[randInt(0, SAMPLE_TAT_STORIES.length - 1)]; });
     meta.sdtPrompts.forEach((p) => { responses.sdt[p.id] = SAMPLE_SDT_ANSWERS[randInt(0, SAMPLE_SDT_ANSWERS.length - 1)]; });
 
-    await Promise.all(['bigFive', 'traits', 'wat', 'srt', 'gto', 'tat', 'sdt'].map((s) => saveSection(s)));
+    await Promise.all(['bigFive', 'traits', 'wat', 'srt', 'gto', 'sdt'].map((s) => saveSection(s)));
 
     const planKeys = Object.keys(meta.plans || {});
     selectedPlanType = planKeys.length ? planKeys[randInt(0, planKeys.length - 1)] : null;

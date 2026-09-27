@@ -4,7 +4,7 @@
 // The actual SSB (Services Selection Board) assesses candidates through five
 // days of live observation by three independently-trained assessors (a
 // psychologist, a Group Testing Officer, and an Interviewing Officer) who
-// cross-verify projective test responses (TAT/WAT/SRT/SDT) against real
+// cross-verify projective test responses (WAT/SRT/SDT) against real
 // behavior in group tasks and a personal interview. No published, validated
 // model exists that maps self-report scores to a true pass/fail probability,
 // and nothing here claims to replicate psychologist-grade projective test
@@ -13,7 +13,8 @@
 // patterns sit relative to the 15 Officer-Like Qualities, plus a clearly
 // disclaimed composite index — never a predicted outcome.
 //
-// The 15 OLQs (per DIPR/DGR framework) are grouped into 4 factors:
+// The 15 OLQs (per the Officer-Like Qualities framework used in Services
+// Selection Board assessments) are grouped into 4 factors:
 //   1. Planning & Organizing  — effective intelligence, reasoning ability,
 //      organizing ability, power of expression
 //   2. Social Adjustment      — cooperation, sense of responsibility,
@@ -400,71 +401,12 @@ export const gtoScenarios = [
   }
 ];
 
-// --- TAT / SDT — guided self-reflection (NOT scored) --------------------
-// These are offered as structured reflection, benchmarked against example
-// answers, never auto-scored — genuine TAT interpretation needs a trained
-// psychologist reading it alongside live behavior. Each prompt has an inline
-// SVG rendered to look like a high-contrast monochrome photograph — the
-// style of a real TAT plate — rather than flat colored clip-art: a dark
-// vignette gradient background and soft silhouette figures with gradient
-// shading and a light blur for photographic depth. (An earlier version also
-// added a feTurbulence film-grain overlay, but that filter isn't reliably
-// supported everywhere — some renderers fall back to an opaque black rect
-// instead of skipping it, blacking out the whole image, so it was dropped in
-// favor of gradients/blur alone, which are universally supported.) Each
-// gradient/filter id is suffixed per image so multiple prompts can render on
-// the same page without ID collisions.
-export const tatPrompts = [
-  {
-    id: 'tat1',
-    description: 'A person stands where a path splits into two: one way goes uphill into fog, the other goes downhill and is clear. Their bag looks heavy.',
-    guidance: 'A good story usually has a main character, a reason for what they do, an action they take, and how it ends — not just a description of the picture.',
-    svg: '<svg viewBox="0 0 400 260" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="bg1" cx="45%" cy="35%" r="75%"><stop offset="0%" stop-color="#5a5a5a"/><stop offset="55%" stop-color="#2b2b2b"/><stop offset="100%" stop-color="#050505"/></radialGradient><linearGradient id="fig1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3d3d3d"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient><filter id="soft1"><feGaussianBlur stdDeviation="0.6"/></filter></defs><rect width="400" height="260" fill="url(#bg1)"/><path d="M200 260 L165 130 L95 45" stroke="#6a6a6a" stroke-width="5" fill="none" opacity="0.55" filter="url(#soft1)"/><path d="M200 260 L200 130 L305 55" stroke="#8a8a8a" stroke-width="5" fill="none" opacity="0.7"/><ellipse cx="80" cy="55" rx="70" ry="30" fill="#9a9a9a" opacity="0.28" filter="url(#soft1)"/><ellipse cx="120" cy="75" rx="85" ry="34" fill="#8f8f8f" opacity="0.22" filter="url(#soft1)"/><g filter="url(#soft1)"><circle cx="198" cy="100" r="15" fill="url(#fig1)"/><path d="M182 118 Q198 108 214 118 L210 175 Q198 182 186 175 Z" fill="url(#fig1)"/><path d="M182 122 Q168 140 172 162" stroke="url(#fig1)" stroke-width="9" fill="none" stroke-linecap="round"/><path d="M170 158 L155 170 Q148 175 152 182 L172 168 Z" fill="#151515"/><path d="M214 122 Q225 145 218 168" stroke="url(#fig1)" stroke-width="9" fill="none" stroke-linecap="round"/><path d="M186 175 L180 220" stroke="url(#fig1)" stroke-width="10" fill="none" stroke-linecap="round"/><path d="M210 175 L216 220" stroke="url(#fig1)" stroke-width="10" fill="none" stroke-linecap="round"/></g><rect width="400" height="260" fill="none" stroke="#000" stroke-width="14"/></svg>'
-  },
-  {
-    id: 'tat2',
-    description: 'A group of people stand around a car that has stopped working, on an empty road as the sky gets dark.',
-    guidance: 'Notice if your story shows the character taking action and solving the problem, or just waiting for someone else to help.',
-    svg: '<svg viewBox="0 0 400 260" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="bg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3a3d47"/><stop offset="60%" stop-color="#17181d"/><stop offset="100%" stop-color="#050506"/></linearGradient><linearGradient id="fig2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#454545"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient><filter id="soft2"><feGaussianBlur stdDeviation="0.5"/></filter></defs><rect width="400" height="260" fill="url(#bg2)"/><rect y="195" width="400" height="65" fill="#0d0d0d"/><ellipse cx="200" cy="196" rx="220" ry="14" fill="#000" opacity="0.5"/><g filter="url(#soft2)"><rect x="115" y="150" width="140" height="45" rx="10" fill="url(#fig2)"/><path d="M140 150 L165 122 L205 122 L225 150 Z" fill="url(#fig2)"/><circle cx="145" cy="197" r="15" fill="#050505"/><circle cx="225" cy="197" r="15" fill="#050505"/></g><g filter="url(#soft2)"><circle cx="70" cy="152" r="13" fill="url(#fig2)"/><path d="M58 168 Q70 160 82 168 L78 200 Q70 205 62 200 Z" fill="url(#fig2)"/></g><g filter="url(#soft2)"><circle cx="300" cy="145" r="13" fill="url(#fig2)"/><path d="M288 161 Q300 153 312 161 L308 198 Q300 204 292 198 Z" fill="url(#fig2)"/></g><rect width="400" height="260" fill="none" stroke="#000" stroke-width="14"/></svg>'
-  },
-  {
-    id: 'tat3',
-    description: 'A person sits alone at a desk covered in papers, looking at a clock on the wall.',
-    guidance: 'Think about whether your story shows planning and follow-through, or shows the character stuck and unsure what to do.',
-    svg: '<svg viewBox="0 0 400 260" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="bg3" cx="35%" cy="30%" r="80%"><stop offset="0%" stop-color="#4a4640"/><stop offset="60%" stop-color="#201e1a"/><stop offset="100%" stop-color="#040403"/></radialGradient><linearGradient id="fig3" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#404040"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient><filter id="soft3"><feGaussianBlur stdDeviation="0.5"/></filter></defs><rect width="400" height="260" fill="url(#bg3)"/><rect x="55" y="168" width="160" height="13" fill="#2c2a26" opacity="0.85"/><rect x="65" y="181" width="10" height="60" fill="#2c2a26" opacity="0.85"/><rect x="195" y="181" width="10" height="60" fill="#2c2a26" opacity="0.85"/><rect x="80" y="140" width="105" height="28" fill="#33312b" opacity="0.6"/><g filter="url(#soft3)"><circle cx="120" cy="120" r="16" fill="url(#fig3)"/><path d="M100 140 Q120 130 140 140 L134 178 Q120 184 106 178 Z" fill="url(#fig3)"/><path d="M100 145 Q88 155 90 168" stroke="url(#fig3)" stroke-width="9" fill="none" stroke-linecap="round"/><path d="M140 145 Q152 152 148 165" stroke="url(#fig3)" stroke-width="9" fill="none" stroke-linecap="round"/></g><g filter="url(#soft3)" opacity="0.85"><circle cx="305" cy="70" r="34" fill="none" stroke="#7a7a7a" stroke-width="4"/><line x1="305" y1="70" x2="305" y2="48" stroke="#9a9a9a" stroke-width="3" stroke-linecap="round"/><line x1="305" y1="70" x2="322" y2="78" stroke="#9a9a9a" stroke-width="3" stroke-linecap="round"/></g><rect width="400" height="260" fill="none" stroke="#000" stroke-width="14"/></svg>'
-  },
-  {
-    id: 'tat4',
-    description: 'Two people stand on opposite sides of a table. One is pointing at a document. The other has arms crossed.',
-    guidance: 'Notice if the ending you write is worked out together, or if one side simply wins over the other.',
-    svg: '<svg viewBox="0 0 400 260" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="bg4" cx="50%" cy="30%" r="80%"><stop offset="0%" stop-color="#464646"/><stop offset="60%" stop-color="#1f1f1f"/><stop offset="100%" stop-color="#050505"/></radialGradient><linearGradient id="fig4" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#404040"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient><filter id="soft4"><feGaussianBlur stdDeviation="0.5"/></filter></defs><rect width="400" height="260" fill="url(#bg4)"/><rect x="95" y="168" width="210" height="12" fill="#2b2b2b"/><rect x="108" y="180" width="10" height="52" fill="#2b2b2b"/><rect x="282" y="180" width="10" height="52" fill="#2b2b2b"/><rect x="165" y="155" width="70" height="16" fill="#333"/><g filter="url(#soft4)"><circle cx="130" cy="122" r="15" fill="url(#fig4)"/><path d="M112 140 Q130 130 148 140 L142 178 Q130 184 118 178 Z" fill="url(#fig4)"/><path d="M148 142 L182 155" stroke="url(#fig4)" stroke-width="9" stroke-linecap="round"/></g><g filter="url(#soft4)"><circle cx="278" cy="122" r="15" fill="url(#fig4)"/><path d="M260 140 Q278 130 296 140 L290 178 Q278 184 266 178 Z" fill="url(#fig4)"/><path d="M262 148 Q278 138 294 148" stroke="url(#fig4)" stroke-width="10" fill="none" stroke-linecap="round"/></g><rect width="400" height="260" fill="none" stroke="#000" stroke-width="14"/></svg>'
-  },
-  {
-    id: 'tat5',
-    description: 'A person stands on a hill, looking down at a small village far below.',
-    guidance: 'A useful story shows what the character wants and what they decide to do next, not just how the view looks.',
-    svg: '<svg viewBox="0 0 400 260" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="bg5" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#55534a"/><stop offset="55%" stop-color="#242219"/><stop offset="100%" stop-color="#050503"/></linearGradient><linearGradient id="fig5" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3d3d3d"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient><filter id="soft5"><feGaussianBlur stdDeviation="0.6"/></filter></defs><rect width="400" height="260" fill="url(#bg5)"/><path d="M0 175 L135 85 L245 175 Z" fill="#2b2a22" opacity="0.9"/><g filter="url(#soft5)" opacity="0.8"><rect x="255" y="196" width="26" height="20" fill="#222018"/><rect x="292" y="202" width="24" height="16" fill="#222018"/><rect x="325" y="192" width="30" height="22" fill="#222018"/></g><line x1="0" y1="230" x2="400" y2="230" stroke="#3a3830" stroke-width="2" opacity="0.6"/><g filter="url(#soft5)"><circle cx="135" cy="72" r="15" fill="url(#fig5)"/><path d="M117 90 Q135 80 153 90 L147 128 Q135 134 123 128 Z" fill="url(#fig5)"/><path d="M117 94 Q104 104 108 118" stroke="url(#fig5)" stroke-width="9" fill="none" stroke-linecap="round"/><path d="M153 94 Q166 104 162 118" stroke="url(#fig5)" stroke-width="9" fill="none" stroke-linecap="round"/></g><rect width="400" height="260" fill="none" stroke="#000" stroke-width="14"/></svg>'
-  },
-  {
-    id: 'tat6',
-    description: 'A person stands in front of a closed door, while a small crowd waits behind them.',
-    guidance: 'Think about whether the character in your story acts, waits, or asks for help — and why.',
-    svg: '<svg viewBox="0 0 400 260" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="bg6" cx="55%" cy="30%" r="80%"><stop offset="0%" stop-color="#484440"/><stop offset="60%" stop-color="#1e1c19"/><stop offset="100%" stop-color="#040403"/></radialGradient><linearGradient id="fig6" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3d3d3d"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient><filter id="soft6"><feGaussianBlur stdDeviation="0.5"/></filter></defs><rect width="400" height="260" fill="url(#bg6)"/><rect x="160" y="55" width="90" height="150" fill="#161513" opacity="0.9"/><circle cx="235" cy="132" r="4" fill="#5a5a5a"/><g filter="url(#soft6)"><circle cx="195" cy="188" r="15" fill="url(#fig6)"/><path d="M177 205 Q195 197 213 205 L207 250 Q195 256 183 250 Z" fill="url(#fig6)"/></g><g filter="url(#soft6)" opacity="0.85"><circle cx="70" cy="200" r="12" fill="url(#fig6)"/><path d="M56 214 Q70 207 84 214 L80 245 Q70 250 60 245 Z" fill="url(#fig6)"/></g><g filter="url(#soft6)" opacity="0.85"><circle cx="105" cy="205" r="11" fill="url(#fig6)"/><path d="M92 217 Q105 211 118 217 L114 246 Q105 251 96 246 Z" fill="url(#fig6)"/></g><rect width="400" height="260" fill="none" stroke="#000" stroke-width="14"/></svg>'
-  },
-  {
-    id: 'tat7',
-    description: 'Two children play near a river, while an adult watches from a distance.',
-    guidance: 'Consider what the adult and children in your story are each thinking, and what happens next.',
-    svg: '<svg viewBox="0 0 400 260" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="bg7" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#454b4c"/><stop offset="55%" stop-color="#1c1f1f"/><stop offset="100%" stop-color="#050606"/></linearGradient><linearGradient id="fig7" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#404040"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient><filter id="soft7"><feGaussianBlur stdDeviation="0.5"/></filter></defs><rect width="400" height="260" fill="url(#bg7)"/><rect y="188" width="400" height="72" fill="#12191a"/><ellipse cx="200" cy="190" rx="230" ry="10" fill="#000" opacity="0.4"/><g filter="url(#soft7)"><circle cx="140" cy="160" r="11" fill="url(#fig7)"/><path d="M128 173 Q140 166 152 173 L147 200 Q140 205 133 200 Z" fill="url(#fig7)"/><circle cx="172" cy="163" r="11" fill="url(#fig7)"/><path d="M160 176 Q172 169 184 176 L179 203 Q172 208 165 203 Z" fill="url(#fig7)"/></g><g filter="url(#soft7)" opacity="0.75"><circle cx="320" cy="130" r="14" fill="url(#fig7)"/><path d="M304 148 Q320 139 336 148 L330 195 Q320 201 310 195 Z" fill="url(#fig7)"/></g><rect width="400" height="260" fill="none" stroke="#000" stroke-width="14"/></svg>'
-  },
-  {
-    id: 'tat8',
-    description: 'A person walks alone, away from a group, carrying a heavy bag.',
-    guidance: 'A strong story explains why the character is leaving and what they plan to do.',
-    svg: '<svg viewBox="0 0 400 260" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="bg8" cx="30%" cy="40%" r="85%"><stop offset="0%" stop-color="#4d4a44"/><stop offset="60%" stop-color="#221f1a"/><stop offset="100%" stop-color="#040403"/></radialGradient><linearGradient id="fig8" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3d3d3d"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient><filter id="soft8"><feGaussianBlur stdDeviation="0.5"/></filter></defs><rect width="400" height="260" fill="url(#bg8)"/><g filter="url(#soft8)"><circle cx="110" cy="145" r="15" fill="url(#fig8)"/><path d="M92 163 Q110 154 128 163 L121 210 Q110 216 99 210 Z" fill="url(#fig8)"/><path d="M92 168 Q78 178 80 195" stroke="url(#fig8)" stroke-width="9" fill="none" stroke-linecap="round"/><ellipse cx="76" cy="192" rx="14" ry="20" fill="#151515" transform="rotate(-18 76 192)"/></g><g filter="url(#soft8)" opacity="0.55"><circle cx="290" cy="150" r="11" fill="url(#fig8)"/><path d="M278 163 Q290 156 302 163 L297 195 Q290 200 283 195 Z" fill="url(#fig8)"/><circle cx="320" cy="148" r="11" fill="url(#fig8)"/><path d="M308 161 Q320 154 332 161 L327 193 Q320 198 313 193 Z" fill="url(#fig8)"/><circle cx="345" cy="152" r="11" fill="url(#fig8)"/><path d="M333 165 Q345 158 357 165 L352 197 Q345 202 338 197 Z" fill="url(#fig8)"/></g><rect width="400" height="260" fill="none" stroke="#000" stroke-width="14"/></svg>'
-  }
-];
-
+// --- SDT — guided self-reflection (NOT scored) ---------------------------
+// Offered as structured reflection, benchmarked against example answers,
+// never auto-scored. (The TAT/picture-story exercise that used to live here
+// has been removed from the SSB test altogether — both the full assessment
+// and the free teaser — per product decision; only SDT remains as the
+// guided-reflection exercise.)
 export const sdtPrompts = [
   { id: 'sdt_self', label: 'How would you describe yourself?', hint: 'Write 4-6 honest sentences. Include your strengths and real weak points, not just good things.' },
   { id: 'sdt_friend', label: 'How would your closest friend describe you?', hint: 'Write it the way they would actually say it, not the way you wish they would say it.' },
@@ -493,25 +435,27 @@ export function buildItemSelection() {
   return {
     wat: pickRandomSubset(watWords, 40),
     srt: pickRandomSubset(srtSituations, 30),
-    gto: pickRandomSubset(gtoScenarios.map((g) => g.id), 8),
-    tat: pickRandomSubset(tatPrompts.map((t) => t.id), 4)
+    gto: pickRandomSubset(gtoScenarios.map((g) => g.id), 8)
   };
 }
 
 // --- Free "teaser" funnel test --------------------------------------------
-// A deliberately tiny, ungated exercise (5 trait items + 1 SRT + 1 TAT) shown
-// to visitors who aren't ready to commit to the full assessment. It exists to
-// give a curious visitor something in 2-3 minutes and a nudge toward the
-// paid plans — NOT a measurement instrument. Its scoring is intentionally
-// separate from calculateOLQProfile/readinessGradeBand (different function
-// names, different label set) so the two are never confused with each other
-// or presented as equivalent. A fresh call to buildTeaserSelection draws a
-// new random subset every time, so repeat visitors always get new questions.
+// A deliberately small, ungated exercise (8 trait items + 2 SRT situations +
+// 3 WAT words) shown to visitors who aren't ready to commit to the full
+// assessment. It exists to give a curious visitor something in a few minutes
+// and a nudge toward the paid plans — NOT a measurement instrument. Its
+// scoring is intentionally separate from calculateOLQProfile/
+// readinessGradeBand (different function names, different label set) so the
+// two are never confused with each other or presented as equivalent. A fresh
+// call to buildTeaserSelection draws a new random subset every time, so a
+// repeat visitor always gets new questions. (The TAT/picture-story exercise
+// that used to appear here has been removed altogether — see the SDT
+// comment above — and replaced with more trait/SRT/WAT coverage instead.)
 export function buildTeaserSelection() {
   return {
-    traits: pickRandomSubset(traitItemBank, 5),
-    srt: pickRandomSubset(srtSituations, 1)[0],
-    tat: pickRandomSubset(tatPrompts, 1)[0]
+    traits: pickRandomSubset(traitItemBank, 8),
+    srt: pickRandomSubset(srtSituations, 2),
+    wat: pickRandomSubset(watWords, 3)
   };
 }
 
@@ -540,12 +484,15 @@ export function teaserGradeBand(score) {
   return { label: 'Just Getting Started' };
 }
 
-// Computes a quick 0-100 snapshot from 5 trait Likert answers (65% weight)
-// plus word-count-based engagement depth on 1 SRT + 1 TAT response (35%
-// weight). Explicitly NOT the OLQ Readiness Index — a much shorter, cruder
-// read whose only job is to give a free-test taker *something* honest while
-// making obvious that the real profile needs the full battery.
-export function computeTeaserScore({ traitItems, traitResponses, srtText, tatText }) {
+// Computes a quick 0-100 snapshot from the trait Likert answers (60% weight)
+// plus word-count-based engagement depth averaged across every SRT/WAT
+// free-text response supplied (40% weight). Explicitly NOT the OLQ
+// Readiness Index — a much shorter, cruder read whose only job is to give a
+// free-test taker *something* honest while making obvious that the real
+// profile needs the full battery. `srtTexts`/`watTexts` are arrays (the
+// teaser now shows more than one of each), so this also replaces the old
+// single-srtText/single-tatText version of this function.
+export function computeTeaserScore({ traitItems, traitResponses, srtTexts, watTexts }) {
   const traitValues = traitItems
     .map((item) => {
       let value = Number(traitResponses[item.id]);
@@ -556,9 +503,11 @@ export function computeTeaserScore({ traitItems, traitResponses, srtText, tatTex
     .filter((v) => v !== null);
   const traitPct = traitValues.length ? traitValues.reduce((a, b) => a + b, 0) / traitValues.length : 50;
 
-  const depthPct = (teaserDepthScore(srtText) + teaserDepthScore(tatText)) / 2;
+  const depthTexts = [...(srtTexts || []), ...(watTexts || [])];
+  const depthScores = depthTexts.map(teaserDepthScore);
+  const depthPct = depthScores.length ? depthScores.reduce((a, b) => a + b, 0) / depthScores.length : 0;
 
-  const score = Math.round(0.65 * traitPct + 0.35 * depthPct);
+  const score = Math.round(0.6 * traitPct + 0.4 * depthPct);
   return { score: Math.max(0, Math.min(100, score)), gradeBand: teaserGradeBand(score) };
 }
 
@@ -590,7 +539,7 @@ export function traitScoreLabel(scoreOn5) {
 
 // Descriptive grade band (Grade I-V) — the same broad language SSB aspirants
 // already use informally to talk about candidate quality. This is NOT the
-// real DIPR/Board grading: that comes from three independently-trained
+// real Services Selection Board grading: that comes from three independently-trained
 // assessors (psychologist, GTO, IO) cross-verifying live behavior across
 // five days, which nothing self-reported can reproduce. This banding exists
 // only to give the readiness index a familiar, honest label — it is
@@ -693,31 +642,66 @@ export function calculateOLQProfile({ wellnessResponses, traitResponses, watResp
     gradeBand,
     weakestFactor,
     strongestFactor,
-    disclaimer: 'This Readiness Index and grade band are a self-assessment indicator based on your questionnaire and practice-exercise responses — a descriptive label, not an official DIPR or SSB Board grading. It is not a prediction of your actual SSB outcome: the real board evaluates live behavior over five days through three independently-trained assessors (psychologist, GTO, IO), which no self-report tool can replicate.'
+    disclaimer: 'This Readiness Index and grade band are a self-assessment indicator based on your questionnaire and practice-exercise responses — a psychometric depiction, not an official Services Selection Board grading or prediction of your actual SSB outcome. The real Board evaluates live behavior over five days through three independently-trained assessors (a psychologist, a Group Testing Officer, and an Interviewing Officer), a far more intensive process than any self-report tool can replicate.'
   };
 }
+
+// Short, honest interpretation of what a factor score practically indicates
+// for SSB-style performance — shown alongside every factor bar, in every
+// tier (including the Snapshot), so even the entry-level report is more than
+// just a number and a bar. Keyed by traitScoreLabel's three bands.
+const FACTOR_INTERPRETATION = {
+  'Planning & Organizing': {
+    Strength: 'You tend to think in structured, prioritized steps and express plans clearly — a real asset in Group Planning Exercises and structured interview questions.',
+    Developing: 'You can usually put together a workable plan, but may skip prioritization or leave gaps under time pressure — worth deliberate practice before your SSB.',
+    'Focus Area': 'Plans may currently come across unstructured or rushed. This is one of the most practice-responsive OLQ clusters — see the actions below.'
+  },
+  'Social Adjustment': {
+    Strength: 'You read group dynamics well and adapt without losing your own position — valuable across GTO tasks and the personal interview.',
+    Developing: 'You cooperate reasonably well but may hold back from taking ownership or initiative unless directly asked.',
+    'Focus Area': 'Group settings may feel effortful right now, or you may default to over-asserting or staying quiet. Both are workable with consistent practice.'
+  },
+  'Social Effectiveness': {
+    Strength: 'You communicate with energy and influence group direction constructively — assessors weigh this heavily in the Lecturette and group discussions.',
+    Developing: 'You participate but may not consistently lead or land your points — a common, very fixable gap.',
+    'Focus Area': 'You may currently find it hard to hold the floor or influence a group discussion. This responds well to repeated, low-stakes practice.'
+  },
+  'Dynamic Factor': {
+    Strength: 'You show resilience, follow-through, and composure under pressure — exactly what the outdoor/physical tasks and the interview are designed to surface.',
+    Developing: 'You generally push through setbacks but may need a more consistent stamina/confidence routine.',
+    'Focus Area': 'Composure and follow-through under pressure look like an area to build deliberately, both physically and mentally, before your SSB.'
+  }
+};
 
 // --- Improvement plan generator -------------------------------------------
 const IMPROVEMENT_LIBRARY = {
   'Planning & Organizing': [
     'Practice the GPE (Group Planning Exercise) format solo: read a scenario, write a plan with a clear priority order and time allocation, in under 10 minutes.',
     'Before answering an SRT situation, force yourself to write one sentence naming the actual problem before jumping to a solution.',
-    'Read one short case study a day and summarize it in 3 bullet points — trains concise, organized expression.'
+    'Read one short case study a day and summarize it in 3 bullet points — trains concise, organized expression.',
+    'Once a week, take a real decision you made (even a small one) and write out the 2-3 options you actually had — trains the habit of seeing alternatives before committing.',
+    'Time yourself solving a short logical/planning puzzle in under 5 minutes — builds the speed-with-structure combination SSB planning tasks reward.'
   ],
   'Social Adjustment': [
     'In your next group activity (college, work, sport), deliberately let someone else lead and note how you adapt.',
     'Practice giving one piece of constructive feedback a week to a peer, focusing on their interest, not just being right.',
-    'Volunteer for a task nobody wants once this month, and reflect afterward on how you approached it.'
+    'Volunteer for a task nobody wants once this month, and reflect afterward on how you approached it.',
+    'When you disagree with a group decision, practice voicing the disagreement calmly and once, then supporting the team\'s final call — shows adjustment without losing conviction.',
+    'Keep a short weekly note of one moment you adapted your behavior for a group\'s benefit, and one moment you did not but could have.'
   ],
   'Social Effectiveness': [
     'Practice a 2-minute impromptu Lecturette on a random topic daily — builds comfort speaking to a group without notes.',
     'In group settings, practice summarizing what others said before adding your own point — builds influence through clarity, not volume.',
-    'Join or start a small group activity (debate club, sport, discussion group) if you are not already in one — social effectiveness is trained through repeated group exposure, not solo reading.'
+    'Join or start a small group activity (debate club, sport, discussion group) if you are not already in one — social effectiveness is trained through repeated group exposure, not solo reading.',
+    'After a group conversation, ask yourself honestly: did people build on what I said, or talk past it? Adjust how you phrase your next point accordingly.',
+    'Practice disagreeing with an idea (not a person) out loud in a low-stakes setting — most people under-practice this and either avoid it or make it personal.'
   ],
   'Dynamic Factor': [
     'Build a simple physical stamina routine (even 20-30 minutes daily) — SSB\'s outdoor tasks are physically demanding and composure under fatigue is part of what\'s assessed.',
     'Practice one small, deliberately uncomfortable thing daily (cold shower, public speaking, a hard conversation) to build tolerance for pressure.',
-    'When a plan fails in practice, write down what you\'d do differently instead of dwelling on the failure — trains quick recovery.'
+    'When a plan fails in practice, write down what you\'d do differently instead of dwelling on the failure — trains quick recovery.',
+    'Set one genuinely difficult personal goal this month with a visible tracker — determination is assessed by what you actually finish, not what you intend.',
+    'Practice staying outwardly calm for 60 seconds the next time something frustrates you before responding — a small, repeatable composure drill.'
   ]
 };
 
@@ -737,13 +721,12 @@ export function buildImprovementPlan(factorDetail) {
 // SSB section, in the same shape admin.js's existing raw-response viewer
 // already uses for wellness assessments — lets that one route branch by
 // track without duplicating its rendering logic. `itemSelection` (if given)
-// restricts WAT/SRT/GTO/TAT to the subset actually shown this attempt.
+// restricts WAT/SRT/GTO to the subset actually shown this attempt.
 export function buildSsbResponseItems(responses = {}, itemSelection = null) {
   const items = [];
   const watList = itemSelection?.wat || watWords;
   const srtList = itemSelection?.srt || srtSituations;
   const gtoList = itemSelection?.gto ? itemSelection.gto.map((id) => gtoScenarios.find((g) => g.id === id)).filter(Boolean) : gtoScenarios;
-  const tatList = itemSelection?.tat ? itemSelection.tat.map((id) => tatPrompts.find((t) => t.id === id)).filter(Boolean) : tatPrompts;
 
   bigFiveItems.forEach((q) => {
     const idx = responses.bigFive?.[q.id];
@@ -766,10 +749,6 @@ export function buildSsbResponseItems(responses = {}, itemSelection = null) {
     const chosen = typeof chosenIndex === 'number' ? scenario.options[chosenIndex] : null;
     items.push({ id: scenario.id, text: `[GTO] ${scenario.prompt}`, answerText: chosen ? chosen.text : null, answered: !!chosen });
   });
-  tatList.forEach((p) => {
-    const text = responses.tat?.[p.id];
-    items.push({ id: p.id, text: `[TAT - reflection, not scored] ${p.description}`, answerText: text || null, answered: !!text });
-  });
   sdtPrompts.forEach((p) => {
     const text = responses.sdt?.[p.id];
     items.push({ id: p.id, text: `[SDT - reflection, not scored] ${p.label}`, answerText: text || null, answered: !!text });
@@ -788,54 +767,98 @@ export const SSB_PLANS = {
     label: 'Readiness Snapshot',
     price: 2499,
     priceLabel: '₹2,499',
-    desc: 'Your OLQ Readiness Index and a 4-factor breakdown — a quick, honest snapshot of where you stand today.',
-    features: ['Readiness Index score', '4 OLQ factor scores', 'Strength & focus areas', 'Instant report'],
+    desc: 'Your OLQ Readiness Index and a 4-factor breakdown, with a plain-English interpretation of what each factor score means for you — a quick, honest snapshot of where you stand today.',
+    features: ['Readiness Index score', '4 OLQ factor scores + interpretation', 'Strength & focus areas', 'Instant report'],
     counsellingSessions: 0
   },
   ssb_detailed: {
     label: 'Detailed Readiness Report',
     price: 4499,
     priceLabel: '₹4,499',
-    desc: 'Everything in the Snapshot, plus a full improvement plan for every OLQ factor and one counselling session with a NavaSetu counsellor.',
-    features: ['Everything in Readiness Snapshot', 'Full improvement plan (all 4 factors)', 'Specific practice actions', '1 counselling session'],
+    desc: 'Everything in the Snapshot, plus a full, expanded improvement plan (5 practice actions per factor) for every OLQ factor and one counselling session with a NavaSetu counsellor.',
+    features: ['Everything in Readiness Snapshot', 'Expanded improvement plan (5 actions per factor)', 'Specific practice actions', '1 counselling session'],
     counsellingSessions: 1
   },
   ssb_comprehensive: {
     label: 'Comprehensive Readiness + Coaching',
     price: 7999,
     priceLabel: '₹7,999',
-    desc: 'The complete picture — everything in Detailed, plus extended, OLQ-by-OLQ suggestions and two counselling sessions to work through your plan.',
-    features: ['Everything in Detailed Report', 'Extended, OLQ-by-OLQ suggestions', 'Priority scheduling', '2 counselling sessions'],
+    desc: 'The complete picture — everything in Detailed, plus a full breakdown of all 16 individual OLQs (not just the 4 factors) with 2 specific practice actions for each one, and two counselling sessions to work through your plan.',
+    features: ['Everything in Detailed Report', 'All 16 OLQs broken down individually', '2 practice actions per OLQ', 'Priority scheduling', '2 counselling sessions'],
     counsellingSessions: 2
   }
 };
 
-// Deeper, OLQ-specific suggestions shown only in the Comprehensive tier —
-// one level more specific than the IMPROVEMENT_LIBRARY actions above.
-const EXTENDED_SUGGESTIONS = {
-  'Planning & Organizing': [
-    'Effective Intelligence: practice explaining a complex topic (from your field of study) to a 12-year-old in under 2 minutes — forces clarity of thought.',
-    'Reasoning Ability: solve one logic/puzzle problem daily (train timetables, seating arrangements, data sufficiency) — builds structured thinking under time pressure.',
-    'Organizing Ability: the next time you plan any event (even a small one), write the plan down first with time slots, before acting on it.',
-    'Power of Expression: record yourself speaking for 2 minutes on a random topic, then listen back — most people are harsher critics of their own speech than they need to be, but it reveals filler words and unclear sentences fast.'
+// Deeper, per-OLQ suggestions shown only in the Comprehensive (top) tier —
+// two concrete actions per individual OLQ (not just per factor), one level
+// more specific than the IMPROVEMENT_LIBRARY factor-level actions above.
+// Keyed by the exact OLQ label used in OLQ_LIST_BY_FACTOR, so the report can
+// render every one of the OLQs individually with its own heading, under its
+// parent factor.
+const OLQ_ACTIONS = {
+  'Effective Intelligence': [
+    'Practice explaining a complex topic (from your field of study) to a 12-year-old in under 2 minutes — forces clarity of thought.',
+    'When you read a news article, pause and summarize the core issue and the two strongest opposing views in three sentences — trains fast, structured comprehension.'
+  ],
+  'Reasoning Ability': [
+    'Solve one logic/puzzle problem daily (train timetables, seating arrangements, data sufficiency) — builds structured thinking under time pressure.',
+    'Before accepting a claim (in the news, from a friend, anywhere), ask yourself what evidence would prove it wrong — trains the habit of testing conclusions, not just reaching them.'
+  ],
+  'Organizing Ability': [
+    'The next time you plan any event (even a small one), write the plan down first with time slots, before acting on it.',
+    'Practice breaking a vague goal ("get fit", "clear this topic") into 3 concrete, dated sub-steps before starting on it.'
+  ],
+  'Power of Expression': [
+    'Record yourself speaking for 2 minutes on a random topic, then listen back — most people are harsher critics of their own speech than they need to be, but it reveals filler words and unclear sentences fast.',
+    'Practice saying the same point in one sentence, then in three — trains you to scale your explanation to the time you actually have.'
+  ],
+  'Cooperation': [
+    'In your next group task, count how many times you ask others for their opinion versus stating your own — aim for at least equal.',
+    'Practice building explicitly on someone else\'s idea in a discussion ("adding to what X said...") instead of only presenting your own separately.'
+  ],
+  'Sense of Responsibility': [
+    'Pick one recurring task (at home, college, or work) that nobody officially owns, and own it without being asked, for a month.',
+    'When something under your watch goes wrong, practice stating what you will do differently before explaining why it happened — order signals ownership.'
+  ],
+  'Initiative': [
+    'The next time you notice a small problem nobody is addressing, be the first to raise it AND propose a fix in the same breath.',
+    'Set yourself a rule: if you think of a good idea in a meeting or group chat, say it within the next two minutes rather than waiting to be sure it\'s "worth it."'
   ],
   'Social Adjustment': [
-    'Cooperation: in your next group task, count how many times you ask others for their opinion versus stating your own — aim for at least equal.',
-    'Sense of Responsibility: pick one recurring task (at home, college, or work) that nobody officially owns, and own it without being asked, for a month.',
-    'Initiative: the next time you notice a small problem nobody is addressing, be the first to raise it AND propose a fix in the same breath.',
-    'Social Adjustment: spend time with a group very different from your usual circle (different age, background, or interests) and notice how you adjust your communication style.'
+    'Spend time with a group very different from your usual circle (different age, background, or interests) and notice how you adjust your communication style.',
+    'Practice adjusting your tone (not your substance) when moving between a formal setting and a casual one in the same day, and notice how deliberate it feels.'
   ],
   'Social Effectiveness': [
-    'Ability to Influence the Group: practice making one point in a group discussion using a concrete example or number, rather than a general statement — specifics persuade more than opinions.',
-    'Liveliness: notice your energy level in group settings this week — if you tend to hang back, practice speaking in the first two minutes of any group conversation.',
-    'Group Cohesiveness: after your next group activity, ask one quieter member for their honest opinion privately — often reveals what the group missed.',
-    'Social Effectiveness: read the room before speaking in a new group — spend the first few minutes observing who\'s already leading, then find where you can add value rather than compete for airtime.'
+    'Read the room before speaking in a new group — spend the first few minutes observing who\'s already leading, then find where you can add value rather than compete for airtime.',
+    'After a group interaction, note one thing that landed well and one that didn\'t — treat social effectiveness as a trainable skill with feedback, not a fixed trait.'
   ],
-  'Dynamic Factor': [
-    'Determination: pick one goal you have abandoned before and restart it this month, tracking progress daily, even in small increments.',
-    'Courage: do one thing this week that you have been avoiding purely out of social discomfort (a difficult conversation, an ask, a correction).',
-    'Stamina: build toward being able to do 30-45 minutes of continuous physical activity without needing to stop — SSB\'s outdoor tasks reward physical endurance directly.',
-    'Self-Confidence: keep a small written log of things you did well each day, however minor — most self-confidence gaps come from selectively remembering only the failures.'
+  'Ability to Influence the Group': [
+    'Practice making one point in a group discussion using a concrete example or number, rather than a general statement — specifics persuade more than opinions.',
+    'Notice which group members people tend to agree with, and study what they do differently in how they phrase and time their points.'
+  ],
+  'Liveliness': [
+    'Notice your energy level in group settings this week — if you tend to hang back, practice speaking in the first two minutes of any group conversation.',
+    'Practice reacting visibly (not performatively) to what others say — a nod, a follow-up question — low energy often reads as disengagement even when you\'re listening closely.'
+  ],
+  'Group Cohesiveness': [
+    'After your next group activity, ask one quieter member for their honest opinion privately — often reveals what the group missed.',
+    'Practice naming and crediting a specific contribution someone else made in a group task — small, consistent recognition strengthens group cohesion more than any single grand gesture.'
+  ],
+  'Determination': [
+    'Pick one goal you have abandoned before and restart it this month, tracking progress daily, even in small increments.',
+    'When motivation dips midway through something, commit in advance to a fixed minimum ("at least 10 minutes") rather than deciding in the moment whether to continue.'
+  ],
+  'Courage': [
+    'Do one thing this week that you have been avoiding purely out of social discomfort (a difficult conversation, an ask, a correction).',
+    'Practice stating an unpopular but honest opinion in a low-stakes group setting, calmly and without over-explaining or apologizing for it.'
+  ],
+  'Stamina': [
+    'Build toward being able to do 30-45 minutes of continuous physical activity without needing to stop — SSB\'s outdoor tasks reward physical endurance directly.',
+    'Practice finishing tasks you find tedious in one sitting rather than breaking them up — builds mental stamina alongside the physical kind.'
+  ],
+  'Self-Confidence': [
+    'Keep a small written log of things you did well each day, however minor — most self-confidence gaps come from selectively remembering only the failures.',
+    'Before a task you\'re nervous about, prepare one sentence on why you\'re reasonably qualified to attempt it — a small, honest confidence anchor beats generic positive thinking.'
   ]
 };
 
@@ -874,6 +897,7 @@ export function buildSsbReportHtml(profile, improvementPlan, candidateName, plan
         <div style="height:100%; border-radius:999px; width:${(score / 5) * 100}%; background:${FACTOR_COLORS[factor]};"></div>
       </div>
       <div style="color:#6B7280; font-size:0.85rem; margin-top:0.3rem;">OLQs: ${profile.factorDetail[factor].olqs.join(', ')}</div>
+      <div style="color:#374151; font-size:0.85rem; margin-top:0.45rem; line-height:1.5;">${(FACTOR_INTERPRETATION[factor] && FACTOR_INTERPRETATION[factor][profile.factorDetail[factor].label]) || ''}</div>
     </div>`).join('');
 
   const planHtml = improvementPlan.map((p) => `
@@ -882,10 +906,17 @@ export function buildSsbReportHtml(profile, improvementPlan, candidateName, plan
       <ul style="margin:0.4rem 0 0; padding-left:1.1rem; font-size:0.88rem; color:#374151;">${p.actions.map((a) => `<li>${a}</li>`).join('')}</ul>
     </div>`).join('');
 
+  // Comprehensive tier only: every one of the OLQs under this factor gets
+  // its own heading + 2 concrete actions from OLQ_ACTIONS (not just a
+  // factor-level list) — this is the "all OLQs, individually" breakdown.
   const extendedHtml = improvementPlan.map((p) => `
-    <div style="border-left:3px solid #059669; padding:0.6rem 0 0.6rem 0.9rem; margin-bottom:0.9rem;">
-      <h4 style="margin:0 0 0.3rem; font-size:0.98rem;">${p.factor}</h4>
-      <ul style="margin:0.4rem 0 0; padding-left:1.1rem; font-size:0.88rem; color:#374151;">${(EXTENDED_SUGGESTIONS[p.factor] || []).map((a) => `<li>${a}</li>`).join('')}</ul>
+    <div style="border-left:3px solid #059669; padding:0.6rem 0 0.6rem 0.9rem; margin-bottom:1.1rem;">
+      <h4 style="margin:0 0 0.5rem; font-size:0.98rem;">${p.factor}</h4>
+      ${(p.olqs || []).map((olq) => `
+        <div style="margin-bottom:0.7rem;">
+          <div style="font-weight:600; font-size:0.88rem; color:#065F46;">${olq}</div>
+          <ul style="margin:0.25rem 0 0; padding-left:1.1rem; font-size:0.86rem; color:#374151;">${(OLQ_ACTIONS[olq] || []).map((a) => `<li>${a}</li>`).join('')}</ul>
+        </div>`).join('')}
     </div>`).join('');
 
   const counsellingHtml = plan.counsellingSessions > 0 ? `
@@ -947,8 +978,8 @@ export function buildSsbReportHtml(profile, improvementPlan, candidateName, plan
     </div>` : ''}
     ${includesExtendedSuggestions ? `
     <div style="background:#fff; border:1px solid #E5E7EB; border-radius:10px; padding:1.75rem; margin-bottom:1.25rem;">
-      <h2 style="margin-top:0;">Extended Suggestions — OLQ by OLQ</h2>
-      <p style="color:#6B7280; font-size:0.88rem;">Deeper, more specific practice ideas for each factor, on top of your improvement plan above.</p>
+      <h2 style="margin-top:0;">Every Officer-Like Quality, Individually</h2>
+      <p style="color:#6B7280; font-size:0.88rem;">All 16 OLQs broken out one by one (not just the 4 factors above), each with two concrete practice actions — on top of your improvement plan above.</p>
       ${extendedHtml}
     </div>` : ''}
     ${upsellHtml}
