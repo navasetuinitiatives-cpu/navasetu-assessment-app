@@ -69,6 +69,7 @@
         .header-info p { font-size: 0.95rem; opacity: 0.9; margin: 0.35rem 0 0 0; }
         .header-contacts { display: flex; flex-direction: column; align-items: flex-end; gap: 0.45rem; font-size: 0.9rem; opacity: 0.9; }
         .contact-item { display: flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
+        @media (max-width: 480px) { .contact-item { white-space: normal; word-break: break-word; } }
         @media (max-width: 640px) {
             .header-content { justify-content: center; text-align: center; }
             .header-left { flex-direction: column; text-align: center; }
@@ -115,7 +116,7 @@
         .btn-primary { background: var(--primary); color: white; }
         .btn-secondary { background: white; color: var(--primary); border: 1px solid var(--border); }
         .btn-success { background: var(--success); color: white; }
-        .btn-small { padding: 0.5rem 1rem; font-size: 0.85rem; }
+        .btn-small { padding: 0.65rem 1rem; font-size: 0.85rem; min-height: 2.5rem; }
         .button-group { display: flex; gap: 1rem; flex-wrap: wrap; margin: 2rem 0; }
 
         /* Hero banner (landing/login page only) */
@@ -146,9 +147,14 @@
         .question-block { background: white; padding: 1.5rem; margin-bottom: 1rem; border-radius: 8px; border-left: 4px solid var(--primary-light); }
         .question-text { font-weight: 500; margin-bottom: 1rem; -webkit-user-select: text; user-select: text; }
         .likert-scale { display: grid; grid-template-columns: repeat(auto-fit, minmax(70px, 1fr)); gap: 0.5rem; }
-        .likert-option { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
-        .likert-option input[type="radio"] { width: 20px; height: 20px; accent-color: var(--primary); }
+        .likert-option { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 0.4rem 0.2rem; min-height: 2.75rem; justify-content: center; }
+        .likert-option input[type="radio"] { width: 22px; height: 22px; accent-color: var(--primary); }
         .likert-option label { margin: 0; font-size: 0.75rem; text-align: center; }
+        @media (max-width: 480px) {
+            .likert-scale { grid-template-columns: repeat(auto-fit, minmax(58px, 1fr)); gap: 0.35rem; }
+            .likert-option input[type="radio"] { width: 24px; height: 24px; }
+            .likert-option label { font-size: 0.7rem; }
+        }
 
         /* Progress */
         .progress-bar { width: 100%; height: 8px; background: var(--border); border-radius: 4px; margin-bottom: 1rem; overflow: hidden; }
@@ -484,8 +490,14 @@
                 <div style="font-size: 0.95rem; line-height: 1.8; color: var(--text-dark);">
                     <p style="margin-bottom: 1rem;"><strong>What to expect:</strong> This assessment has 73 short statements and questions — 53 about your day-to-day experience as a teacher (your energy, focus, sleep, sense of achievement, relationships at work, and how work and personal life currently fit together), plus 20 about your natural working style and personality. It takes most people 18–22 minutes to complete.</p>
                     <p style="margin-bottom: 1rem;"><strong>How to answer:</strong> For each question, choose the single option that best reflects how you've genuinely been feeling recently — not how you think you should feel, and not how you'd like things to be. There are no right or wrong answers; the value of this assessment depends entirely on how honestly you answer.</p>
-                    <p style="margin-bottom: 1rem;"><strong>Your answers are saved as you go.</strong> You can move through the questions at your own pace, and before you finally submit, you'll get a chance to review everything and change any answer you're not sure about.</p>
-                    <p style="margin-bottom: 1rem;"><strong>Once submitted, your responses are locked</strong> and your report is generated from them. If you ever need to retake the assessment after that, please write to us at <a href="mailto:navasetuinitiatives@gmail.com">navasetuinitiatives@gmail.com</a> or call <a href="tel:+918556840001">8556840001</a>, and we'll enable it for you.</p>
+                    <p style="margin-bottom: 1rem;"><strong>Your answers are saved as you go.</strong> You can move through the questions at your own pace, and before you finally submit, you'll get a chance to review everything and change any answer you're not sure about — this review step is your <em>only</em> opportunity to make changes.</p>
+                </div>
+
+                <div style="background:#FEF2F2; border:1px solid #FECACA; border-left:4px solid #DC2626; border-radius:6px; padding:1rem 1.25rem; margin-bottom:1.5rem; font-size:0.92rem; color:#991B1B; line-height:1.7;">
+                    <strong>⚠️ Please read before you submit:</strong> Once you submit, your responses are permanently locked and your report is generated from them — this account cannot generate a new report or a fresh set of responses afterwards. Review every answer carefully on the review screen first. If you genuinely need to retake the assessment later, a NavaSetu admin has to enable that for you — write to <a href="mailto:navasetuinitiatives@gmail.com" style="color:#991B1B;">navasetuinitiatives@gmail.com</a> or call <a href="tel:+918556840001" style="color:#991B1B;">8556840001</a>.
+                </div>
+
+                <div style="font-size: 0.95rem; line-height: 1.8; color: var(--text-dark);">
                     <p>This is a self-reflection tool, not a clinical or diagnostic test. If you're going through something difficult right now, please also reach out to someone you trust or a mental health professional — this assessment is a starting point, not a substitute for that support.</p>
                 </div>
 
@@ -1109,25 +1121,70 @@
                 const hasSubmitted = this.myAssessments.some(a => a.status === 'submitted');
 
                 const tierMeta = {
-                    discover: { icon: '🔍', label: 'Discover', color: 'var(--text-light)' },
-                    explore: { icon: '🧭', label: 'Explore', color: 'var(--accent-wellness)' },
-                    navigate: { icon: '🗺️', label: 'Navigate', color: 'var(--primary-light)' }
+                    discover: { icon: '🔍', label: 'Discover' },
+                    explore: { icon: '🧭', label: 'Explore' },
+                    navigate: { icon: '🗺️', label: 'Navigate' }
                 };
+                const tierOrder = ['discover', 'explore', 'navigate'];
 
-                let reportsHtml = `<p style="color: var(--text-light); font-size: 0.95rem;">You haven't generated a report yet — once you do, every version you create (Discover, Explore, or Navigate) will stay right here for you to revisit.</p>`;
-                if (this.myReports.length > 0) {
-                    reportsHtml = `<div style="display:grid; gap:0.75rem;">` + this.myReports.map(r => {
-                        const meta = tierMeta[r.plan_type] || { icon: '📄', label: r.plan_type, color: 'var(--border)' };
-                        const testBadge = r.is_test ? `<span style="background:#DC2626; color:#fff; font-size:0.68rem; font-weight:700; letter-spacing:0.3px; padding:0.15rem 0.5rem; border-radius:999px; margin-left:0.5rem; vertical-align:middle;">TEST</span>` : '';
+                // Group every generated report by the assessment it belongs to, so a
+                // submission's responses and its report tiers show up together in one
+                // row — instead of a flat list where it wasn't obvious which reports
+                // came from which attempt, or which "set" a TEST badge belonged to.
+                const reportsByAssessment = {};
+                this.myReports.forEach(r => {
+                    (reportsByAssessment[r.assessment_id] = reportsByAssessment[r.assessment_id] || []).push(r);
+                });
+                const submittedAssessments = this.myAssessments
+                    .filter(a => a.status === 'submitted')
+                    .sort((a, b) => new Date(b.submitted_at || b.created_at) - new Date(a.submitted_at || a.created_at));
+
+                let reportsHtml = `<p style="color: var(--text-light); font-size: 0.95rem;">You haven't generated a report yet — once you do, your responses and every report tier you create will show up here together.</p>`;
+                if (submittedAssessments.length > 0) {
+                    const rows = submittedAssessments.map(a => {
+                        const reports = reportsByAssessment[a.id] || [];
+                        const byTier = {};
+                        reports.forEach(r => { byTier[r.plan_type] = r; });
+                        const tierCells = tierOrder.map(t => {
+                            const r = byTier[t];
+                            if (!r) return `<td style="text-align:center; color:var(--text-light); padding:0.6rem 0.4rem;">—</td>`;
+                            return `<td style="text-align:center; padding:0.6rem 0.4rem;"><button class="btn btn-secondary btn-small" onclick="app.openStoredReport('${r.id}')" ${r.payment_status === 'pending' ? 'disabled' : ''}>👁️ View</button></td>`;
+                        }).join('');
+                        const typeBadge = a.is_test
+                            ? `<span style="background:#DC2626; color:#fff; font-size:0.68rem; font-weight:700; padding:0.15rem 0.5rem; border-radius:999px; white-space:nowrap;">TEST</span>`
+                            : `<span style="background:var(--accent-wellness); color:#fff; font-size:0.68rem; font-weight:700; padding:0.15rem 0.5rem; border-radius:999px; white-space:nowrap;">REAL</span>`;
+                        const dateStr = new Date(a.submitted_at || a.created_at).toLocaleString();
+                        const deleteBtn = a.is_test
+                            ? `<button class="btn btn-secondary btn-small" style="color:#B91C1C; border-color:#FCA5A5;" onclick="app.deleteTestAssessment('${a.id}')">🗑️ Delete</button>`
+                            : '';
                         return `
-                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap; gap: 0.5rem; padding:1rem 1.25rem; border-left: 4px solid ${r.is_test ? '#DC2626' : meta.color}; background: #FAFAFA; border-radius:6px;">
-                            <div>
-                                <div style="font-weight:600;">${meta.icon} ${meta.label} Report${testBadge}</div>
-                                <div style="font-size:0.8rem; color:var(--text-light); margin-top:0.15rem;">Generated ${new Date(r.created_at).toLocaleDateString()}${r.payment_status === 'pending' ? ' — payment pending' : ''}</div>
-                            </div>
-                            <button class="btn btn-secondary btn-small" onclick="app.openStoredReport('${r.id}')" ${r.payment_status === 'pending' ? 'disabled' : ''}>👁️ View</button>
-                        </div>`;
-                    }).join('') + `</div>`;
+                            <tr style="border-bottom:1px solid var(--border);">
+                                <td style="padding:0.6rem 0.4rem;">${typeBadge}</td>
+                                <td style="padding:0.6rem 0.4rem; font-size:0.82rem; color:var(--text-light); white-space:nowrap;">${dateStr}</td>
+                                <td style="text-align:center; padding:0.6rem 0.4rem;"><button class="btn btn-secondary btn-small" onclick="app.downloadResponses('${a.id}')">📥 Responses</button></td>
+                                ${tierCells}
+                                <td style="text-align:center; padding:0.6rem 0.4rem;">${deleteBtn}</td>
+                            </tr>`;
+                    }).join('');
+                    reportsHtml = `
+                        <div style="overflow-x:auto;">
+                        <table style="width:100%; border-collapse:collapse; font-size:0.88rem;">
+                            <thead>
+                                <tr style="border-bottom:2px solid var(--border); text-align:left;">
+                                    <th style="padding:0.4rem;">Type</th>
+                                    <th style="padding:0.4rem;">Submitted</th>
+                                    <th style="padding:0.4rem; text-align:center;">Responses</th>
+                                    <th style="padding:0.4rem; text-align:center;">🔍 Discover</th>
+                                    <th style="padding:0.4rem; text-align:center;">🧭 Explore</th>
+                                    <th style="padding:0.4rem; text-align:center;">🗺️ Navigate</th>
+                                    <th style="padding:0.4rem;"></th>
+                                </tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                        </div>
+                        <p style="color: var(--text-light); font-size:0.78rem; margin-top:0.85rem;">🧪 TEST rows are pilot sample data — delete them anytime, and they're removed automatically when you log out. REAL responses and reports are generated once and can't be regenerated from this account; contact NavaSetu for a retake.</p>
+                    `;
                 }
 
                 let actionHtml;
@@ -1148,7 +1205,7 @@
 
                     <div class="card">
                         <div style="margin-bottom: 1.5rem;">${actionHtml}</div>
-                        <h3 style="margin-bottom: 1rem; color: var(--primary);">My Reports</h3>
+                        <h3 style="margin-bottom: 1rem; color: var(--primary);">My Responses &amp; Reports</h3>
                         ${reportsHtml}
                     </div>
 
@@ -1188,7 +1245,22 @@
                 }
             }
 
-            logout() {
+            async deleteTestAssessment(assessmentId) {
+                if (!confirm('Delete this test attempt and every report generated from it? This cannot be undone.')) return;
+                try {
+                    await apiFetch(`/assessments/${assessmentId}`, { method: 'DELETE' });
+                    await this.loadDashboard();
+                } catch (e) {
+                    showModal(e.message || 'Could not delete this attempt.', 'error');
+                }
+            }
+
+            async logout() {
+                // Pilot test data must never outlive the session it was created
+                // in — best-effort, and logout proceeds regardless of whether
+                // this succeeds, so a network hiccup never traps someone on
+                // the page.
+                try { await apiFetch('/assessments/test-data', { method: 'DELETE' }); } catch (e) { /* non-fatal */ }
                 localStorage.removeItem('navasetu_token');
                 // Back to the two-test landing page, not this app's own login
                 // screen — wellness and SSB are separate, unrelated clients,
@@ -1514,7 +1586,26 @@
                 }
             }
 
-            downloadResponses() {
+            // assessmentId is optional: omitted, this downloads the currently
+            // in-memory assessment (the live/just-generated one — unchanged
+            // behavior). Passed (from the dashboard table), it fetches that
+            // specific past assessment's own frozen responses from the server,
+            // so every row's "Responses" button downloads the right attempt
+            // rather than whichever one happens to be loaded in memory.
+            async downloadResponses(assessmentId) {
+                let responses = this.responses;
+                let isTestAttempt = this.isTestRun;
+                if (assessmentId) {
+                    try {
+                        const assessment = await apiFetch(`/assessments/${assessmentId}`);
+                        responses = assessment.responses || {};
+                        isTestAttempt = !!assessment.is_test;
+                    } catch (e) {
+                        showModal(e.message || 'Could not load these responses.', 'error');
+                        return;
+                    }
+                }
+
                 // Opens a branded, print-ready document (logo, contact details,
                 // disclaimer) in a new tab and triggers the browser's print dialog,
                 // so the teacher can "Save as PDF" — rather than a raw text file.
@@ -1526,7 +1617,7 @@
                     : `<svg viewBox="0 0 100 100" style="width:60px;height:60px;"><circle cx="50" cy="50" r="48" fill="#D4A017" opacity="0.15"/><circle cx="50" cy="50" r="45" fill="none" stroke="#D4A017" stroke-width="2"/><text x="50" y="58" font-family="Crimson Text, serif" font-size="20" font-weight="700" text-anchor="middle" fill="#D4A017">NS</text></svg>`;
 
                 const rows = questions.map((q, idx) => {
-                    const answerIdx = this.responses[q.id];
+                    const answerIdx = responses[q.id];
                     const answerText = (answerIdx !== undefined) ? q.options[answerIdx] : '(not answered)';
                     return `<div style="padding:0.6rem 0; border-bottom:1px solid #E5E7EB;">
                         <div style="font-size:0.9rem; color:#1F2937;">${idx + 1}. ${q.text}</div>
@@ -1548,13 +1639,13 @@
                     .test-banner { background:#DC2626; color:#fff; text-align:center; font-weight:700; font-size:0.9rem; padding:0.65rem 1rem; border-radius:8px; margin-bottom:1.25rem; }
                 </style></head>
                 <body>
-                    ${this.isTestRun ? `<div class="test-banner">🧪 TEST RESPONSES — Sample data generated for pilot review. This is not a real submission.</div>` : ''}
+                    ${isTestAttempt ? `<div class="test-banner">🧪 TEST RESPONSES — Sample data generated for pilot review. This is not a real submission.</div>` : ''}
                     <div class="header-row">${logoHtml}<div><h1>NavaSetu</h1><p>Teacher Wellness & Professional Growth · www.navasetu.online</p></div></div>
                     <h2 style="margin-bottom:0.25rem;">My Assessment Responses</h2>
                     <div class="meta"><strong>Name:</strong> ${name} &nbsp;|&nbsp; <strong>Date:</strong> ${new Date().toLocaleDateString()}</div>
                     ${rows}
                     <div class="disclaimer"><strong>⚠️ Disclaimer:</strong> This assessment is a self-report screening tool designed to provide initial insights into your wellness dimensions. It is not a diagnostic instrument and should not be used as a substitute for professional mental health assessment or counseling. For any concerns about your mental health or wellbeing, please consult a qualified healthcare professional or counselor.</div>
-                    ${this.isTestRun ? `<div class="test-banner">🧪 TEST RESPONSES — Sample data generated for pilot review. This is not a real submission.</div>` : ''}
+                    ${isTestAttempt ? `<div class="test-banner">🧪 TEST RESPONSES — Sample data generated for pilot review. This is not a real submission.</div>` : ''}
                     <div class="footer">NavaSetu Initiatives &nbsp;·&nbsp; navasetuinitiatives@gmail.com &nbsp;·&nbsp; 8556840001 &nbsp;·&nbsp; www.navasetu.online</div>
                     <script>window.onload = function() { window.print(); };<\/script>
                 </body></html>`;

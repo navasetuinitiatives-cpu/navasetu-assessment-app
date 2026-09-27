@@ -8,10 +8,11 @@
   :root { --primary:#0a0e27; --gold:#D4A017; --bg:#F9FAFB; --border:#E5E7EB; --accent:#5B21B6; }
   * { box-sizing:border-box; }
   body { font-family:-apple-system, Segoe UI, Inter, sans-serif; background:var(--bg); margin:0; color:#1F2937; }
-  header { background:var(--primary); color:#fff; padding:1rem 1.5rem; display:flex; align-items:center; gap:1rem; }
-  header img { max-height:36px; }
-  header h1 { font-size:1.1rem; margin:0; font-weight:600; }
-  header a.home { color:#D1D5DB; text-decoration:none; margin-left:auto; font-size:0.85rem; }
+  header { background:var(--primary); color:#fff; padding:1rem 1.5rem; display:flex; align-items:center; gap:1rem; flex-wrap:wrap; }
+  header img { max-height:36px; flex:0 0 auto; }
+  header h1 { font-size:1.1rem; margin:0; font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1 1 auto; }
+  header a.home { color:#D1D5DB; text-decoration:none; margin-left:auto; font-size:0.85rem; padding:0.4rem 0; flex:0 0 auto; }
+  @media (max-width:480px) { header h1 { font-size:0.92rem; white-space:normal; } }
   main { max-width:760px; margin:0 auto; padding:1.5rem 1.25rem 4rem; }
   .card { background:#fff; border:1px solid var(--border); border-radius:10px; padding:1.75rem; margin-bottom:1.25rem; }
   .card h2 { margin-top:0; font-size:1.2rem; }
@@ -28,7 +29,7 @@
   .likertItem:last-child { border-bottom:none; }
   .likertItem .qtext { font-size:0.94rem; margin-bottom:0.5rem; }
   .likertOptions { display:flex; gap:0.4rem; flex-wrap:wrap; }
-  .likertOptions label { display:flex; align-items:center; gap:0.3rem; font-weight:400; font-size:0.8rem; background:#F3F4F6; padding:0.35rem 0.6rem; border-radius:999px; cursor:pointer; margin:0; }
+  .likertOptions label { display:flex; align-items:center; gap:0.3rem; font-weight:400; font-size:0.85rem; background:#F3F4F6; padding:0.55rem 0.9rem; border-radius:999px; cursor:pointer; margin:0; min-height:2.5rem; }
   .likertOptions input { width:auto; }
   .watItem, .srtItem { padding:0.85rem 0; border-bottom:1px solid var(--border); }
   .watItem .word, .srtItem .situation { font-weight:600; margin-bottom:0.4rem; }
@@ -50,7 +51,7 @@
   .stepLabel { font-size:0.8rem; color:#9CA3AF; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:0.3rem; }
   .voiceRow { display:flex; gap:0.5rem; align-items:flex-start; }
   .voiceRow input, .voiceRow textarea { flex:1; }
-  .micBtn { flex:0 0 auto; background:#F3F4F6; border:1px solid var(--border); border-radius:8px; width:2.4rem; height:2.4rem; font-size:1rem; cursor:pointer; margin-top:0; }
+  .micBtn { flex:0 0 auto; background:#F3F4F6; border:1px solid var(--border); border-radius:8px; width:2.75rem; height:2.75rem; font-size:1.1rem; cursor:pointer; margin-top:0; }
   .micBtn.recording { background:#FEE2E2; border-color:#FCA5A5; animation:micPulse 1s infinite; }
   @keyframes micPulse { 0%, 100% { opacity:1; } 50% { opacity:0.5; } }
   .tatImageWrap { margin-bottom:0.75rem; }
@@ -66,6 +67,10 @@
   .plan-card .plan-price { font-size:1.4rem; font-weight:700; color:var(--accent); margin-bottom:0.5rem; }
   .plan-card .plan-desc { font-size:0.85rem; color:#6B7280; margin-bottom:0.75rem; }
   .plan-card ul.plan-features { margin:0; padding-left:1.1rem; font-size:0.82rem; color:#374151; }
+  @media (max-width:480px) {
+    main { padding:1rem 0.85rem 3rem; }
+    .card { padding:1.1rem; }
+  }
 </style>
 </head>
 <body>
@@ -266,7 +271,10 @@ async function authRegister() {
   } catch (e) { errEl.textContent = e.message; }
 }
 
-function ssbLogout() {
+async function ssbLogout() {
+  // Pilot test data must never outlive the session it was created in —
+  // best-effort, and logout proceeds regardless of whether this succeeds.
+  try { await api('/ssb/assessments/test-data', { method: 'DELETE' }); } catch (e) { /* non-fatal */ }
   localStorage.removeItem('navasetu_ssb_token');
   window.location.href = '/welcome.html';
 }
@@ -679,36 +687,153 @@ async function renderSsbDashboard(submittedAttempts) {
   dash.classList.remove('hidden');
   dash.innerHTML = `<div class="card"><p class="muted">Loading your reports…</p></div>`;
 
+  // One row per attempt, with its responses and every report tier it has
+  // generated shown side by side — rather than a flat list of reports with
+  // no visible link back to which attempt (and TEST/REAL set) each belonged to.
   const perAttempt = await Promise.all(submittedAttempts.map(async (a) => {
     try {
       const r = await api(`/reports/by-assessment/${a.id}`);
-      return r.reports || [];
-    } catch (e) { return []; }
+      return { assessment: a, reports: r.reports || [] };
+    } catch (e) { return { assessment: a, reports: [] }; }
   }));
-  const allReports = perAttempt.flat().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  perAttempt.sort((x, y) => new Date(y.assessment.submitted_at || y.assessment.created_at) - new Date(x.assessment.submitted_at || x.assessment.created_at));
 
-  const reportsHtml = allReports.length
-    ? allReports.map((r) => `
-      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; padding:1rem 1.25rem; border-left:4px solid ${r.is_test ? '#DC2626' : 'var(--accent)'}; background:#FAFAFA; border-radius:6px; margin-bottom:0.75rem;">
-        <div>
-          <div style="font-weight:600;">${SSB_PLAN_LABELS[r.plan_type] || r.plan_type}${r.is_test ? ' <span style="background:#DC2626;color:#fff;font-size:0.68rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:999px;margin-left:0.4rem;">TEST</span>' : ''}</div>
-          <div style="font-size:0.8rem; color:#6B7280; margin-top:0.15rem;">Generated ${new Date(r.created_at).toLocaleDateString()}${r.payment_status === 'pending' ? ' — payment pending' : ''}</div>
-        </div>
-        <button class="btn secondary" style="margin-top:0;" onclick="viewSsbReport('${r.id}')" ${r.payment_status === 'pending' ? 'disabled' : ''}>👁️ View / Download</button>
-      </div>`).join('')
+  const tierOrder = ['ssb_basic', 'ssb_detailed', 'ssb_comprehensive'];
+  const tierShort = { ssb_basic: '📋 Snapshot', ssb_detailed: '📊 Detailed', ssb_comprehensive: '🎯 Comprehensive' };
+
+  const rowsHtml = perAttempt.map(({ assessment: a, reports }) => {
+    const byTier = {};
+    reports.forEach((r) => { byTier[r.plan_type] = r; });
+    const tierCells = tierOrder.map((t) => {
+      const r = byTier[t];
+      if (!r) return `<td style="text-align:center; color:#9CA3AF; padding:0.6rem 0.4rem;">—</td>`;
+      return `<td style="text-align:center; padding:0.6rem 0.4rem;"><button class="btn secondary" style="margin-top:0; font-size:0.8rem; padding:0.4rem 0.7rem;" onclick="viewSsbReport('${r.id}')" ${r.payment_status === 'pending' ? 'disabled' : ''}>👁️ View</button></td>`;
+    }).join('');
+    const typeBadge = a.is_test
+      ? `<span style="background:#DC2626; color:#fff; font-size:0.68rem; font-weight:700; padding:0.15rem 0.5rem; border-radius:999px; white-space:nowrap;">TEST</span>`
+      : `<span style="background:var(--accent); color:#fff; font-size:0.68rem; font-weight:700; padding:0.15rem 0.5rem; border-radius:999px; white-space:nowrap;">REAL</span>`;
+    const dateStr = new Date(a.submitted_at || a.created_at).toLocaleString();
+    const deleteBtn = a.is_test
+      ? `<button class="btn secondary" style="margin-top:0; font-size:0.8rem; padding:0.4rem 0.7rem; color:#B91C1C; border-color:#FCA5A5;" onclick="deleteSsbTestAssessment('${a.id}')">🗑️ Delete</button>`
+      : '';
+    return `
+      <tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:0.6rem 0.4rem;">${typeBadge}</td>
+        <td style="padding:0.6rem 0.4rem; font-size:0.82rem; color:#6B7280; white-space:nowrap;">${dateStr}</td>
+        <td style="text-align:center; padding:0.6rem 0.4rem;"><button class="btn secondary" style="margin-top:0; font-size:0.8rem; padding:0.4rem 0.7rem;" onclick="downloadSsbResponses('${a.id}')">📥 Responses</button></td>
+        ${tierCells}
+        <td style="text-align:center; padding:0.6rem 0.4rem;">${deleteBtn}</td>
+      </tr>`;
+  }).join('');
+
+  const tableHtml = perAttempt.length
+    ? `<div style="overflow-x:auto;">
+        <table style="width:100%; border-collapse:collapse; font-size:0.86rem;">
+          <thead>
+            <tr style="border-bottom:2px solid var(--border); text-align:left;">
+              <th style="padding:0.4rem;">Type</th>
+              <th style="padding:0.4rem;">Submitted</th>
+              <th style="padding:0.4rem; text-align:center;">Responses</th>
+              <th style="padding:0.4rem; text-align:center;">${tierShort.ssb_basic}</th>
+              <th style="padding:0.4rem; text-align:center;">${tierShort.ssb_detailed}</th>
+              <th style="padding:0.4rem; text-align:center;">${tierShort.ssb_comprehensive}</th>
+              <th style="padding:0.4rem;"></th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
+      <p class="muted" style="font-size:0.78rem; margin-top:0.85rem;">🧪 TEST rows are pilot sample data — delete them anytime, and they're removed automatically when you log out. REAL responses and reports are generated once and can't be regenerated from this account.</p>`
     : `<p class="muted">No reports yet.</p>`;
 
   dash.innerHTML = `
     <div class="card">
-      <h2 style="margin-top:0;">My OLQ Readiness Reports</h2>
-      <p class="muted">Every report you generate stays here — reopen or download any of them, anytime.</p>
-      ${reportsHtml}
+      <h2 style="margin-top:0;">My Responses &amp; Reports</h2>
+      <p class="muted">Every attempt's responses and generated report tiers stay here, side by side.</p>
+      ${tableHtml}
       <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-top:1.25rem;">
         <button class="btn" onclick="startNewSsbAssessment()">🎯 Take Another Assessment</button>
         <button class="btn secondary" onclick="fillSampleSSB()">🧪 Fill Sample &amp; Generate Report</button>
         <button class="btn secondary" onclick="ssbLogout()">🚪 Logout</button>
       </div>
     </div>`;
+}
+
+async function deleteSsbTestAssessment(assessmentId) {
+  if (!confirm('Delete this test attempt and every report generated from it? This cannot be undone.')) return;
+  try {
+    await api(`/ssb/assessments/${assessmentId}`, { method: 'DELETE' });
+    await backToSsbDashboard();
+  } catch (e) {
+    alert('Could not delete this attempt: ' + e.message);
+  }
+}
+
+// Never existed for SSB before — the assessment's raw section responses,
+// resolved against the item bank where possible, as a branded printable page
+// (matching the wellness app's "Download My Responses" pattern).
+async function downloadSsbResponses(assessmentId) {
+  try {
+    const data = await api(`/ssb/assessments/${assessmentId}`);
+    const a = data.assessment;
+    const r = a.responses || {};
+    const isTestAttempt = !!a.is_test;
+
+    const likertRows = (items, answers) => (items || []).map((q, idx) => {
+      const val = answers ? answers[q.id] : undefined;
+      const answerText = (val !== undefined && q.options) ? q.options[val] : '(not answered)';
+      return `<div style="padding:0.5rem 0; border-bottom:1px solid #E5E7EB;"><div style="font-size:0.88rem;">${idx + 1}. ${q.text}</div><div style="font-size:0.85rem; font-weight:600; color:var(--accent); margin-top:0.15rem;">${answerText}</div></div>`;
+    }).join('');
+
+    const freeTextSection = (obj) => Object.entries(obj || {}).map(([key, val]) =>
+      `<div style="padding:0.5rem 0; border-bottom:1px solid #E5E7EB;"><div style="font-size:0.88rem; font-weight:600;">${key}</div><div style="font-size:0.85rem; color:#374151; margin-top:0.15rem;">${val}</div></div>`
+    ).join('') || '<p class="muted">Not answered.</p>';
+
+    const gtoRows = Object.entries(r.gto || {}).map(([scenarioId, optionIdx]) => {
+      const scenario = (meta.gtoScenarios || []).find((g) => g.id === scenarioId);
+      const optionText = scenario && scenario.options ? scenario.options[optionIdx] : `Option ${optionIdx}`;
+      return `<div style="padding:0.5rem 0; border-bottom:1px solid #E5E7EB;"><div style="font-size:0.88rem; font-weight:600;">${scenario ? scenario.prompt : scenarioId}</div><div style="font-size:0.85rem; color:#374151; margin-top:0.15rem;">${optionText}</div></div>`;
+    }).join('') || '<p class="muted">Not answered.</p>';
+
+    const docHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>NavaSetu — SSB Responses</title>
+    <style>
+      body { font-family: -apple-system, Segoe UI, Inter, sans-serif; color:#1F2937; margin:0; padding:2rem 2.5rem; }
+      h2 { color:#0a0e27; }
+      h3 { color:#5B21B6; margin-top:1.5rem; }
+      .test-banner { background:#DC2626; color:#fff; text-align:center; font-weight:700; font-size:0.9rem; padding:0.65rem 1rem; border-radius:8px; margin-bottom:1.25rem; }
+      .disclaimer { background:#FFFBEB; border-left:4px solid #FDE68A; padding:1rem; margin-top:2rem; font-size:0.8rem; color:#92400E; border-radius:4px; }
+      .muted { color:#6B7280; font-size:0.85rem; }
+      @media print { body { padding: 1.2cm; } }
+    </style></head>
+    <body>
+      ${isTestAttempt ? `<div class="test-banner">🧪 TEST RESPONSES — Sample data generated for pilot review. This is not a real submission.</div>` : ''}
+      <h2>My SSB OLQ Assessment Responses</h2>
+      <div style="font-size:0.9rem; color:#374151; margin-bottom:1rem;"><strong>Date:</strong> ${new Date(a.submitted_at || a.created_at).toLocaleDateString()}</div>
+      <h3>Personality (Big Five)</h3>
+      ${likertRows(meta.bigFiveItems, r.bigFive) || '<p class="muted">Not answered.</p>'}
+      <h3>SSB Trait Scales</h3>
+      ${likertRows(meta.traitItemBank, r.traits) || '<p class="muted">Not answered.</p>'}
+      <h3>Word Association Test (WAT)</h3>
+      ${freeTextSection(r.wat)}
+      <h3>Situation Reaction Test (SRT)</h3>
+      ${freeTextSection(r.srt)}
+      <h3>Group Testing (GTO)</h3>
+      ${gtoRows}
+      <h3>Thematic Apperception Test (TAT)</h3>
+      ${freeTextSection(r.tat)}
+      <h3>Self-Description (SDT)</h3>
+      ${freeTextSection(r.sdt)}
+      <div class="disclaimer"><strong>Note:</strong> This is a self-assessment practice tool, not an official DIPR/SSB Board evaluation.</div>
+      ${isTestAttempt ? `<div class="test-banner">🧪 TEST RESPONSES — Sample data generated for pilot review. This is not a real submission.</div>` : ''}
+      <script>window.onload = function() { window.print(); };<\/script>
+    </body></html>`;
+
+    const win = window.open('', '_blank');
+    if (win) { win.document.write(docHtml); win.document.close(); }
+    else { alert('Please allow pop-ups for this site to download your responses.'); }
+  } catch (e) {
+    alert('Could not load these responses: ' + e.message);
+  }
 }
 
 async function viewSsbReport(reportId) {

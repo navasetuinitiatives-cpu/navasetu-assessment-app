@@ -20,18 +20,6 @@ router.post('/', requireAuth, async (req, res) => {
     const { schoolId, schoolTeacherId, clientType, isTest } = req.body;
     const userId = req.user.userId;
 
-    // Pilot "Fill Sample" hygiene: each run used to just add another 3 reports
-    // on top of whatever the last run left behind, so a tester who clicked it
-    // twice saw two full sets of Discover/Explore/Navigate stacked on their
-    // home page with no way to tell which was current. Since these are only
-    // ever throwaway samples (never a real teacher's data), a fresh run
-    // purges any of this account's *previous* test assessments first — the
-    // cascade on reports.assessment_id takes their reports with them — so the
-    // dashboard always shows exactly one, current sample set.
-    if (isTest) {
-      await pool.query(`DELETE FROM assessments WHERE user_id = $1 AND track = 'wellness' AND is_test = true`, [userId]);
-    }
-
     // BUG FIX: the same `assessments` table also holds SSB attempts (added
     // later, distinguished by the `track` column, default 'wellness' so every
     // pre-existing row already has it). This query used to have no track
@@ -189,7 +177,7 @@ router.post('/:assessmentId/enable-retake', requireAuth, requireAdmin, async (re
 router.get('/mine', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, status, client_type, submitted, submitted_at, created_at, scores
+      `SELECT id, status, client_type, submitted, submitted_at, created_at, scores, is_test
        FROM assessments WHERE user_id = $1 AND track = 'wellness' ORDER BY created_at DESC`,
       [req.user.userId]
     );
@@ -197,6 +185,45 @@ router.get('/mine', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('List my assessments error:', error);
     res.status(500).json({ error: 'Failed to fetch your assessments' });
+  }
+});
+
+// Wipe every one of the caller's own pilot "Fill Sample" attempts (and their
+// reports, via the cascade on reports.assessment_id) in one call — used by
+// the frontend right before Logout, so test data never survives a session.
+// Declared before the two param routes below ("test-data" would otherwise be
+// captured as an :assessmentId). Never touches the `users` row itself, so a
+// visitor who only ever ran a sample still shows up as a CRM lead.
+router.delete('/test-data', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `DELETE FROM assessments WHERE user_id = $1 AND track = 'wellness' AND is_test = true RETURNING id`,
+      [req.user.userId]
+    );
+    res.json({ success: true, deleted: result.rows.length });
+  } catch (error) {
+    console.error('Delete my test data error:', error);
+    res.status(500).json({ error: 'Failed to delete your test data' });
+  }
+});
+
+// Delete one of the caller's own pilot "Fill Sample" attempts (cascades to
+// its reports). Deliberately scoped to is_test = true — a real, submitted
+// assessment can never be deleted this way, by design.
+router.delete('/:assessmentId', requireAuth, async (req, res) => {
+  try {
+    const { assessmentId } = req.params;
+    const result = await pool.query(
+      `DELETE FROM assessments WHERE id = $1 AND user_id = $2 AND track = 'wellness' AND is_test = true RETURNING id`,
+      [assessmentId, req.user.userId]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Not found, not yours, or not a test attempt (only test attempts can be deleted)' });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete test assessment error:', error);
+    res.status(500).json({ error: 'Failed to delete this attempt' });
   }
 });
 

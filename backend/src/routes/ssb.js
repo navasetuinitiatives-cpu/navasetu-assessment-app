@@ -34,14 +34,6 @@ router.post('/assessments', requireAuth, async (req, res) => {
     const userId = req.user.userId;
     const { isTest } = req.body || {};
 
-    // Pilot "Fill Sample" hygiene — same as the wellness start route: each
-    // run used to just stack another report on top of the last one with no
-    // way to tell which sample was current. Purges this account's previous
-    // test attempts (cascades to their reports) before starting a new one.
-    if (isTest) {
-      await pool.query(`DELETE FROM assessments WHERE user_id = $1 AND track = 'ssb' AND is_test = true`, [userId]);
-    }
-
     const existing = await pool.query(
       `SELECT * FROM assessments WHERE user_id = $1 AND track = 'ssb' AND status = 'in_progress' ORDER BY created_at DESC LIMIT 1`,
       [userId]
@@ -105,12 +97,50 @@ router.get('/assessments/:id', requireAuth, async (req, res) => {
 router.get('/assessments-mine/list', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, status, created_at, submitted_at FROM assessments WHERE user_id = $1 AND track = 'ssb' ORDER BY created_at DESC`,
+      `SELECT id, status, created_at, submitted_at, is_test FROM assessments WHERE user_id = $1 AND track = 'ssb' ORDER BY created_at DESC`,
       [req.user.userId]
     );
     res.json({ assessments: result.rows });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch your SSB assessments' });
+  }
+});
+
+// Wipe every one of the caller's own pilot "Fill Sample" SSB attempts (and
+// their reports, via cascade) in one call — used by the frontend right
+// before Logout so test data never survives a session. Declared before the
+// param routes below so "test-data" is never captured as :id. Never touches
+// the `users` row, so a visitor who only ever ran a sample still shows up as
+// a CRM lead.
+router.delete('/assessments/test-data', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `DELETE FROM assessments WHERE user_id = $1 AND track = 'ssb' AND is_test = true RETURNING id`,
+      [req.user.userId]
+    );
+    res.json({ success: true, deleted: result.rows.length });
+  } catch (error) {
+    console.error('Delete my SSB test data error:', error);
+    res.status(500).json({ error: 'Failed to delete your test data' });
+  }
+});
+
+// Delete one of the caller's own pilot "Fill Sample" SSB attempts (cascades
+// to its reports). Scoped to is_test = true — a real, submitted attempt can
+// never be deleted this way.
+router.delete('/assessments/:id', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `DELETE FROM assessments WHERE id = $1 AND user_id = $2 AND track = 'ssb' AND is_test = true RETURNING id`,
+      [req.params.id, req.user.userId]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Not found, not yours, or not a test attempt (only test attempts can be deleted)' });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete test SSB assessment error:', error);
+    res.status(500).json({ error: 'Failed to delete this attempt' });
   }
 });
 
@@ -265,11 +295,30 @@ router.post('/assessments/:id/upgrade-report', requireAuth, async (req, res) => 
       return res.status(409).json({ error: 'Submit your assessment before upgrading your report' });
     }
 
+    // Same inherited TEST REPORT marking as the submit route above.
+    const isTest = !!assessment.is_test;
+
+    // BUG FIX: mirrors the wellness reports.js fix — an upgrade click fired
+    // twice (double-click, retry after a slow response, etc.) used to insert
+    // a second copy of the same tier's report for a real candidate. Real
+    // reports are generated once per tier and then immutable; test reports
+    // keep the old always-insert behavior since multiple sample sets are
+    // expected there.
+    if (!isTest) {
+      const existingReport = await pool.query(
+        `SELECT id, plan_type, payment_status, created_at, html_content, is_test FROM reports
+         WHERE assessment_id = $1 AND plan_type = $2 AND is_test = false LIMIT 1`,
+        [req.params.id, planType]
+      );
+      if (existingReport.rows.length > 0) {
+        const r = existingReport.rows[0];
+        return res.json({ success: true, report: { id: r.id, planType: r.plan_type, htmlContent: r.html_content, locked: r.payment_status === 'pending' }, alreadyExisted: true });
+      }
+    }
+
     const { profile, improvementPlan } = assessment.scores;
     const userRow = await pool.query('SELECT full_name FROM users WHERE id = $1', [req.user.userId]);
     const candidateName = userRow.rows[0]?.full_name || null;
-    // Same inherited TEST REPORT marking as the submit route above.
-    const isTest = !!assessment.is_test;
     const reportHtml = buildSsbReportHtml(profile, improvementPlan, candidateName, planType, isTest);
 
     const paymentStatus = PILOT_FREE_ACCESS ? 'admin_released' : 'pending';

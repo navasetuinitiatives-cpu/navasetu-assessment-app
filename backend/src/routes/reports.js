@@ -44,6 +44,27 @@ router.post('/', requireAuth, async (req, res) => {
     // mismarked and a sample one can never slip through unmarked.
     const isTest = !!assessment.is_test;
 
+    // BUG FIX: this route used to insert a brand-new row on every call, so a
+    // real teacher who revisited the plan-selection screen (or clicked
+    // "Upgrade" a second time, or double-clicked) got a second, third, etc.
+    // copy of the same tier's report — the exact "multiple original reports"
+    // clutter the counsellors were seeing on her home page. For a real
+    // (non-test) report, a tier is generated once and then treated as
+    // immutable: if one already exists for this assessment+plan, hand back
+    // that same row instead of creating another. Test reports (is_test) keep
+    // the old always-insert behavior on purpose, since a pilot tester is
+    // meant to be able to generate several sample sets to compare.
+    if (!isTest) {
+      const existingReport = await pool.query(
+        `SELECT id, plan_type, payment_status, created_at, is_test FROM reports
+         WHERE assessment_id = $1 AND plan_type = $2 AND is_test = false LIMIT 1`,
+        [assessmentId, effectivePlan]
+      );
+      if (existingReport.rows.length > 0) {
+        return res.status(200).json({ success: true, report: existingReport.rows[0], locked: existingReport.rows[0].payment_status === 'pending', alreadyExisted: true });
+      }
+    }
+
     const id = uuidv4();
     const result = await pool.query(
       `INSERT INTO reports (id, assessment_id, user_id, plan_type, html_content, payment_status, released_at, is_test)
