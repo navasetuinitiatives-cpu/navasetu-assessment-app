@@ -113,7 +113,7 @@
         </div>
         <input placeholder="Search by name or email" id="leadSearch" oninput="loadLeads()" style="margin-top:1rem;">
         <table>
-          <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Mobile</th><th>Type</th><th>Institution</th><th>Plan</th><th>Assigned To</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Mobile</th><th>Location</th><th>Type</th><th>Institution</th><th>Plan</th><th>Assigned To</th><th>Status</th><th></th></tr></thead>
           <tbody id="leadsBody"></tbody>
         </table>
       </div>
@@ -622,6 +622,7 @@ async function loadLeads() {
         <td>${l.full_name}</td>
         <td>${l.email}</td>
         <td>${l.phone_number || '—'}</td>
+        <td>${[l.city, l.state].filter(Boolean).join(', ') || '—'}</td>
         <td>${l.client_type}${l.latest_track === 'ssb' ? ' <span class="roleBadge counsellor" style="font-size:0.65rem;">SSB</span>' : ''}</td>
         <td>${l.institution || '—'}</td>
         <td>${l.plan || '—'}</td>
@@ -637,7 +638,7 @@ async function loadLeads() {
             ? (currentAdmin && currentAdmin.role === 'platform_admin' ? `<button class="btn secondary" onclick="restoreLead('${l.id}')">Restore</button>` : '')
             : `<button class="btn secondary danger" onclick="deleteLeadPrompt('${l.id}')">Delete</button>`}
         </td>
-      </tr>${deleted && l.delete_reason ? `<tr class="${deleted ? '' : ''}"><td></td><td colspan="9" class="muted" style="font-style:italic;">Reason: ${l.delete_reason}</td></tr>` : ''}`;
+      </tr>${deleted && l.delete_reason ? `<tr class="${deleted ? '' : ''}"><td></td><td colspan="10" class="muted" style="font-style:italic;">Reason: ${l.delete_reason}</td></tr>` : ''}`;
     }).join('');
     document.querySelectorAll('#leadsBody select.statusSelect').forEach((sel) => {
       const lead = data.leads.find(l => sel.getAttribute('onchange').includes(l.id));
@@ -788,6 +789,7 @@ function renderLeadOverview() {
 
   document.getElementById('leadTab-overview').innerHTML = `
     <p><strong>Email:</strong> ${u.email} &nbsp; <strong>Mobile:</strong> ${u.phone_number || '—'}</p>
+    <p><strong>Location:</strong> ${[u.city, u.state].filter(Boolean).join(', ') || '—'}${u.pincode ? ` (PIN ${u.pincode})` : ''}</p>
     <p><strong>Type:</strong> ${u.client_type}${window._currentLead.assessments && window._currentLead.assessments.some(a => a.track === 'ssb') ? ' <span class="roleBadge counsellor" style="font-size:0.65rem;">SSB</span>' : ''} &nbsp; <strong>Institution:</strong> ${(demographics && demographics.institution) || '—'}</p>
     <p><strong>Registered:</strong> ${new Date(u.created_at).toLocaleDateString()} &nbsp; <strong>Last login:</strong> ${u.last_login ? new Date(u.last_login).toLocaleString() : 'never'}</p>
     <p><strong>Assigned To:</strong> ${assignHtml}</p>
