@@ -20,8 +20,15 @@ router.post('/', requireAuth, async (req, res) => {
     const { schoolId, schoolTeacherId, clientType } = req.body;
     const userId = req.user.userId;
 
+    // BUG FIX: the same `assessments` table also holds SSB attempts (added
+    // later, distinguished by the `track` column, default 'wellness' so every
+    // pre-existing row already has it). This query used to have no track
+    // filter, so an account with an in-progress SSB attempt starting a
+    // wellness assessment would get handed back the SSB row instead of a
+    // fresh wellness one — silently corrupting both. Scoped to track =
+    // 'wellness' to keep the two completely separate, as intended.
     const existing = await pool.query(
-      `SELECT * FROM assessments WHERE user_id = $1 AND status = 'in_progress' ORDER BY created_at DESC LIMIT 1`,
+      `SELECT * FROM assessments WHERE user_id = $1 AND track = 'wellness' AND status = 'in_progress' ORDER BY created_at DESC LIMIT 1`,
       [userId]
     );
     if (existing.rows.length > 0) {
@@ -163,11 +170,15 @@ router.post('/:assessmentId/enable-retake', requireAuth, requireAdmin, async (re
 // All of the caller's own assessments (used to power her "My Reports" dashboard
 // after logging back in). Declared before /:assessmentId so "mine" isn't
 // swallowed by the :assessmentId param route.
+// BUG FIX: same cross-track leak as the start route above — this used to
+// return the caller's SSB attempts too, which fed straight into the wellness
+// dashboard's "already submitted" / "resume" logic. Scoped to track =
+// 'wellness'.
 router.get('/mine', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT id, status, client_type, submitted, submitted_at, created_at, scores
-       FROM assessments WHERE user_id = $1 ORDER BY created_at DESC`,
+       FROM assessments WHERE user_id = $1 AND track = 'wellness' ORDER BY created_at DESC`,
       [req.user.userId]
     );
     res.json({ assessments: result.rows });

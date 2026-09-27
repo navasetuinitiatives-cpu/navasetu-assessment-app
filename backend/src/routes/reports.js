@@ -56,11 +56,21 @@ router.post('/', requireAuth, async (req, res) => {
 // All of the caller's own reports, most recent first — used to power her
 // "My Reports" dashboard after logging back in. Declared before /:reportId
 // so "mine" isn't swallowed by the :reportId param route.
+// BUG FIX: `reports` is shared with the SSB module (by design, so admins see
+// both in one CRM/report viewer — see ssb.js), but this query had no track
+// filter, so a candidate who used the same email/account for both apps saw
+// her SSB reports mixed into the wellness "My Reports" dashboard. Joins to
+// assessments to scope this to wellness's own reports only; the SSB
+// candidate portal (ssb.html) has no equivalent "my reports" list, so no
+// symmetric fix is needed there.
 router.get('/mine', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, assessment_id, plan_type, payment_status, created_at, released_at
-       FROM reports WHERE user_id = $1 ORDER BY created_at DESC`,
+      `SELECT r.id, r.assessment_id, r.plan_type, r.payment_status, r.created_at, r.released_at
+       FROM reports r
+       JOIN assessments a ON a.id = r.assessment_id
+       WHERE r.user_id = $1 AND a.track = 'wellness'
+       ORDER BY r.created_at DESC`,
       [req.user.userId]
     );
     res.json({ reports: result.rows });

@@ -250,19 +250,6 @@
         .home-btn:hover { opacity: 0.9; }
         @media print { .home-btn { display: none; } }
 
-        /* Pilot demo: one-click random sample answers + report, for an SME to
-           review without manually clicking through the whole assessment. */
-        .sample-btn {
-            position: fixed; top: 1rem; right: 8.5rem; z-index: 500;
-            background: #fff; color: var(--primary-light); border: 1.5px solid var(--primary-light);
-            border-radius: 20px; padding: 0.5rem 1.1rem; font-weight: 600; font-size: 0.85rem;
-            cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-        }
-        .sample-btn:hover { opacity: 0.9; }
-        .sample-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        @media print { .sample-btn { display: none; } }
-        @media (max-width: 640px) { .sample-btn { top: auto; bottom: 1rem; right: 1.25rem; } }
-
         .required { color: var(--danger); }
         .success-msg { background: rgba(16, 185, 129, 0.1); color: var(--success); padding: 1rem; border-radius: 6px; margin-bottom: 1rem; border-left: 4px solid var(--success); }
         .error-msg { background: rgba(239, 68, 68, 0.1); color: var(--danger); padding: 1rem; border-radius: 6px; margin-bottom: 1rem; border-left: 4px solid var(--danger); }
@@ -318,9 +305,6 @@
 
     <!-- Persistent Home button — hidden on login/register, shown everywhere else -->
     <button class="home-btn" id="homeBtn" style="display:none;" onclick="app.loadDashboard()">🏠 Home</button>
-
-    <!-- Pilot demo button — hidden on login/register, shown once logged in -->
-    <button class="sample-btn" id="sampleBtn" style="display:none;" onclick="app.fillSampleAnswers()">🧪 Fill Sample & Generate Report</button>
 
     <div class="container">
         <!-- LOGIN PAGE -->
@@ -909,9 +893,6 @@
                 const homeBtn = document.getElementById('homeBtn');
                 if (homeBtn) homeBtn.style.display = (pageName === 'login' || pageName === 'register' || pageName === 'dashboard') ? 'none' : 'block';
 
-                const sampleBtn = document.getElementById('sampleBtn');
-                if (sampleBtn) sampleBtn.style.display = (pageName === 'login' || pageName === 'register') ? 'none' : 'block';
-
                 if (pageName === 'assessment') {
                     this.renderQuestions();
                 } else if (pageName === 'demographics') {
@@ -1386,97 +1367,6 @@
                     }
                 } catch (e) {
                     showModal(e.message || 'Could not submit your assessment — please try again.', 'error');
-                }
-            }
-
-            // --- Pilot demo: Fill Sample Answers ------------------------------
-            // One click randomly answers every question, submits, and jumps
-            // straight to a generated report — for an SME to review the report
-            // pipeline without manually clicking through 73 questions. Always
-            // produces a fresh assessment + a fresh report on every click: the
-            // start endpoint (POST /assessments) only resumes a row that is
-            // still 'in_progress', and this flow submits (freezing the row)
-            // immediately, so the very next click has nothing to resume and
-            // creates a brand-new one. Uses the exact same start/save/submit/
-            // report endpoints a real teacher's browser calls, so the report is
-            // produced by the real scoring pipeline, not a mock.
-            async fillSampleAnswers() {
-                if (!confirm('This will answer every question randomly and generate a report immediately (pilot demo feature). Continue?')) return;
-                const btn = document.getElementById('sampleBtn');
-                if (btn) { btn.disabled = true; btn.textContent = '🧪 Generating…'; }
-                try {
-                    if (!this.currentUser) {
-                        showModal('Please log in first, then use Fill Sample.', 'error');
-                        return;
-                    }
-
-                    const data = await apiFetch('/assessments', {
-                        method: 'POST',
-                        body: JSON.stringify({
-                            schoolId: this.schoolId || undefined,
-                            schoolTeacherId: this.schoolTeacherId || undefined,
-                            clientType: this.clientType
-                        })
-                    });
-                    this.assessmentId = data.assessment.id;
-
-                    // Fill in plausible demographics if this account doesn't have
-                    // any yet — harmless to (re)send for a sample run.
-                    if (!this.demographics || !this.demographics.age) {
-                        const cities = ['Delhi', 'Mumbai', 'Pune', 'Bengaluru', 'Jaipur', 'Lucknow', 'Chennai', 'Kolkata'];
-                        const subjects = ['Mathematics', 'Science', 'English', 'Social Studies', 'Hindi', 'Computer Science'];
-                        const institutionTypes = ['Government', 'Private', 'Aided'];
-                        this.demographics = {
-                            name: this.currentUser.fullName,
-                            age: String(24 + Math.floor(Math.random() * 25)),
-                            location: cities[Math.floor(Math.random() * cities.length)],
-                            institution: 'Sample Demo School',
-                            institutionType: institutionTypes[Math.floor(Math.random() * institutionTypes.length)],
-                            experience: String(1 + Math.floor(Math.random() * 20)),
-                            subject: subjects[Math.floor(Math.random() * subjects.length)]
-                        };
-                        try {
-                            await apiFetch('/auth/demographics', {
-                                method: 'PUT',
-                                body: JSON.stringify({
-                                    age: this.demographics.age,
-                                    location: this.demographics.location,
-                                    institution: this.demographics.institution,
-                                    institutionType: this.demographics.institutionType,
-                                    experience: this.demographics.experience,
-                                    subject: this.demographics.subject
-                                })
-                            });
-                        } catch (e) { /* non-fatal for a sample run */ }
-                    }
-
-                    // Randomly answer every question in the bank
-                    this.responses = {};
-                    assessmentData.questionBank.forEach((q) => {
-                        this.responses[q.id] = Math.floor(Math.random() * q.options.length);
-                    });
-
-                    const submitData = await apiFetch(`/assessments/${this.assessmentId}/submit`, {
-                        method: 'POST',
-                        body: JSON.stringify({ responses: this.responses })
-                    });
-                    this.submitted = true;
-                    this.submittedAt = new Date().toISOString();
-                    this.calculatedScores = submitData.parameterScores;
-                    this.dimensionScores = submitData.dimensionScores;
-                    this.personalityScores = submitData.personalityScores || {};
-
-                    if (this.clientType === 'b2b') {
-                        this.selectedPlan = 'navigate';
-                    } else {
-                        const plans = ['discover', 'explore', 'navigate'];
-                        this.selectedPlan = plans[Math.floor(Math.random() * plans.length)];
-                    }
-                    this.generateReport();
-                } catch (e) {
-                    showModal(e.message || 'Could not generate a sample report.', 'error');
-                } finally {
-                    if (btn) { btn.disabled = false; btn.textContent = '🧪 Fill Sample & Generate Report'; }
                 }
             }
 

@@ -213,6 +213,25 @@ router.get('/leads', requireStaff, async (req, res) => {
   }
 });
 
+// Free SSB "teaser" test attempts (see ssb.js /teaser/submit) — captured in
+// their own isolated table since they have no account, so they never showed
+// up in the CRM leads list above. Read-only list for staff to follow up on;
+// the leads & reports layer is the one place SSB and wellness are meant to
+// converge for NavaSetu staff, even though the two apps serve completely
+// different, unrelated candidates.
+router.get('/ssb-teaser-leads', requireStaff, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, name, email, phone, score, grade_label, created_at
+       FROM ssb_teaser_leads ORDER BY created_at DESC LIMIT 300`
+    );
+    res.json({ leads: result.rows });
+  } catch (error) {
+    console.error('SSB teaser leads fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch free-test leads' });
+  }
+});
+
 // Update a lead's CRM status (submitted -> counselling_booked -> counselled)
 router.put('/leads/:userId/status', requireStaff, async (req, res) => {
   try {

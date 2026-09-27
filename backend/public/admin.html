@@ -117,6 +117,14 @@
           <tbody id="leadsBody"></tbody>
         </table>
       </div>
+      <div class="card">
+        <h2 style="margin:0;">SSB Free Test Leads</h2>
+        <p class="muted">Visitors who took the free SSB snapshot test (no account created) — not yet real CRM leads. Convert the promising ones.</p>
+        <table>
+          <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Score</th><th>Result</th><th>Date</th><th></th></tr></thead>
+          <tbody id="ssbTeaserLeadsBody"></tbody>
+        </table>
+      </div>
       <div class="card" id="leadDetailCard" style="display:none;">
         <button class="btn secondary" onclick="closeLeadDetail()">← Back to Leads</button>
         <h2 id="leadDetailTitle">Lead</h2>
@@ -572,10 +580,39 @@ function assignedCellHtml(l) {
   return `<select onchange="reassignLead('${l.id}', this.value)">${options}</select>`;
 }
 
+// SSB free-test attempts (no account, so they never appear in the main leads
+// table above) — separate isolated table, loaded alongside the real CRM
+// leads whenever this tab is shown.
+async function loadSsbTeaserLeads() {
+  try {
+    const data = await api('/admin/ssb-teaser-leads');
+    document.getElementById('ssbTeaserLeadsBody').innerHTML = data.leads.map(l => `
+      <tr>
+        <td>${l.name}</td>
+        <td>${l.email}</td>
+        <td>${l.phone || '—'}</td>
+        <td>${l.score}/100</td>
+        <td>${l.grade_label}</td>
+        <td>${new Date(l.created_at).toLocaleDateString()}</td>
+        <td><button class="btn secondary" onclick="convertTeaserLead('${l.name.replace(/'/g, "\\'")}', '${l.email}', '${(l.phone || '').replace(/'/g, "\\'")}')">+ Convert to Lead</button></td>
+      </tr>
+    `).join('') || `<tr><td colspan="7" class="muted">No free-test attempts yet.</td></tr>`;
+  } catch (e) { console.error(e); }
+}
+
+function convertTeaserLead(name, email, phone) {
+  openAddLeadForm();
+  document.getElementById('newLeadName').value = name;
+  document.getElementById('newLeadEmail').value = email;
+  document.getElementById('newLeadPhone').value = phone;
+  document.getElementById('addLeadForm').scrollIntoView({ behavior: 'smooth' });
+}
+
 async function loadLeads() {
   try {
     const search = document.getElementById('leadSearch').value;
     const [data] = await Promise.all([api(`/admin/leads?search=${encodeURIComponent(search)}`), loadCounsellors()]);
+    loadSsbTeaserLeads();
     window._leadsCache = data.leads;
     document.getElementById('leadsBody').innerHTML = data.leads.map(l => {
       const deleted = !!l.deleted_at;
