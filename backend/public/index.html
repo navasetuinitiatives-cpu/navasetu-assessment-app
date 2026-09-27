@@ -1340,7 +1340,12 @@
                             this.responses = data.assessment.responses;
                         }
                     } catch (e) {
-                        showModal('Could not start the assessment right now — please check your connection and try again.', 'error');
+                        // A real submission is now one-shot per account — the server
+                        // returns a specific, human-readable message for that case
+                        // (see assessments.js), which is worth showing verbatim rather
+                        // than masking it behind the generic connectivity message.
+                        showModal(e.message || 'Could not start the assessment right now — please check your connection and try again.', 'error');
+                        this.loadDashboard();
                         return;
                     }
                 }

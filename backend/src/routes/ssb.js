@@ -59,6 +59,26 @@ router.post('/assessments', requireAuth, async (req, res) => {
       return res.json({ success: true, assessment: row, resumed: true });
     }
 
+    // BUG FIX: mirrors the wellness assessments.js fix — nothing used to stop
+    // a real candidate from starting a brand-new SSB attempt after already
+    // submitting one, producing a second complete "REAL" set of responses
+    // and reports on the same account. A real submission is one-shot per
+    // account now; the admin retake path (if/when added for SSB) would need
+    // its own direct insert, same as wellness's enable-retake. Test ("Fill
+    // Sample") runs are exempt.
+    if (!isTest) {
+      const alreadySubmitted = await pool.query(
+        `SELECT id FROM assessments WHERE user_id = $1 AND track = 'ssb' AND status = 'submitted' AND is_test = false LIMIT 1`,
+        [userId]
+      );
+      if (alreadySubmitted.rows.length > 0) {
+        return res.status(409).json({
+          error: 'You have already submitted this assessment from this account. Your report cannot be regenerated — contact a NavaSetu admin at navasetuinitiatives@gmail.com or 8556840001 if you need a retake enabled.',
+          alreadySubmitted: true
+        });
+      }
+    }
+
     // Fresh attempt: draw a brand-new random subset of WAT/SRT/GTO/TAT items
     // and freeze it on the row, so this attempt always shows the same items
     // on reload, but the *next* new attempt gets a different draw. Big Five +

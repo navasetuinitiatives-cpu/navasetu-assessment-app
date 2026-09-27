@@ -309,7 +309,7 @@ async function afterAuth() {
 // Starts (or resumes) the stepper — used for a brand-new candidate, for
 // resuming an in-progress attempt, and for "Take Another Assessment" from
 // the dashboard.
-async function initAssessment() {
+async function initAssessment(rethrow) {
   document.getElementById('dashboardScreen').classList.add('hidden');
   document.getElementById('reportViewScreen').classList.add('hidden');
   document.getElementById('pathChoiceScreen').classList.add('hidden');
@@ -328,12 +328,26 @@ async function initAssessment() {
     currentStepIndex = 0;
     renderStep();
   } catch (e) {
+    // "Take Another Assessment" (startNewSsbAssessment) passes rethrow=true
+    // so it can show this in a dismissable alert and return to the
+    // dashboard, instead of stranding the candidate on a bare error card.
+    if (rethrow) throw e;
     document.getElementById('stepContainer').innerHTML = `<div class="card"><p class="muted" style="color:#B91C1C;">${e.message}</p></div>`;
   }
 }
 
 async function startNewSsbAssessment() {
-  await initAssessment();
+  // A real submission is now one-shot per account (server-enforced by
+  // POST /ssb/assessments). initAssessment() already surfaces a thrown
+  // error inline, but that leaves a real candidate stranded on a blank
+  // appScreen with just red text and no way back — catch it here instead so
+  // she sees the message and lands back on her dashboard.
+  try {
+    await initAssessment(true);
+  } catch (e) {
+    alert(e.message);
+    await backToSsbDashboard();
+  }
 }
 
 if (token) {

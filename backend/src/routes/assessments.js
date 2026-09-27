@@ -35,6 +35,33 @@ router.post('/', requireAuth, async (req, res) => {
       return res.json({ success: true, assessment: existing.rows[0], resumed: true });
     }
 
+    // BUG FIX: this route used to let a real (non-test) candidate start a
+    // brand-new attempt any number of times as long as none was currently
+    // in_progress — nothing stopped her from submitting, then coming back
+    // later and starting again, producing a second complete "REAL" set of
+    // responses and reports for the same account. That's exactly the
+    // clutter the counsellors were seeing (multiple original reports per
+    // client). A real submission is now one-shot per account: once she has
+    // ANY submitted, non-test wellness assessment, a further real attempt is
+    // blocked here. The only way past this is the admin-only
+    // /:assessmentId/enable-retake route below, which inserts its retake row
+    // directly and is unaffected by this check — exactly the "admin has to
+    // enable that for you" escape hatch already promised on the
+    // instructions page. Test ("Fill Sample") runs are explicitly exempt,
+    // since multiple sample sets are meant to coexist.
+    if (!isTest) {
+      const alreadySubmitted = await pool.query(
+        `SELECT id FROM assessments WHERE user_id = $1 AND track = 'wellness' AND status = 'submitted' AND is_test = false LIMIT 1`,
+        [userId]
+      );
+      if (alreadySubmitted.rows.length > 0) {
+        return res.status(409).json({
+          error: 'You have already submitted this assessment from this account. Your report cannot be regenerated — contact a NavaSetu admin at navasetuinitiatives@gmail.com or 8556840001 if you need a retake enabled.',
+          alreadySubmitted: true
+        });
+      }
+    }
+
     const id = uuidv4();
     const result = await pool.query(
       `INSERT INTO assessments (id, user_id, school_id, school_teacher_id, client_type, status, responses, is_test)
