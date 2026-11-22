@@ -119,7 +119,7 @@ const LEAD_ROLE_FILTER = `role NOT IN ('platform_admin', 'counsellor')`;
 // but it's a complete, restorable snapshot of everything the CRM shows.
 router.get('/backup', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const [users, demographics, schools, schoolTeachers, assessments, reports, orders, appointments, activity] = await Promise.all([
+    const [users, demographics, schools, schoolTeachers, assessments, reports, orders, appointments, activity, cdSchools, cdSubmissions, cdLeads] = await Promise.all([
       pool.query(`SELECT * FROM users WHERE ${LEAD_ROLE_FILTER}`),
       pool.query(`SELECT d.* FROM user_demographics d JOIN users u ON u.id = d.user_id WHERE ${LEAD_ROLE_FILTER.replace('role', 'u.role')}`),
       pool.query('SELECT * FROM schools'),
@@ -128,7 +128,10 @@ router.get('/backup', requireAuth, requireAdmin, async (req, res) => {
       pool.query(`SELECT r.* FROM reports r JOIN users u ON u.id = r.user_id WHERE ${LEAD_ROLE_FILTER.replace('role', 'u.role')}`),
       pool.query(`SELECT o.* FROM orders o JOIN users u ON u.id = o.user_id WHERE ${LEAD_ROLE_FILTER.replace('role', 'u.role')}`),
       pool.query(`SELECT c.* FROM consultation_requests c JOIN users u ON u.id = c.user_id WHERE ${LEAD_ROLE_FILTER.replace('role', 'u.role')}`),
-      pool.query('SELECT * FROM lead_activity')
+      pool.query('SELECT * FROM lead_activity'),
+      pool.query('SELECT * FROM cd_schools'),
+      pool.query('SELECT * FROM cd_submissions'),
+      pool.query('SELECT * FROM cd_leads')
     ]);
 
     res.json({
@@ -143,7 +146,8 @@ router.get('/backup', requireAuth, requireAdmin, async (req, res) => {
         reports: reports.rows,
         orders: orders.rows,
         appointments: appointments.rows,
-        leadActivity: activity.rows
+        leadActivity: activity.rows,
+        careerDiscovery: { schools: cdSchools.rows, submissions: cdSubmissions.rows, leads: cdLeads.rows }
       }
     });
   } catch (error) {
@@ -179,6 +183,12 @@ router.post('/backup/restore', requireAuth, requireAdmin, async (req, res) => {
     await client.query('DELETE FROM school_teachers');
     await client.query('DELETE FROM schools');
     await client.query(`DELETE FROM users WHERE ${LEAD_ROLE_FILTER}`);
+    // Career Discovery data is only replaced when the backup file contains it (older backups leave it alone).
+    if (data.careerDiscovery) {
+      await client.query('DELETE FROM cd_leads');
+      await client.query('DELETE FROM cd_submissions');
+      await client.query('DELETE FROM cd_schools');
+    }
 
     const insertRows = async (table, columns, rows) => {
       for (const row of rows || []) {
@@ -198,6 +208,14 @@ router.post('/backup/restore', requireAuth, requireAdmin, async (req, res) => {
     await insertRows('orders', ['id', 'user_id', 'report_id', 'razorpay_order_id', 'razorpay_payment_id', 'amount', 'currency', 'plan_type', 'status', 'payment_method', 'marked_paid_by', 'notes', 'created_at', 'updated_at'], data.orders);
     await insertRows('consultation_requests', ['id', 'user_id', 'report_id', 'consultant_id', 'preferred_slot', 'scheduled_at', 'status', 'notes', 'consultant_name', 'created_by', 'created_at', 'updated_at'], data.appointments);
     await insertRows('lead_activity', ['id', 'user_id', 'recipient_email', 'type', 'subject', 'body', 'created_by', 'created_at'], data.leadActivity);
+
+    if (data.careerDiscovery) {
+      const cd = data.careerDiscovery, json = (rows) => (rows || []).map((r) => ({ ...r, headcount: r.headcount ? JSON.stringify(r.headcount) : r.headcount, answers: r.answers ? JSON.stringify(r.answers) : r.answers, scores: r.scores ? JSON.stringify(r.scores) : r.scores, top_areas: r.top_areas ? JSON.stringify(r.top_areas) : r.top_areas, flags: r.flags ? JSON.stringify(r.flags) : r.flags }));
+      await insertRows('cd_schools', ['id', 'code', 'name', 'city', 'headcount', 'is_open', 'consent_by', 'consent_at', 'consent_note', 'created_at'], json(cd.schools));
+      await insertRows('cd_submissions', ['id', 'school_id', 'name', 'class_label', 'section', 'roll_no', 'stream', 'result_code', 'status', 'released_at', 'answers', 'scores', 'top_areas', 'flags', 'duration_sec', 'created_at'], json(cd.submissions));
+      await insertRows('cd_leads', ['id', 'created_at', 'updated_at', 'source', 'school_id', 'contact_name', 'mobile', 'email', 'student_name', 'class_label', 'stream', 'top_areas', 'consent_at', 'status', 'note', 'assigned_to'], json(cd.leads));
+      for (const tb of ['cd_schools', 'cd_submissions', 'cd_leads']) await client.query(`SELECT setval('${tb}_id_seq', COALESCE((SELECT MAX(id) FROM ${tb}), 1))`);
+    }
 
     // Restored rows may carry explicit lead_number values higher than the
     // sequence's current position — resync it so the next manually-created
