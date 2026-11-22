@@ -312,3 +312,6 @@ CREATE TABLE IF NOT EXISTS cd_leads (
   note TEXT,
   assigned_to UUID REFERENCES users(id) ON DELETE SET NULL
 );
+
+-- Career Discovery: keep the student's answers with the lead so staff can open the report
+ALTER TABLE cd_leads ADD COLUMN IF NOT EXISTS answers JSONB;

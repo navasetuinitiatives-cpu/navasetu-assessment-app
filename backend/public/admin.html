@@ -828,7 +828,9 @@ function renderLeadReports() {
           <td>${r.plan_type}${r.is_test ? ' <span class="pill" style="background:#DC2626;color:#fff;">TEST</span>' : ''}</td>
           <td>${new Date(r.created_at).toLocaleDateString()}</td>
           <td><span class="pill ${r.payment_status === 'paid' || r.payment_status === 'free' ? 'ok' : 'pending'}">${r.payment_status}</span></td>
-          <td><button class="btn secondary" onclick="viewLeadReport('${r.id}')">View / Download</button></td>
+          <td><button class="btn secondary" onclick="viewLeadReport('${r.id}')">View / Download</button>
+            ${currentAdmin && currentAdmin.role === 'platform_admin' && r.payment_status === 'pending' ? `<button class="btn" style="background:#15803D;" onclick="setReportLock('${r.id}', false)">Unlock (payment received)</button>` : ''}
+            ${currentAdmin && currentAdmin.role === 'platform_admin' && (r.payment_status === 'admin_released' || r.payment_status === 'paid') ? `<button class="btn secondary" onclick="setReportLock('${r.id}', true)">Lock again</button>` : ''}</td>
         </tr>`).join('')
     : '<tr><td colspan="4" class="muted">No reports yet.</td></tr>';
 
@@ -975,6 +977,16 @@ async function viewLeadResponses(assessmentId) {
 function closeLeadDetail() {
   document.getElementById('leadDetailCard').style.display = 'none';
   document.getElementById('tab-leads').querySelector('.card').style.display = 'block';
+}
+
+// Unlock a paid report after payment is received, or put it back behind the lock.
+async function setReportLock(reportId, lock) {
+  if (!confirm(lock ? 'Lock this report again? The candidate will not be able to open it until you unlock it.' : 'Confirm payment has been received. Unlock this report for the candidate?')) return;
+  try {
+    await api(`/reports/${reportId}/${lock ? 'admin-lock' : 'admin-release'}`, { method: 'POST', body: '{}' });
+    const id = document.getElementById('leadDetailCard').dataset.userId;
+    if (id) await openLeadDetail(id);
+  } catch (e) { alert(e.message); }
 }
 
 async function viewLeadReport(reportId) {

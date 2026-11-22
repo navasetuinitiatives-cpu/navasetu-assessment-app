@@ -103,6 +103,8 @@ footer{text-align:center;color:var(--mute);font-size:.78rem;padding:10px 14px 30
 const CONFIG = {
   // Leads are sent to the app's own /api/lead only when served over http(s) (i.e. from server.js). From file:// nothing leaves the device.
   LEAD_ENDPOINT: location.protocol.indexOf('http') === 0 ? '/api/career/lead' : '',
+  BOOK_URL: 'https://navasetu.edumilestones.com/career-counsellor/Dr-Vibhuti-Jasrotia',
+  LIBRARY_URL: 'https://navasetu.edumilestones.com/global-career-library/',
   get WHATSAPP() { return Brand.whatsapp; },
   get SITE() { return Brand.site; },
   get EMAIL() { return Brand.email; }
@@ -216,7 +218,7 @@ function viewSubmitted() {
 }
 
 function contactForm() {
-  if (S.mode !== 'school') return '';
+  if (S.review || S.mode !== 'school') return '';
   if (S.contactSent) return `<div class="card"><h2>Thank you</h2><p>We have noted your details. A NavaSetu counsellor will get in touch. Your school does not see these details.</p></div>`;
   return `<div class="card"><h2>Want to talk to a career counsellor?</h2>
     <p class="muted small">Optional. A parent or guardian can leave contact details and NavaSetu Initiatives will call. These details are kept by NavaSetu only and are not shared with the school.</p>
@@ -242,8 +244,13 @@ async function sendSchoolLead() {
   } catch (x) { e('No internet connection. Please try again.'); }
 }
 
+/* Remember the roll number and result code on this device so the student can come back and open the result again. */
+function saveLogin() { try { localStorage.setItem('ns_career_login_' + S.schoolCode, JSON.stringify({ roll: S.roll, code: S.resultCode })); } catch (e) { /* ignore */ } }
+function savedLogin() { try { return JSON.parse(localStorage.getItem('ns_career_login_' + S.schoolCode) || 'null'); } catch (e) { return null; } }
+
 function viewCheck() {
-  return `<div class="card"><h2>Check my result</h2><p class="muted">Enter the roll number you used and your result code.</p>
+  const sv = savedLogin(); if (sv && !S.roll && !S.resultCode) { S.roll = sv.roll || ''; S.resultCode = sv.code || ''; }
+  return `<div class="card"><h2>Check my result</h2><p class="muted">Enter the roll number you used and your result code. You can open your result again any time with the same two details. If you lost your code, ask your teacher or NavaSetu.</p>
     <div class="row">
       <div><label for="roll">Roll number</label><input id="roll" type="text" maxlength="10" autocomplete="off" value="${esc(S.roll)}"></div>
       <div><label for="code">Result code</label><input id="code" type="text" maxlength="8" autocomplete="off" style="text-transform:uppercase" value="${esc(S.resultCode)}"></div>
@@ -282,6 +289,34 @@ const compute = () => Engine.compute(S.ans, band(), S.stream);
 const band3 = p => p >= 70 ? ['Strong match', 's'] : p >= 55 ? ['Good match', 'g'] : ['Worth exploring', 'w'];
 const meter = (label, v, cls) => `<div class="meter"><span>${esc(label)}</span><div class="bar ${cls || ''}"><i style="width:${v}%"></i></div><b>${v}%</b></div>`;
 
+function nextStepCard() {
+  if (S.review) return '';
+  const wa = `Hello NavaSetu, I am ${S.name} (Class ${S.cls}). I have seen my Career Discovery result and would like to talk to a counsellor.`;
+  return `<div class="card noprint"><h2>Your next step</h2>
+    <p class="muted">Talk through your result with a career counsellor, or keep exploring on your own. All three are open to you.</p>
+    <div class="actions">
+      <a class="btn" style="text-decoration:none" target="_blank" rel="noopener" href="${CONFIG.BOOK_URL}">Book a free 15-minute call</a>
+      <a class="btn wa" style="text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(wa)}">WhatsApp us: 8556840001</a>
+      <a class="btn ghost" style="text-decoration:none" target="_blank" rel="noopener" href="${CONFIG.LIBRARY_URL}">Explore the Career Library</a>
+    </div></div>`;
+}
+
+function dashPromoCard() {
+  if (S.review) return '';
+  const wa = encodeURIComponent('Hello NavaSetu, I am ' + S.name + ' (Class ' + S.cls + '). I would like career guidance and access to the AI-enabled personalised dashboard.');
+  return `<div class="card noprint" style="border-color:var(--gold)">
+    <p class="small gold" style="letter-spacing:.1em;text-transform:uppercase;margin:0">NavaSetu career guidance</p>
+    <h2 style="margin-top:4px">Get your own AI-enabled personalised career dashboard</h2>
+    <p class="muted">This snapshot is the first step. The dashboard turns it into a plan, with a counsellor beside you. Reach out to us and we will set you up.</p>
+    <img src="/ns-dashboard.jpg" alt="NavaSetu AI-powered student dashboard showing career profiling, counsellor connect and AI assistant" style="width:100%;height:auto;border-radius:10px;border:1px solid #E5E7EB;margin:6px 0 10px" loading="lazy">
+    <ul style="margin:0 0 10px;padding-left:20px"><li>A personalised AI career report of 30+ pages, built from your assessment</li><li>Your own counsellor, on WhatsApp, call or review, from the dashboard</li><li>An AI career assistant for instant answers to any career question</li><li>10,000+ Indian colleges and 8,000+ universities abroad, with admission prediction and shortlisting</li><li>1,400+ entrance exams and a library of 3,300+ careers</li><li>Scholarships, free virtual internships, online courses and your own personal website</li></ul>
+    <div class="actions">
+      <a class="btn" style="text-decoration:none" target="_blank" rel="noopener" href="${CONFIG.BOOK_URL}">Book a free 15-minute call</a>
+      <a class="btn wa" style="text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${CONFIG.WHATSAPP}?text=${wa}">WhatsApp us: 8556840001</a>
+      <a class="btn ghost" style="text-decoration:none" target="_blank" rel="noopener" href="https://navasetu.edumilestones.com">See the platform</a>
+    </div></div>`;
+}
+
 function viewResult() {
   const R = compute(), b = band();
   const date = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -314,13 +349,14 @@ function viewResult() {
 
   return `
   <div class="card hero">
-    <p class="small gold" style="letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">Career Discovery snapshot · ${S.mode === 'school' ? esc(S.schoolName) : 'free demo'}</p>
+    <p class="small gold" style="letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">Career Discovery snapshot · ${S.review ? 'staff view' : S.mode === 'school' ? esc(S.schoolName) : 'free demo'}</p>
     <h1>${esc(S.name)}</h1>
     <p style="margin-top:6px">Class ${esc(S.cls)}${b === '1112' ? ' · ' + esc(STREAM_NAME[S.stream]) : ''} · ${esc(date)}</p>
     <p class="small" style="margin:8px 0 0">Based on your answers to ${totalQuestions()} questions. It shows where to explore next; it is not a prediction or a decision.</p>
   </div>
   ${R.flat ? `<div class="card note"><b>A note first.</b> Your answers did not show strong likes yet. That is completely normal at this age. Use the "Try this week" ideas to find out what you enjoy by doing.</div>` : ''}
 
+  ${nextStepCard()}
   <div class="card">
     <h2>1. Your interest profile</h2>
     <p class="muted">Six kinds of work people enjoy. Your top three shape most of what follows.</p>
@@ -370,6 +406,7 @@ function viewResult() {
     <ul style="margin:4px 0 0;padding-left:20px">${stepsBy.map(t => `<li>${esc(t)}</li>`).join('')}</ul>
   </div>
 
+  ${dashPromoCard()}
   <div class="card lock">
     <h2>Go deeper with the full NavaSetu Career Assessment</h2>
     <p style="margin-top:6px">Your snapshot shows where to look. The full assessment tells you what to do about it, and includes:</p>
@@ -385,7 +422,7 @@ function viewResult() {
   <div class="actions noprint">
     <button class="btn" id="print">Save as PDF / Print</button>
     <a class="btn wa" style="text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(summary)}">Share on WhatsApp</a>
-    <button class="btn ghost" id="restart">Start over</button>
+    ${S.review ? '' : '<button class="btn ghost" id="restart">Start over</button>'}
   </div>
   <p class="small muted" style="margin-top:14px">This demo is an indicative, self-reported snapshot built on well-known interest and learning-preference ideas. It is not a clinical or diagnostic tool and does not predict exam results or selection.</p>`;
 }
@@ -414,7 +451,7 @@ async function submitSchool() {
       schoolCode: S.schoolCode, name: S.name, classLabel: S.cls, section: S.section, roll: S.roll, stream: band() === '1112' ? S.stream : '',
       answers: S.ans, startedAt: S.startedAt, submittedAt: Date.now() }) });
     const j = await r.json().catch(() => ({}));
-    if (r.ok && j.resultCode) { S.resultCode = j.resultCode; S.step = 'submitted'; S.busy = false; return render(); }
+    if (r.ok && j.resultCode) { S.resultCode = j.resultCode; saveLogin(); S.step = 'submitted'; S.busy = false; return render(); }
     S.busy = false; fail(j.error || 'Could not submit. Please try again.'); if (btn) btn.disabled = false;
   } catch (e) { S.busy = false; fail('No internet connection. Your answers are kept; please try again.'); if (btn) btn.disabled = false; }
 }
@@ -430,7 +467,7 @@ async function checkResult() {
     S.busy = false;
     if (!r.ok) { render(); return fail(j.error || 'Could not check. Please try again.'); }
     if (j.status !== 'approved') { S.info = 'Your answers are received and are being reviewed. Please check again later.'; return render(); }
-    Object.assign(S, { name: j.name, cls: j.classLabel, stream: j.stream || '', ans: j.answers, info: '', step: 'result' }); render();
+    Object.assign(S, { name: j.name, cls: j.classLabel, stream: j.stream || '', ans: j.answers, info: '', step: 'result' }); saveLogin(); render();
   } catch (e) { S.busy = false; render(); fail('No internet connection. Please try again.'); }
 }
 
@@ -489,6 +526,20 @@ document.addEventListener('click', e => {
 });
 (async function boot() {
   await loadBrand();
+  const rv = (new URLSearchParams(location.search).get('review') || '').trim();
+  if (rv) { // staff opening one student's report from the HR Panel
+    S.review = true; S.mode = 'review'; const bd = document.querySelector('header.top .demo'); if (bd) bd.textContent = 'Staff view';
+    try {
+      const [kind, id] = rv.split(':'), tok = localStorage.getItem('navasetu_admin_token');
+      if (!tok || !/^\d+$/.test(id || '')) throw new Error('Please sign in to the HR Panel first, then open the report from there.');
+      const r = await fetch('/api/career/admin/' + (kind === 'lead' ? 'leads/' : 'submissions/') + id, { headers: { Authorization: 'Bearer ' + tok } }), j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || 'Could not open this report.');
+      const d = kind === 'lead' ? j.lead : j.submission;
+      if (!d.answers) throw new Error('This lead has no saved answers, so there is no report to show.');
+      Object.assign(S, { name: d.name || d.studentName || 'Student', cls: String(d.cls || d.classLabel || '').split('-')[0], stream: d.stream || '', ans: d.answers, step: 'result' });
+      return render();
+    } catch (e) { S.step = 'bad'; S.err = e.message; return render(); }
+  }
   const code = (new URLSearchParams(location.search).get('school') || '').trim().toUpperCase();
   if (!code) return render();
   S.mode = 'school'; S.schoolCode = code; S.step = 'loading'; const bd = document.querySelector('header.top .demo'); if (bd) bd.textContent = 'School activity'; render();

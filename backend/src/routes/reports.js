@@ -172,4 +172,28 @@ router.post('/:reportId/admin-release', requireAuth, requireAdmin, async (req, r
   }
 });
 
+// Admin puts a paid report back behind the payment lock (used to block detailed
+// reports until payment is received; "admin-release" above is the unlock).
+// Free tiers ('not_required') are never locked.
+router.post('/:reportId/admin-lock', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { reportId } = req.params;
+    const result = await pool.query(
+      `UPDATE reports SET payment_status = 'pending', released_at = NULL
+       WHERE id = $1 AND payment_status IN ('admin_released', 'paid') RETURNING id, plan_type, payment_status`,
+      [reportId]
+    );
+    if (result.rows.length === 0) return res.status(409).json({ error: 'This report is free or already locked.' });
+
+    await pool.query(
+      `INSERT INTO audit_logs (actor_user_id, action, entity_type, entity_id) VALUES ($1, $2, $3, $4)`,
+      [req.user.userId, 'admin_lock_report', 'report', reportId]
+    );
+
+    res.json({ success: true, report: result.rows[0] });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to lock report' });
+  }
+});
+
 export default router;

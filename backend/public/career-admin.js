@@ -83,11 +83,11 @@
         <button class="btn secondary" id="cdcodes">Result codes CSV</button><button class="btn secondary" id="cdfup">Follow-up list CSV</button></div></div>
     <div class="card"><div class="muted">${data.total} students · page ${st.page + 1} of ${pages}
       <button class="btn secondary" id="cdpp" style="margin:0 4px"${st.page ? '' : ' disabled'}>Prev</button><button class="btn secondary" id="cdpn" style="margin:0"${st.page < pages - 1 ? '' : ' disabled'}>Next</button></div>
-      <div class="scroll"><table><thead><tr><th><input type="checkbox" id="cdall"></th><th>Class</th><th>Roll</th><th>Name</th><th>Top career areas</th><th>Flags</th><th>Time</th><th>Status</th><th></th></tr></thead><tbody>
-      ${rows.map(r => `<tr><td><input type="checkbox" class="cdsel" value="${r.id}"${st.sel.has(r.id) ? ' checked' : ''}></td><td>${r.cls}-${esc(r.section)}</td><td>${esc(r.roll)}</td><td>${esc(r.name)}</td>
+      <div class="scroll"><table><thead><tr><th><input type="checkbox" id="cdall"></th><th>Class</th><th>Roll</th><th>Student name</th><th>Result code</th><th>Top career areas</th><th>Flags</th><th>Time</th><th>Status</th><th></th></tr></thead><tbody>
+      ${rows.map(r => `<tr><td><input type="checkbox" class="cdsel" value="${r.id}"${st.sel.has(r.id) ? ' checked' : ''}></td><td>${r.cls}-${esc(r.section)}</td><td>${esc(r.roll)}</td><td><b>${esc(r.name)}</b></td><td><code>${esc(r.resultCode)}</code></td>
         <td>${r.topAreas.map(a => esc(a.name)).join(', ')}</td><td>${r.flags.map(x => `<span class="tag">${esc(x)}</span>`).join(' ')}</td>
         <td>${r.durationSec == null ? '' : Math.round(r.durationSec / 60) + ' min'}</td><td><span class="tag ${r.status}">${r.status}</span></td>
-        <td>${isAdmin() ? `<button class="btn danger cddel" data-id="${r.id}" style="margin:0;padding:.25rem .6rem">Delete</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="9" class="muted">No students match.</td></tr>'}
+        <td><button class="btn secondary cdview" data-ref="sub:${r.id}" style="margin:0;padding:.25rem .6rem">View report</button> ${isAdmin() ? `<button class="btn danger cddel" data-id="${r.id}" style="margin:0;padding:.25rem .6rem">Delete</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="10" class="muted">No students match.</td></tr>'}
       </tbody></table></div></div>`;
     $('#cdsp').onchange = e => { st.schoolId = e.target.value; st.page = 0; st.sel.clear(); again(); };
     $('#cdfc').onchange = e => { f.cls = e.target.value; st.page = 0; again(); }; $('#cdfs').onchange = e => { f.status = e.target.value; st.page = 0; again(); }; $('#cdff').onchange = e => { f.flagged = e.target.checked ? '1' : ''; st.page = 0; again(); };
@@ -99,6 +99,7 @@
     $('#cdapsel').onclick = () => run(async () => { if (!st.sel.size) return; const r = await A('/approve', J({ ids: [...st.sel] })); st.sel.clear(); alert(r.updated + ' results released.'); again(); });
     $('#cdhold').onclick = () => run(async () => { if (!st.sel.size) return; await A('/hold', J({ ids: [...st.sel] })); st.sel.clear(); again(); });
     $('#cdcodes').onclick = () => dl('/codes.csv?schoolId=' + st.schoolId, 'result-codes.csv'); $('#cdfup').onclick = () => dl('/followup.csv?schoolId=' + st.schoolId, 'followup.csv');
+    $$('.cdview').forEach(b => b.onclick = () => window.open('/career.html?review=' + b.dataset.ref, '_blank'));
     $$('.cddel').forEach(b => b.onclick = () => run(async () => { if (!confirm("Permanently delete this student's record?")) return; await A('/submissions/' + b.dataset.id, { method: 'DELETE' }); again(); }));
   }
 
@@ -147,17 +148,18 @@
         <div><label>School</label><select id="cdlsc"><option value="">All</option>${st.schools.map(s => `<option value="${s.id}"${String(s.id) === f.schoolId ? ' selected' : ''}>${esc(s.name)}</option>`).join('')}</select></div>
         <button class="btn secondary" id="cdlgo" style="margin:0">Search</button></div></div>
     <div class="card" id="cdaddbox" style="display:none"><h2>Add a lead</h2><div class="row"><div><label>Name</label><input id="cdan" style="width:190px"></div><div><label>Mobile</label><input id="cdam" maxlength="10" style="width:130px"></div><div><label>Email</label><input id="cdae" style="width:210px"></div>
-      <div><label>Student (optional)</label><input id="cdas" style="width:160px"></div><div><label>Class (optional)</label><input id="cdac" style="width:70px"></div></div><label>Note</label><input id="cdano" style="width:100%"><div class="err" id="cdaerr"></div><button class="btn" id="cdasave">Save lead</button></div>
-    <div class="card"><div class="scroll"><table><thead><tr><th>Date</th><th>Name</th><th>Mobile</th><th>Email</th><th>Student</th><th>Source</th><th>Status</th>${isAdmin() ? '<th>Assigned</th>' : ''}<th>Note</th><th></th></tr></thead><tbody>
-    ${d.leads.map(l => `<tr><td>${fmtD(l.createdAt)}</td><td>${esc(l.contactName)}</td><td>${esc(l.mobile)}</td><td>${esc(l.email)}</td>
-      <td>${esc(l.studentName)} ${esc(l.classLabel)} ${esc(l.stream)}<div class="muted">${(l.topAreas || []).map(a => esc(a.name || a.area)).join(', ')}${l.schoolName ? ' · ' + esc(l.schoolName) : ''}</div></td>
+      <div><label>Student name</label><input id="cdas" style="width:160px"></div><div><label>Class</label><input id="cdac" style="width:70px"></div></div><label>Note</label><input id="cdano" style="width:100%"><div class="err" id="cdaerr"></div><button class="btn" id="cdasave">Save lead</button></div>
+    <div class="card"><div class="scroll"><table><thead><tr><th>Date</th><th>Student name</th><th>Class</th><th>Parent / contact</th><th>Mobile</th><th>Email</th><th>Source</th><th>Status</th>${isAdmin() ? '<th>Assigned</th>' : ''}<th>Note</th><th></th></tr></thead><tbody>
+    ${d.leads.map(l => `<tr><td>${fmtD(l.createdAt)}</td><td><b>${esc(l.studentName) || '<span class="muted">not given</span>'}</b><div class="muted">${(l.topAreas || []).map(a => esc(a.name || a.area)).join(', ')}${l.schoolName ? ' · ' + esc(l.schoolName) : ''}</div>${l.hasAnswers ? `<button class="btn secondary cdview" data-ref="lead:${l.id}" style="margin:4px 0 0;padding:.2rem .55rem">View report</button>` : ''}</td>
+      <td>${esc(l.classLabel)} ${esc(l.stream)}</td><td>${esc(l.contactName)}</td><td>${esc(l.mobile)}</td><td>${esc(l.email)}</td>
       <td><span class="tag">${SRC[l.source] || l.source}</span></td>
       <td><select class="cdlstat" data-id="${l.id}">${LSTAT.map(x => `<option${l.status === x ? ' selected' : ''}>${x}</option>`).join('')}</select></td>
       ${isAdmin() ? `<td><select class="cdlasg" data-id="${l.id}"><option value="">Unassigned</option>${couns.map(u => `<option value="${u.id}"${l.assignedTo === u.id ? ' selected' : ''}>${esc(u.full_name)}</option>`).join('')}</select></td>` : ''}
       <td><input class="cdlnote" data-id="${l.id}" value="${esc(l.note)}" style="width:150px"></td>
-      <td>${isAdmin() ? `<button class="btn danger cdldel" data-id="${l.id}" style="margin:0;padding:.25rem .6rem">Delete</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="10" class="muted">No leads yet.</td></tr>'}</tbody></table></div></div>`;
+      <td>${isAdmin() ? `<button class="btn danger cdldel" data-id="${l.id}" style="margin:0;padding:.25rem .6rem">Delete</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="11" class="muted">No leads yet.</td></tr>'}</tbody></table></div></div>`;
     const reload = () => { f.q = $('#cdlq').value; f.source = $('#cdlsrc').value; f.status = $('#cdlst').value; f.schoolId = $('#cdlsc').value; vLeads(); };
     $('#cdlgo').onclick = reload; $('#cdlq').onkeydown = e => { if (e.key === 'Enter') reload(); }; ['#cdlsrc', '#cdlst', '#cdlsc'].forEach(s => $(s).onchange = reload);
+    $$('.cdview').forEach(b => b.onclick = () => window.open('/career.html?review=' + b.dataset.ref, '_blank'));
     $('#cdlcsv').onclick = () => dl('/leads.csv?' + q, 'career-leads.csv');
     $('#cdladd').onclick = () => { const b = $('#cdaddbox'); b.style.display = b.style.display === 'none' ? 'block' : 'none'; };
     $('#cdasave').onclick = async () => { try { await A('/leads', J({ contactName: $('#cdan').value, mobile: $('#cdam').value, email: $('#cdae').value, studentName: $('#cdas').value, classLabel: $('#cdac').value, note: $('#cdano').value })); vLeads(); } catch (e) { $('#cdaerr').textContent = e.message; } };

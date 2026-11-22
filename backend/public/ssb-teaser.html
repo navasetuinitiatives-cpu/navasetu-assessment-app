@@ -266,6 +266,22 @@ async function submitTeaser() {
   }
 }
 
+function teaserPromoHtml() {
+  const wa = encodeURIComponent('Hello NavaSetu, I would like career guidance and access to the AI-enabled personalised dashboard.');
+  return `<div class="card" style="border-color:#DDD6FE;">
+    <p style="text-transform:uppercase; letter-spacing:0.08em; font-size:0.75rem; margin:0; color:#5B21B6; font-weight:700;">NavaSetu career guidance</p>
+    <h2 style="margin-top:0.25rem;">Get your own AI-enabled personalised career dashboard</h2>
+    <p class="muted">Your free snapshot is only the start. The dashboard gives you a full personalised report, an AI assistant and a counsellor. Reach out to us and we will guide you.</p>
+    <img src="/ns-dashboard.jpg" alt="NavaSetu AI-powered student dashboard showing career profiling, counsellor connect and AI assistant" style="width:100%; height:auto; border-radius:10px; border:1px solid #E5E7EB; margin:0.5rem 0 0.75rem;" loading="lazy">
+    <ul style="margin:0 0 0.75rem; padding-left:1.2rem;"><li>A personalised AI career report of 30+ pages, built from your assessment</li><li>Your own counsellor, on WhatsApp, call or review, from the dashboard</li><li>An AI career assistant for instant answers to any career question</li><li>10,000+ Indian colleges and 8,000+ universities abroad, with admission prediction and shortlisting</li><li>1,400+ entrance exams and a library of 3,300+ careers</li><li>Scholarships, free virtual internships, online courses and your own personal website</li></ul>
+    <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">
+      <a class="btn" style="text-decoration:none; display:inline-block;" target="_blank" rel="noopener" href="https://navasetu.edumilestones.com/career-counsellor/Dr-Vibhuti-Jasrotia">Book a free 15-minute call</a>
+      <a class="btn secondary" style="text-decoration:none; display:inline-block;" target="_blank" rel="noopener" href="https://wa.me/918556840001?text=${wa}">WhatsApp us: 8556840001</a>
+      <a class="btn secondary" style="text-decoration:none; display:inline-block;" target="_blank" rel="noopener" href="https://navasetu.edumilestones.com">See the platform</a>
+    </div>
+  </div>`;
+}
+
 function renderResult(result) {
   const plans = result.plans || {};
   const planCards = Object.keys(plans).map((key) => {
@@ -294,6 +310,7 @@ function renderResult(result) {
       <p class="muted">Whatever your score just now, it says nothing about whether SSB/Defence is actually the right fit for <em>you</em> among everything else you could do. A lot of people prepare for years before pausing to ask that question properly. A free, no-obligation career counselling conversation can help you weigh this honestly, alongside your other options — before you commit more time and money to prep.</p>
       <button class="btn secondary" id="resultCounsellingBtn" style="margin-top:0;" onclick="requestCounsellingInterest(this)">🎯 Yes, I'd like a free career counselling call</button>
     </div>
+    ${teaserPromoHtml()}
     <div class="card">
       <h2>Get Your Full OLQ Readiness Report</h2>
       <div class="plan-grid">${planCards}</div>
