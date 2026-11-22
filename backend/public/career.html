@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NavaSetu Career Discovery · Student Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Crimson+Text:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--navy:#0a0e27;--navy2:#151b44;--gold:#E6B800;--gold2:#D4AF37;--cream:#f6f3ea;--card:#fff;--ink:#14183a;--mute:#5d6285;--line:#e3dfd0;--ok:#1f7a55;--warn:#a86a00;
+--serif:"Crimson Text",Georgia,serif;--sans:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--cream);color:var(--ink);font:15px/1.6 var(--sans)}
+h1,h2,h3{font-family:var(--serif);margin:0;line-height:1.2;color:var(--navy)}
+h1{font-size:2rem}h2{font-size:1.5rem}h3{font-size:1.15rem}
+p{margin:0 0 .7em}
+header.top{background:var(--navy);border-bottom:3px solid var(--gold);padding:10px 16px;display:flex;align-items:center;gap:12px}
+header.top svg{width:40px;height:46px;flex:none}
+header.top .brand{font:700 1.35rem var(--serif);color:var(--gold);letter-spacing:.04em}
+header.top .sub{color:#c9cdea;font-size:.78rem;margin-top:-2px}
+header.top .demo{margin-left:auto;border:1px solid var(--gold);color:var(--gold);border-radius:99px;padding:2px 10px;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase}
+main{max-width:760px;margin:0 auto;padding:18px 14px 60px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:14px;box-shadow:0 1px 2px rgba(10,14,39,.04)}
+.hero{background:linear-gradient(160deg,var(--navy),var(--navy2));color:#fff;border:0}
+.hero h1,.hero h2{color:#fff}.hero p{color:#d6d9f2}.hero .gold{color:var(--gold)}
+label{display:block;font-weight:500;margin:12px 0 4px;font-size:.9rem}
+input[type=text],input[type=tel],input[type=email],select{width:100%;padding:11px 12px;border:1px solid #cfcab8;border-radius:10px;font:inherit;background:#fff;color:var(--ink)}
+input:focus,select:focus{outline:2px solid var(--gold);border-color:var(--gold)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:560px){.row{grid-template-columns:1fr}}
+.check{display:flex;gap:10px;align-items:flex-start;margin-top:14px;padding:12px;background:#fbf7e6;border:1px solid #efe2a6;border-radius:10px;font-size:.88rem}
+.check input{margin-top:4px;width:18px;height:18px;flex:none}
+.btn{appearance:none;border:0;border-radius:10px;padding:12px 20px;font:600 .95rem var(--sans);cursor:pointer;background:var(--gold);color:var(--navy)}
+.btn:hover{background:#f2c514}.btn[disabled]{opacity:.45;cursor:not-allowed}
+.btn.ghost{background:transparent;border:1.5px solid var(--navy);color:var(--navy)}
+.btn.wa{background:#1f9d57;color:#fff}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.err{color:#b3261e;font-size:.85rem;margin-top:8px;min-height:1.2em}
+.muted{color:var(--mute)}.small{font-size:.85rem}
+.progress{height:6px;background:#e7e2cf;border-radius:9px;overflow:hidden;margin:0 0 6px}
+.progress i{display:block;height:100%;background:linear-gradient(90deg,var(--gold2),var(--gold));transition:width .3s}
+.q{padding:14px 0;border-top:1px solid var(--line)}
+.q:first-of-type{border-top:0}
+.q .t{font-weight:500;margin-bottom:8px}
+.opts{display:flex;flex-wrap:wrap;gap:8px}
+.opt{border:1.5px solid #d3cdb8;background:#fff;border-radius:99px;padding:8px 14px;font:500 .88rem var(--sans);cursor:pointer;color:var(--ink)}
+.opt:hover{border-color:var(--gold2)}
+.opt.on{background:var(--navy);border-color:var(--navy);color:var(--gold)}
+.opts.stack{flex-direction:column}.opts.stack .opt{border-radius:10px;text-align:left;padding:10px 14px}
+.chips{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.chip{border:1.5px solid #d3cdb8;border-radius:12px;padding:12px;cursor:pointer;background:#fff;font-weight:500}
+.chip small{display:block;font-weight:400;color:var(--mute)}
+.chip.on{border-color:var(--navy);box-shadow:0 0 0 2px var(--gold)}
+/* results */
+.bar{height:10px;background:#ece7d3;border-radius:9px;overflow:hidden}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--navy),#2a3a8f)}
+.bar.gold i{background:linear-gradient(90deg,var(--gold2),var(--gold))}
+.bar.soft i{background:#9aa2cf}
+.meter{display:grid;grid-template-columns:130px 1fr 46px;gap:10px;align-items:center;margin:7px 0;font-size:.88rem}
+@media(max-width:560px){.meter{grid-template-columns:100px 1fr 40px}}
+.tag{display:inline-block;border-radius:99px;padding:2px 10px;font-size:.74rem;font-weight:600;letter-spacing:.03em}
+.tag.s{background:#dff3ea;color:var(--ok)}.tag.g{background:#fbf0cd;color:#7a5a00}.tag.w{background:#ece9f7;color:#4a4580}
+.area{border-left:4px solid var(--gold);padding-left:14px;margin:16px 0}
+.area h3 span{font:500 .8rem var(--sans);margin-left:8px}
+.kv{font-size:.88rem;margin:.3em 0}.kv b{color:var(--navy)}
+.lock{position:relative;background:linear-gradient(160deg,#101640,var(--navy));color:#e8eaff;border:0}
+.lock h2,.lock h3{color:var(--gold)}
+.lock ul{list-style:none;padding:0;margin:10px 0}
+.lock li{padding:8px 0 8px 28px;border-top:1px solid rgba(255,255,255,.1);position:relative;font-size:.92rem}
+.lock li:before{content:"🔒";position:absolute;left:0;top:7px;font-size:.85rem;filter:grayscale(.2)}
+.lock .small{color:#b9bfe6}
+.note{background:#f1f3fb;border:1px solid #dde1f3;border-radius:10px;padding:10px 12px;font-size:.85rem;color:#3c4272}
+hr.gold{border:0;height:2px;background:linear-gradient(90deg,var(--gold),transparent);margin:14px 0}
+footer{text-align:center;color:var(--mute);font-size:.78rem;padding:10px 14px 30px}
+@media print{
+ body{background:#fff}header.top .demo,.actions,.noprint,footer{display:none!important}
+ .card{box-shadow:none;break-inside:avoid;border-color:#ccc}.lock{background:#fff!important;color:#000!important;border:1px solid #999!important}
+ .lock h2,.lock h3{color:#000!important}.lock li{border-color:#ccc!important}.lock .small{color:#333!important}
+ .hero{background:#fff!important;color:#000!important;border:1px solid #999!important}.hero h1,.hero h2,.hero p,.hero .gold{color:#000!important}
+ *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <svg data-brand-logo viewBox="0 0 80 92" aria-label="NavaSetu crest"><path d="M40 3 76 14v32c0 22-15 36-36 43C19 82 4 68 4 46V14z" fill="#0a0e27" stroke="#D4AF37" stroke-width="3"/>
+   <g stroke="#E6B800" fill="none" stroke-width="2.2" stroke-linecap="round"><path d="M40 20v-7M26 27l-5-5M54 27l5-5M16 38h-6M64 38h6"/><path d="M22 54Q40 34 58 54"/><path d="M22 54v10M58 54v10M40 44v20"/></g>
+   <circle cx="40" cy="36" r="7" fill="#E6B800"/>
+   <path d="M14 70q6-5 13 0t13 0 13 0 13 0" stroke="#D4AF37" fill="none" stroke-width="2.2"/><path d="M18 77q6-4 11 0t11 0 11 0 11 0" stroke="#D4AF37" fill="none" stroke-width="1.6" opacity=".7"/></svg>
+  <div><div class="brand" data-brand="orgName">NavaSetu</div><div class="sub" data-brand="tagline">Every Journey Needs a Setu</div></div>
+  <span class="demo">Free demo</span>
+</header>
+<main id="app"></main>
+<footer><span data-brand="orgName">NavaSetu</span> Initiatives · <span data-brand="site">www.navasetu.online</span> · <span data-brand="email">navasetuinitiatives@gmail.com</span></footer>
+
+<script src="/career-engine.js"></script>
+<script src="/career-brand.js"></script>
+<script>
+'use strict';
+/* ====================== CONFIG ====================== */
+const CONFIG = {
+  // Leads are sent to the app's own /api/lead only when served over http(s) (i.e. from server.js). From file:// nothing leaves the device.
+  LEAD_ENDPOINT: location.protocol.indexOf('http') === 0 ? '/api/career/lead' : '',
+  get WHATSAPP() { return Brand.whatsapp; },
+  get SITE() { return Brand.site; },
+  get EMAIL() { return Brand.email; }
+};
+
+/* ====================== CONTENT (shared with the server: engine.js) ====================== */
+const { THEMES, INTEREST, MOTIV, MOTIV_TXT, LEARN, LEARN_TXT, STRENGTH, OPT, AREAS, AREA, FIELDS, STREAMS, STREAM_NAME, STREAM810, CLASSES, pct, openFor } = Engine;
+
+/* ====================== STATE ====================== */
+// In-memory only (no localStorage): works from file:// and inside WhatsApp / in-app browsers.
+const S = { step: 'intro', page: 0, ans: {}, name: '', cls: '', parent: '', phone: '', email: '', consent: false, consentAt: null, stream: '', err: '',
+  mode: 'public', schoolCode: '', schoolName: '', section: '', roll: '', startedAt: null, resultCode: '', busy: false, info: '' };
+const band = () => (['XI', 'XII'].includes(S.cls) ? '1112' : '810');
+
+/* ====================== HELPERS ====================== */
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const opts = (id, list, stack) => `<div class="opts${stack ? ' stack' : ''}">${list.map(([l, v]) => `<button type="button" class="opt${S.ans[id] === v ? ' on' : ''}" data-q="${id}" data-v="${v}">${esc(l)}</button>`).join('')}</div>`;
+
+/* ====================== PAGES ====================== */
+function buildPages() {
+  const pages = [];
+  for (let i = 0; i < 3; i++) pages.push({ title: 'What would you enjoy?', intro: 'How much would you enjoy…', items: INTEREST.slice(i * 6, i * 6 + 6).map(([id, , t]) => ({ id: 'i_' + id, t, o: OPT.int })) });
+  pages.push({ title: 'What matters to you?', intro: 'When you think of your future work, how important is each of these?', items: MOTIV.map(([id, t]) => ({ id: 'm_' + id, t, o: OPT.imp })) });
+  pages.push({ title: 'How do you learn?', intro: 'Pick the one that sounds most like you.', items: LEARN.map(([id, t, o]) => ({ id: 'l_' + id, t, o: o.map(([k, l]) => [l, k]), stack: true })) });
+  pages.push({ title: 'Your strengths', intro: 'How comfortable are you with…  (This is how you see yourself today. It is not a test, and it can grow.)', items: STRENGTH.map(([id, , t]) => ({ id: 's_' + id, t, o: OPT.comf })) });
+  const key = band() === '810' ? '810' : S.stream;
+  pages.push({ title: 'Careers you are curious about', intro: 'How curious are you about careers in…', items: FIELDS[key].map(id => ({ id: 'f_' + id, t: AREA[id].fq, o: OPT.cur })) });
+  return pages;
+}
+const totalQuestions = () => buildPages().reduce((n, p) => n + p.items.length, 0);
+
+/* ====================== RENDER ====================== */
+function render() {
+  const app = $('#app');
+  if (S.step === 'loading') app.innerHTML = '<div class="card"><p class="muted">Loading…</p></div>';
+  else if (S.step === 'bad') app.innerHTML = `<div class="card"><h2>This link is not active</h2><p class="muted">${esc(S.err)}</p><p class="small">Please check the link your school gave you, or ask your teacher.</p></div>`;
+  else if (S.step === 'submitted') app.innerHTML = viewSubmitted();
+  else if (S.step === 'check') app.innerHTML = viewCheck();
+  else if (S.step === 'intro') app.innerHTML = S.mode === 'school' ? viewIntroSchool() : viewIntro();
+  else if (S.step === 'stream') app.innerHTML = viewStream();
+  else if (S.step === 'quiz') app.innerHTML = viewQuiz();
+  else app.innerHTML = viewResult();
+  window.scrollTo(0, 0);
+}
+
+function viewIntro() {
+  const sends = !!CONFIG.LEAD_ENDPOINT;
+  return `
+  <div class="card hero">
+    <h1>Career Discovery <span class="gold">for Class VIII–XII</span></h1>
+    <p style="margin-top:8px">A free, 10–12 minute snapshot of your interests, motivators, learning style and the career areas that fit you. No right or wrong answers, and nothing is marked.</p>
+  </div>
+  <div class="card">
+    <h2>Let's begin</h2>
+    <div class="row">
+      <div><label for="name">Student's name</label><input id="name" type="text" maxlength="60" autocomplete="off" value="${esc(S.name)}"></div>
+      <div><label for="cls">Current class</label><select id="cls"><option value="">Select…</option>${CLASSES.map(c => `<option${S.cls === c ? ' selected' : ''}>${c}</option>`).join('')}</select></div>
+    </div>
+    <hr class="gold">
+    <h3>Parent / guardian details</h3>
+    <p class="small muted">Students are under 18, so a parent or guardian needs to agree before we begin.</p>
+    <div class="row">
+      <div><label for="parent">Parent / guardian name</label><input id="parent" type="text" maxlength="60" value="${esc(S.parent)}"></div>
+      <div><label for="phone">Parent mobile (India, 10 digits)</label><input id="phone" type="tel" inputmode="numeric" maxlength="10" value="${esc(S.phone)}"></div>
+    </div>
+    <label for="email">Parent email <span class="muted">(optional)</span></label><input id="email" type="email" maxlength="100" value="${esc(S.email)}">
+    <label class="check"><input id="consent" type="checkbox"${S.consent ? ' checked' : ''}>
+      <span>I am the parent or guardian, or a parent or guardian is with the student and agrees to this. ${sends
+        ? 'I understand NavaSetu will receive the student\'s name, class, stream, our contact details and the result summary, so a counsellor can follow up if we ask. It is used for nothing else.'
+        : 'I understand all answers stay on this device and are not sent anywhere.'}</span></label>
+    <div class="err" id="err">${esc(S.err)}</div>
+    <div class="actions"><button class="btn" id="go">Start the assessment</button></div>
+  </div>
+  <p class="small muted" style="text-align:center">This is a free demo snapshot. It guides exploration; it does not decide anyone's future.</p>`;
+}
+
+function viewIntroSchool() {
+  return `
+  <div class="card hero">
+    <p class="small gold" style="letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">${esc(S.schoolName)}</p>
+    <h1>Career Discovery <span class="gold">for Class VIII–XII</span></h1>
+    <p style="margin-top:8px">A 10–12 minute activity about your interests, what matters to you and how you learn. There are no right or wrong answers, and nothing is marked. Answer for yourself, not for what others expect.</p>
+  </div>
+  <div class="card">
+    <h2>Your details</h2>
+    <div class="row">
+      <div><label for="name">Your full name</label><input id="name" type="text" maxlength="60" autocomplete="off" value="${esc(S.name)}"></div>
+      <div><label for="cls">Class</label><select id="cls"><option value="">Select…</option>${CLASSES.map(c => `<option${S.cls === c ? ' selected' : ''}>${c}</option>`).join('')}</select></div>
+    </div>
+    <div class="row">
+      <div><label for="section">Section</label><input id="section" type="text" maxlength="3" autocomplete="off" placeholder="e.g. A" value="${esc(S.section)}"></div>
+      <div><label for="roll">Roll number</label><input id="roll" type="text" maxlength="10" autocomplete="off" value="${esc(S.roll)}"></div>
+    </div>
+    <label class="check"><input id="consent" type="checkbox"${S.consent ? ' checked' : ''}>
+      <span>I understand that my school has arranged this activity with my parents' permission. My answers go to NavaSetu, who prepare my result. My result is shared with me after it has been reviewed. My school only receives combined class-level summaries, not my individual answers.</span></label>
+    <div class="err" id="err">${esc(S.err)}</div>
+    <div class="actions"><button class="btn" id="go">Start</button><button class="btn ghost" id="tocheck">Already done? Check my result</button></div>
+  </div>`;
+}
+
+function viewSubmitted() {
+  return `<div class="card hero"><h1>Thank you, ${esc(S.name)}!</h1><p style="margin-top:8px">Your answers have been received.</p></div>
+  <div class="card">
+    <h2>Your result code</h2>
+    <div style="font:700 2.2rem var(--serif);letter-spacing:.2em;color:var(--navy);margin:8px 0">${esc(S.resultCode)}</div>
+    <p><b>Write this code down or take a photo of it.</b> After your school's review, open this same link, choose <i>Check my result</i> and enter your roll number and this code to see your result.</p>
+    <p class="small muted">Your result is not shown straight away because each batch is reviewed first.</p>
+    <div class="actions"><button class="btn" id="tocheck">Check my result</button></div>
+  </div>${contactForm()}`;
+}
+
+function contactForm() {
+  if (S.mode !== 'school') return '';
+  if (S.contactSent) return `<div class="card"><h2>Thank you</h2><p>We have noted your details. A NavaSetu counsellor will get in touch. Your school does not see these details.</p></div>`;
+  return `<div class="card"><h2>Want to talk to a career counsellor?</h2>
+    <p class="muted small">Optional. A parent or guardian can leave contact details and NavaSetu Initiatives will call. These details are kept by NavaSetu only and are not shared with the school.</p>
+    <div class="row"><div><label for="lname">Parent / guardian name</label><input id="lname" maxlength="80" value="${esc(S.lname || '')}"></div>
+    <div><label for="lmob">Mobile number</label><input id="lmob" inputmode="numeric" maxlength="10" value="${esc(S.lmob || '')}"></div>
+    <div><label for="lemail">Email (optional)</label><input id="lemail" type="email" maxlength="120" value="${esc(S.lemail || '')}"></div></div>
+    <label style="display:flex;gap:8px;align-items:flex-start;margin-top:10px"><input type="checkbox" id="lconsent" style="margin-top:3px"> <span class="small">I am the parent or guardian and I agree that NavaSetu Initiatives may contact me about career guidance for this student.</span></label>
+    <div class="err" id="lerr"></div>
+    <div class="actions"><button class="btn" id="sendlead">Request a call</button></div></div>`;
+}
+async function sendSchoolLead() {
+  const g = id => $(id).value.trim(); S.lname = g('#lname'); S.lmob = g('#lmob').replace(/\D/g, ''); S.lemail = g('#lemail');
+  const e = m => { $('#lerr').textContent = m; };
+  if (S.lname.length < 2) return e("Please enter the parent or guardian's name.");
+  if (!/^[6-9]\d{9}$/.test(S.lmob)) return e('Please enter a valid 10-digit mobile number.');
+  if (S.lemail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(S.lemail)) return e('That email address does not look right.');
+  if (!$('#lconsent').checked) return e('A parent or guardian needs to agree before we can contact them.');
+  try {
+    const r = await fetch('/api/career/school-lead', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ schoolCode: S.schoolCode, roll: S.roll, resultCode: S.resultCode, contactName: S.lname, mobile: S.lmob, email: S.lemail, consent: true }) });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && j.ok) { S.contactSent = true; return render(); }
+    e(j.error || 'Could not save. Please try again.');
+  } catch (x) { e('No internet connection. Please try again.'); }
+}
+
+function viewCheck() {
+  return `<div class="card"><h2>Check my result</h2><p class="muted">Enter the roll number you used and your result code.</p>
+    <div class="row">
+      <div><label for="roll">Roll number</label><input id="roll" type="text" maxlength="10" autocomplete="off" value="${esc(S.roll)}"></div>
+      <div><label for="code">Result code</label><input id="code" type="text" maxlength="8" autocomplete="off" style="text-transform:uppercase" value="${esc(S.resultCode)}"></div>
+    </div>
+    <div class="err" id="err">${esc(S.err)}</div>
+    <div class="note" id="info" ${S.info ? '' : 'hidden'}>${esc(S.info)}</div>
+    <div class="actions"><button class="btn" id="docheck"${S.busy ? ' disabled' : ''}>Check</button><button class="btn ghost" id="backintro">Back</button></div></div>`;
+}
+
+function viewStream() {
+  return `<div class="card"><h2>Which subjects are you studying?</h2>
+  <p class="muted">This tells us which career routes stay open with your current subjects.</p>
+  <div class="chips">${STREAMS.map(([k, n, d]) => `<div class="chip${S.stream === k ? ' on' : ''}" data-stream="${k}">${esc(n)}<small>${esc(d)}</small></div>`).join('')}</div>
+  <div class="err" id="err">${esc(S.err)}</div>
+  <div class="actions"><button class="btn ghost" id="back">Back</button><button class="btn" id="go">Continue</button></div></div>`;
+}
+
+function viewQuiz() {
+  const pages = buildPages(), p = pages[S.page];
+  const done = pages.slice(0, S.page).reduce((n, x) => n + x.items.length, 0), total = totalQuestions();
+  const answered = p.items.every(i => S.ans[i.id] !== undefined);
+  const last = S.page === pages.length - 1;
+  return `<div class="progress"><i style="width:${Math.round(done / total * 100)}%"></i></div>
+  <p class="small muted">Step ${S.page + 1} of ${pages.length} · ${done} of ${total} questions done</p>
+  <div class="card"><h2>${esc(p.title)}</h2><p class="muted" style="margin-top:4px">${esc(p.intro)}</p>
+    ${p.items.map(i => `<div class="q"><div class="t">${esc(i.t)}</div>${opts(i.id, i.o, i.stack)}</div>`).join('')}
+    <div class="err" id="err">${esc(S.err)}</div>
+    <div class="actions"><button class="btn ghost" id="back">Back</button><button class="btn" id="go"${answered ? '' : ' disabled'}>${last ? 'See my result' : 'Next'}</button></div>
+  </div>`;
+}
+
+/* ====================== SCORING (engine.js) ====================== */
+const compute = () => Engine.compute(S.ans, band(), S.stream);
+
+/* ====================== RESULT ====================== */
+const band3 = p => p >= 70 ? ['Strong match', 's'] : p >= 55 ? ['Good match', 'g'] : ['Worth exploring', 'w'];
+const meter = (label, v, cls) => `<div class="meter"><span>${esc(label)}</span><div class="bar ${cls || ''}"><i style="width:${v}%"></i></div><b>${v}%</b></div>`;
+
+function viewResult() {
+  const R = compute(), b = band();
+  const date = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+  const open = R.rows.filter(r => r.open), top3 = open.slice(0, 3), next3 = open.slice(3, 6);
+  const closedStrong = R.rows.filter(r => !r.open && r.score >= 60).slice(0, 2);
+  const top3Themes = R.themeRank.slice(0, 3);
+  const motTop = Object.entries(R.mot).sort((x, y) => y[1] - x[1]).slice(0, 2);
+  const L = LEARN_TXT[R.lead[0]];
+  const strRank = Object.entries(R.str).sort((x, y) => y[1] - x[1]);
+
+  const summary = `NavaSetu Career Discovery snapshot for ${S.name} (Class ${S.cls}). Top interests: ${top3Themes.map(([t]) => THEMES[t].name).join(', ')}. Career areas to explore: ${top3.map(r => r.a.name).join(', ')}. Try the free demo: ${CONFIG.SITE}`;
+  const waMsg = `Hello NavaSetu, I tried the Career Discovery demo for ${S.name} (Class ${S.cls}). Top career areas: ${top3.map(r => r.a.name).join(', ')}. We would like to know more about the full career assessment.`;
+
+  const stepsBy = {
+    VIII: ['Treat this year as exploring, not deciding: try the "Try this week" ideas below.', 'Notice which activities make you lose track of time, and note them down.', 'Keep your basics strong in Maths, Science and languages, since they keep every option open.'],
+    IX: ['Treat this year as exploring, not deciding: try the "Try this week" ideas below.', 'Talk to two adults who work in an area that interests you.', 'Keep building strong foundations in Maths, Science and languages.'],
+    X: ['Note which subject combinations your school offers for Class XI, and what each keeps open.', 'Talk through this snapshot with your parents before choosing, and weigh your marks and interests together.', 'Try one or two of the "Try this week" ideas to test your interest before you decide.'],
+    XI: ['Plan your Class XII year around the entrance exams or portfolios your top areas need.', 'Build a small profile outside classroom marks: a project, competition or volunteering in your top area.', 'Read about courses, not just careers, for your top three areas.'],
+    XII: ['Shortlist 8–10 courses across your top areas and check each one\'s entrance exam and application dates.', 'Plan your board-exam and entrance-exam preparation together; note every deadline.', 'Speak to current college students in your top courses about the real experience.']
+  }[S.cls];
+
+  const lockedItems = [
+    'Personality profile and a measured aptitude test: timed questions across eight skill areas, so strengths are measured, not just self-rated',
+    'Your full ranking of every career area, with the reasons behind each',
+    'Recommended career paths and courses, with demand and pay in India',
+    'A check on where your answers point in different directions, and what to do about it',
+    'One-to-one counselling with a NavaSetu counsellor, including a conversation with your parents',
+    'Study-abroad guidance and a printed, branded report you can keep'
+  ];
+
+  return `
+  <div class="card hero">
+    <p class="small gold" style="letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">Career Discovery snapshot · ${S.mode === 'school' ? esc(S.schoolName) : 'free demo'}</p>
+    <h1>${esc(S.name)}</h1>
+    <p style="margin-top:6px">Class ${esc(S.cls)}${b === '1112' ? ' · ' + esc(STREAM_NAME[S.stream]) : ''} · ${esc(date)}</p>
+    <p class="small" style="margin:8px 0 0">Based on your answers to ${totalQuestions()} questions. It shows where to explore next; it is not a prediction or a decision.</p>
+  </div>
+  ${R.flat ? `<div class="card note"><b>A note first.</b> Your answers did not show strong likes yet. That is completely normal at this age. Use the "Try this week" ideas to find out what you enjoy by doing.</div>` : ''}
+
+  <div class="card">
+    <h2>1. Your interest profile</h2>
+    <p class="muted">Six kinds of work people enjoy. Your top three shape most of what follows.</p>
+    ${R.themeRank.map(([t, v]) => meter(`${THEMES[t].name} (${THEMES[t].full})`, v, top3Themes.some(x => x[0] === t) ? 'gold' : 'soft')).join('')}
+    <hr class="gold">
+    ${top3Themes.map(([t, v], i) => `<div class="kv"><b>${i + 1}. ${esc(THEMES[t].name)}</b>: ${esc(THEMES[t].d)}<br><span class="muted">At school: ${esc(THEMES[t].school)} Often leads to: ${esc(THEMES[t].careers)}.</span></div>`).join('<div style="height:8px"></div>')}
+  </div>
+
+  <div class="card">
+    <h2>2. Career areas to explore</h2>
+    <p class="muted">${b === '1112' ? `Areas that stay open with ${esc(STREAM_NAME[S.stream])}, best fit first.` : 'Best fit first. At this stage these are areas to explore, not careers to choose.'}</p>
+    ${top3.map((r, i) => { const [lab, c] = band3(r.score); return `<div class="area"><h3>${i + 1}. ${esc(r.a.name)}<span class="tag ${c}">${lab} · ${r.score}%</span></h3>
+      <div class="kv"><b>Why it showed up:</b> ${r.reasons.length ? esc(r.reasons.join('; ')) + '.' : 'it fits parts of your profile, though no single signal is strong yet.'}</div>
+      <div class="kv"><b>Careers like:</b> ${esc(r.a.careers)}</div>
+      <div class="kv"><b>Subjects and exams:</b> ${esc(r.a.subj)}</div>
+      <div class="kv"><b>Try this week:</b> ${esc(r.a.try)}</div></div>`; }).join('')}
+    ${next3.length ? `<p class="small"><b>Also on your radar:</b> ${next3.map(r => `${esc(r.a.name)} (${r.score}%)`).join(' · ')}</p>` : ''}
+    ${closedStrong.length ? `<div class="note" style="margin-top:10px">You also scored well for <b>${closedStrong.map(r => esc(r.a.name)).join('</b> and <b>')}</b>, which usually need ${closedStrong.some(r => r.a.need === 'PCB') ? 'Biology' : closedStrong.some(r => r.a.need === 'PCM') ? 'Physics, Chemistry and Maths' : 'Maths or Science'} in Class 12. A counsellor can explain what is still possible from your current subjects.</div>` : ''}
+    <p class="small muted" style="margin-top:10px">Match % shows how closely your answers fit each area. It is not a pass mark and it is not a prediction.</p>
+  </div>
+
+  ${b === '810' ? `<div class="card"><h2>3. Which stream might suit you?</h2>
+    <p class="muted">A leaning to discuss at home and at school, not a decision.</p>
+    ${R.streams.slice(0, 2).map(([g, v], i) => meter(STREAM810[g], v, i === 0 ? 'gold' : 'soft')).join('')}
+    <p class="small" style="margin-top:10px">Many careers open from any stream, including design, media, law, business, civil services and the defence forces. Schools are also moving towards more flexible subject combinations under NEP 2020, so check what your school offers. Marks, subject strengths and your own interest all count too.</p></div>` : ''}
+
+  <div class="card">
+    <h2>${b === '810' ? '4' : '3'}. What matters to you at work</h2>
+    ${motTop.map(([k, v]) => `<div class="kv"><b>${esc(MOTIV_TXT[k][0])}</b> (${v}%): ${esc(MOTIV_TXT[k][1])}</div>`).join('')}
+  </div>
+
+  <div class="card">
+    <h2>${b === '810' ? '5' : '4'}. How you learn best</h2>
+    <p><b>${R.lead.length > 1 ? 'A blend: ' + R.lead.map(k => LEARN_TXT[k][0]).join(' and ') : esc(L[0])}</b>. ${R.lead.length > 1 ? 'You use more than one way to learn, which is a strength.' : esc(L[1])}</p>
+    <div class="kv"><b>Study tips for you:</b></div>
+    <ul style="margin:4px 0 0;padding-left:20px">${R.lead.slice(0, 2).flatMap(k => LEARN_TXT[k][2].slice(0, R.lead.length > 1 ? 2 : 3)).map(t => `<li>${esc(t)}</li>`).join('')}</ul>
+  </div>
+
+  <div class="card">
+    <h2>${b === '810' ? '6' : '5'}. Your strengths, as you see them</h2>
+    ${strRank.map(([k, v]) => meter(STRENGTH.find(s => s[0] === k)[1], v, 'soft')).join('')}
+    <div class="note" style="margin-top:8px">These are self-ratings, not measured ability. Most people rate themselves differently from how a timed test measures them, which is why the full assessment tests skills directly.</div>
+  </div>
+
+  <div class="card">
+    <h2>${b === '810' ? '7' : '6'}. Your next steps</h2>
+    <ul style="margin:4px 0 0;padding-left:20px">${stepsBy.map(t => `<li>${esc(t)}</li>`).join('')}</ul>
+  </div>
+
+  <div class="card lock">
+    <h2>Go deeper with the full NavaSetu Career Assessment</h2>
+    <p style="margin-top:6px">Your snapshot shows where to look. The full assessment tells you what to do about it, and includes:</p>
+    <ul>${lockedItems.map(t => `<li>${esc(t)}</li>`).join('')}</ul>
+    <div class="actions noprint">
+      <a class="btn wa" style="text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(waMsg)}">Talk to a counsellor on WhatsApp</a>
+      <a class="btn" style="text-decoration:none" target="_blank" rel="noopener" href="${CONFIG.SITE}">Visit navasetu.online</a>
+    </div>
+    <p class="small" style="margin-top:10px">Or write to ${esc(CONFIG.EMAIL)}.</p>
+  </div>
+  <div class="noprint">${contactForm()}</div>
+
+  <div class="actions noprint">
+    <button class="btn" id="print">Save as PDF / Print</button>
+    <a class="btn wa" style="text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(summary)}">Share on WhatsApp</a>
+    <button class="btn ghost" id="restart">Start over</button>
+  </div>
+  <p class="small muted" style="margin-top:14px">This demo is an indicative, self-reported snapshot built on well-known interest and learning-preference ideas. It is not a clinical or diagnostic tool and does not predict exam results or selection.</p>`;
+}
+
+/* ====================== ACTIONS ====================== */
+function fail(m) { S.err = m; const e = $('#err'); if (e) e.textContent = m; }
+
+function startQuizSchool() {
+  S.name = $('#name').value.trim(); S.cls = $('#cls').value; S.section = $('#section').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  S.roll = $('#roll').value.trim().replace(/[^A-Za-z0-9\-\/]/g, ''); S.consent = $('#consent').checked;
+  if (S.name.length < 2) return fail('Please enter your full name.');
+  if (!S.cls) return fail('Please select your class.');
+  if (!S.section) return fail('Please enter your section.');
+  if (!S.roll) return fail('Please enter your roll number.');
+  if (!S.consent) return fail('Please tick the box to confirm you have read this.');
+  S.err = ''; S.consentAt = S.consentAt || new Date().toISOString(); S.startedAt = S.startedAt || Date.now(); S.page = 0;
+  S.step = band() === '1112' ? 'stream' : 'quiz';
+  render();
+}
+
+async function submitSchool() {
+  if (S.busy) return; S.busy = true; fail('');
+  const btn = $('#go'); if (btn) btn.disabled = true;
+  try {
+    const r = await fetch('/api/career/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+      schoolCode: S.schoolCode, name: S.name, classLabel: S.cls, section: S.section, roll: S.roll, stream: band() === '1112' ? S.stream : '',
+      answers: S.ans, startedAt: S.startedAt, submittedAt: Date.now() }) });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && j.resultCode) { S.resultCode = j.resultCode; S.step = 'submitted'; S.busy = false; return render(); }
+    S.busy = false; fail(j.error || 'Could not submit. Please try again.'); if (btn) btn.disabled = false;
+  } catch (e) { S.busy = false; fail('No internet connection. Your answers are kept; please try again.'); if (btn) btn.disabled = false; }
+}
+
+async function checkResult() {
+  if (S.busy) return;
+  S.roll = $('#roll').value.trim().replace(/[^A-Za-z0-9\-\/]/g, ''); S.resultCode = $('#code').value.trim().toUpperCase();
+  if (!S.roll || !S.resultCode) return fail('Please enter both your roll number and your result code.');
+  S.busy = true; fail(''); $('#docheck').disabled = true;
+  try {
+    const r = await fetch('/api/career/result', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ schoolCode: S.schoolCode, roll: S.roll, resultCode: S.resultCode }) });
+    const j = await r.json().catch(() => ({}));
+    S.busy = false;
+    if (!r.ok) { render(); return fail(j.error || 'Could not check. Please try again.'); }
+    if (j.status !== 'approved') { S.info = 'Your answers are received and are being reviewed. Please check again later.'; return render(); }
+    Object.assign(S, { name: j.name, cls: j.classLabel, stream: j.stream || '', ans: j.answers, info: '', step: 'result' }); render();
+  } catch (e) { S.busy = false; render(); fail('No internet connection. Please try again.'); }
+}
+
+function startQuiz() {
+  if (S.mode === 'school') return startQuizSchool();
+  S.name = $('#name').value.trim(); S.cls = $('#cls').value; S.parent = $('#parent').value.trim();
+  S.phone = $('#phone').value.replace(/\D/g, ''); S.email = $('#email').value.trim(); S.consent = $('#consent').checked;
+  if (S.name.length < 2) return fail("Please enter the student's name.");
+  if (!S.cls) return fail('Please select the current class.');
+  if (S.parent.length < 2) return fail("Please enter the parent or guardian's name.");
+  if (!/^[6-9]\d{9}$/.test(S.phone)) return fail('Please enter a valid 10-digit Indian mobile number.');
+  if (S.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(S.email)) return fail('That email address does not look right.');
+  if (!S.consent) return fail('A parent or guardian needs to tick the consent box to continue.');
+  S.err = ''; S.consentAt = S.consentAt || new Date().toISOString(); S.page = 0;
+  S.step = band() === '1112' ? 'stream' : 'quiz';
+  render();
+}
+
+function sendLead() {
+  if (!CONFIG.LEAD_ENDPOINT) return;
+  const R = compute();
+  const body = { studentName: S.name, classLabel: S.cls, stream: band() === '1112' ? S.stream : '', parentName: S.parent, parentPhone: S.phone, parentEmail: S.email, consentAt: S.consentAt,
+    topAreas: R.rows.filter(r => r.open).slice(0, 3).map(r => ({ area: r.a.name, score: r.score })),
+    scores: { themes: R.theme, motivators: R.mot, strengths: R.str, learning: R.lc }, answers: S.ans };
+  try { fetch(CONFIG.LEAD_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).catch(() => {}); } catch (e) { /* ignore */ }
+}
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('button,.chip'); if (!t) return;
+  if (t.dataset.q) { // answer
+    const v = isNaN(t.dataset.v) ? t.dataset.v : Number(t.dataset.v);
+    S.ans[t.dataset.q] = v; S.err = ''; const y = window.scrollY; render(); window.scrollTo(0, y); return;
+  }
+  if (t.dataset.stream) { S.stream = t.dataset.stream; S.err = ''; render(); return; }
+  if (t.id === 'go') {
+    if (S.step === 'intro') return startQuiz();
+    if (S.step === 'stream') { if (!S.stream) return fail('Please choose your subject combination.'); S.step = 'quiz'; S.page = 0; return render(); }
+    if (S.step === 'quiz') {
+      const pages = buildPages(); if (!pages[S.page].items.every(i => S.ans[i.id] !== undefined)) return fail('Please answer every question on this page.');
+      if (S.page < pages.length - 1) { S.page++; return render(); }
+      if (S.mode === 'school') return submitSchool();
+      S.step = 'result'; sendLead(); return render();
+    }
+  }
+  if (t.id === 'back') {
+    if (S.step === 'quiz' && S.page > 0) { S.page--; return render(); }
+    if (S.step === 'quiz') { S.step = band() === '1112' ? 'stream' : 'intro'; return render(); }
+    if (S.step === 'stream') { S.step = 'intro'; return render(); }
+  }
+  if (t.id === 'tocheck') { S.err = ''; S.info = ''; S.step = 'check'; return render(); }
+  if (t.id === 'backintro') { S.err = ''; S.info = ''; S.step = 'intro'; return render(); }
+  if (t.id === 'docheck') return checkResult();
+  if (t.id === 'sendlead') return sendSchoolLead();
+  if (t.id === 'print') return window.print();
+  if (t.id === 'restart') { Object.assign(S, { step: 'intro', page: 0, ans: {}, name: '', cls: '', parent: '', phone: '', email: '', consent: false, consentAt: null, stream: '', err: '', section: '', roll: '', startedAt: null, resultCode: '', info: '', busy: false, contactSent: false, lname: '', lmob: '', lemail: '' }); render(); }
+});
+(async function boot() {
+  await loadBrand();
+  const code = (new URLSearchParams(location.search).get('school') || '').trim().toUpperCase();
+  if (!code) return render();
+  S.mode = 'school'; S.schoolCode = code; S.step = 'loading'; const bd = document.querySelector('header.top .demo'); if (bd) bd.textContent = 'School activity'; render();
+  try {
+    const r = await fetch('/api/career/school/' + encodeURIComponent(code)); const j = await r.json().catch(() => ({}));
+    if (!r.ok) { S.step = 'bad'; S.err = j.error || 'We could not find this school link.'; return render(); }
+    S.schoolName = j.name; S.step = 'intro'; render();
+  } catch (e) { S.step = 'bad'; S.err = 'No internet connection.'; render(); }
+})();
+</script>
+</body>
+</html>
