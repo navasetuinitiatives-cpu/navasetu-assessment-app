@@ -84,6 +84,7 @@
   <nav>
     <button class="active" onclick="showTab('leads')">CRM / Leads</button>
     <button id="navSchools" onclick="showTab('schools')">Schools</button>
+    <button id="navCareer" onclick="showTab('career')">Career Discovery</button>
     <button onclick="showTab('calendar')">Calendar</button>
     <button id="navOrders" onclick="showTab('orders')">Payments</button>
     <button id="navStaff" onclick="showTab('admins')">Staff</button>
@@ -223,6 +224,8 @@
       </div>
     </section>
 
+    <section id="tab-career"><div id="cdRoot"></div></section>
+
     <section id="tab-calendar">
       <div class="card">
         <div style="display:flex; align-items:center; justify-content:space-between;">
@@ -342,6 +345,8 @@
   </main>
 </div>
 
+<script src="/career-engine.js"></script>
+<script src="/career-admin.js"></script>
 <script>
 const API = '/api';
 let token = localStorage.getItem('navasetu_admin_token');
@@ -452,6 +457,7 @@ function showTab(name) {
   event.currentTarget.classList.add('active');
   document.getElementById(`tab-${name}`).classList.add('active');
   if (name === 'schools') loadSchools();
+  if (name === 'career') loadCareer();
   if (name === 'orders') loadOrders();
   if (name === 'admins') loadAdmins();
   if (name === 'calendar') loadCalendar();

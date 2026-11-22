@@ -38,8 +38,8 @@
   .intro { max-width:720px; margin:0 auto 2.5rem; text-align:center; }
   .intro h2 { font-family:'Crimson Text', serif; font-size:1.8rem; margin-bottom:0.5rem; color:var(--primary); }
   .intro p { color:#6B7280; font-size:1rem; line-height:1.6; }
-  .cards { display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; }
-  @media (max-width:720px) { .cards { grid-template-columns:1fr; } }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:1.5rem; }
+  
   .card { background:#fff; border:1px solid var(--border); border-radius:14px; padding:2rem; text-align:center; text-decoration:none; color:inherit; transition:transform 0.15s, box-shadow 0.15s; display:flex; flex-direction:column; align-items:center; }
   .card:hover { transform:translateY(-3px); box-shadow:0 10px 30px rgba(10,14,39,0.08); }
   .card .icon { font-size:2.75rem; margin-bottom:0.75rem; }
@@ -47,6 +47,7 @@
   .card p { color:#6B7280; font-size:0.92rem; line-height:1.55; margin:0 0 1.25rem; }
   .card .go { background:var(--primary); color:#fff; padding:0.65rem 1.4rem; border-radius:8px; font-size:0.9rem; font-weight:600; }
   .card.ssb .go { background:#5B21B6; }
+  .card.career .go { background:#0F766E; }
   footer { text-align:center; padding:1.5rem; color:#9CA3AF; font-size:0.8rem; }
 </style>
 </head>
@@ -85,6 +86,12 @@
         <h3>SSB Aspirants</h3>
         <p>Get an OLQ Readiness Profile against the 15 Officer-Like Qualities the Services Selection Board looks for — plus WAT/SRT/GTO-style practice and a targeted improvement plan for your weaker areas.</p>
         <span class="go">Start OLQ Assessment</span>
+      </a>
+      <a class="card career" href="/career.html">
+        <div class="icon">🧭</div>
+        <h3>Students, Class VIII–XII</h3>
+        <p>A free 10–12 minute Career Discovery snapshot of your interests, motivators, learning style and the career areas that suit you. Open to all streams, with a guided next step for families.</p>
+        <span class="go">Start Career Discovery</span>
       </a>
       <a class="card wellness" href="/index.html">
         <div class="icon">🌿</div>
