@@ -149,9 +149,9 @@
         <button class="btn secondary" id="cdlgo" style="margin:0">Search</button></div></div>
     <div class="card" id="cdaddbox" style="display:none"><h2>Add a lead</h2><div class="row"><div><label>Name</label><input id="cdan" style="width:190px"></div><div><label>Mobile</label><input id="cdam" maxlength="10" style="width:130px"></div><div><label>Email</label><input id="cdae" style="width:210px"></div>
       <div><label>Student name</label><input id="cdas" style="width:160px"></div><div><label>Class</label><input id="cdac" style="width:70px"></div></div><label>Note</label><input id="cdano" style="width:100%"><div class="err" id="cdaerr"></div><button class="btn" id="cdasave">Save lead</button></div>
-    <div class="card"><div class="scroll"><table><thead><tr><th>Date</th><th>Student name</th><th>Class</th><th>Parent / contact</th><th>Mobile</th><th>Email</th><th>Source</th><th>Status</th>${isAdmin() ? '<th>Assigned</th>' : ''}<th>Note</th><th></th></tr></thead><tbody>
+    <div class="card"><div class="scroll"><table><thead><tr><th>Date</th><th>Student name</th><th>Class</th><th>Parent / contact</th><th>Mobile</th><th>Email / login ID</th><th>Source</th><th>Status</th>${isAdmin() ? '<th>Assigned</th>' : ''}<th>Note</th><th></th></tr></thead><tbody>
     ${d.leads.map(l => `<tr><td>${fmtD(l.createdAt)}</td><td><b>${esc(l.studentName) || '<span class="muted">not given</span>'}</b><div class="muted">${(l.topAreas || []).map(a => esc(a.name || a.area)).join(', ')}${l.schoolName ? ' · ' + esc(l.schoolName) : ''}</div>${l.hasAnswers ? `<button class="btn secondary cdview" data-ref="lead:${l.id}" style="margin:4px 0 0;padding:.2rem .55rem">View report</button>` : ''}</td>
-      <td>${esc(l.classLabel)} ${esc(l.stream)}</td><td>${esc(l.contactName)}</td><td>${esc(l.mobile)}</td><td>${esc(l.email)}</td>
+      <td>${esc(l.classLabel)} ${esc(l.stream)}</td><td>${esc(l.contactName)}</td><td>${esc(l.mobile)}</td><td>${esc(l.email)}${l.hasAccount ? `<div class="muted">Login: ${esc(l.loginEmail)}</div><button class="btn secondary cdpw" data-id="${l.id}" style="margin:4px 0 0;padding:.2rem .55rem">Reset password</button>` : ''}</td>
       <td><span class="tag">${SRC[l.source] || l.source}</span></td>
       <td><select class="cdlstat" data-id="${l.id}">${LSTAT.map(x => `<option${l.status === x ? ' selected' : ''}>${x}</option>`).join('')}</select></td>
       ${isAdmin() ? `<td><select class="cdlasg" data-id="${l.id}"><option value="">Unassigned</option>${couns.map(u => `<option value="${u.id}"${l.assignedTo === u.id ? ' selected' : ''}>${esc(u.full_name)}</option>`).join('')}</select></td>` : ''}
@@ -160,6 +160,11 @@
     const reload = () => { f.q = $('#cdlq').value; f.source = $('#cdlsrc').value; f.status = $('#cdlst').value; f.schoolId = $('#cdlsc').value; vLeads(); };
     $('#cdlgo').onclick = reload; $('#cdlq').onkeydown = e => { if (e.key === 'Enter') reload(); }; ['#cdlsrc', '#cdlst', '#cdlsc'].forEach(s => $(s).onchange = reload);
     $$('.cdview').forEach(b => b.onclick = () => window.open('/career.html?review=' + b.dataset.ref, '_blank'));
+    $$('.cdpw').forEach(b => b.onclick = async () => {
+      if (!confirm('Set a new temporary password for this student? Their old password will stop working.')) return;
+      try { const r = await A('/leads/' + b.dataset.id + '/reset-password', J({})); prompt('Give this to the student (login: ' + r.loginEmail + ' or mobile ' + r.mobile + '). It is shown only once. Copy it now:', r.password); }
+      catch (e) { alert(e.message); }
+    });
     $('#cdlcsv').onclick = () => dl('/leads.csv?' + q, 'career-leads.csv');
     $('#cdladd').onclick = () => { const b = $('#cdaddbox'); b.style.display = b.style.display === 'none' ? 'block' : 'none'; };
     $('#cdasave').onclick = async () => { try { await A('/leads', J({ contactName: $('#cdan').value, mobile: $('#cdam').value, email: $('#cdae').value, studentName: $('#cdas').value, classLabel: $('#cdac').value, note: $('#cdano').value })); vLeads(); } catch (e) { $('#cdaerr').textContent = e.message; } };

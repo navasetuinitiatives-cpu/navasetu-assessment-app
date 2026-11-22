@@ -91,6 +91,7 @@ footer{text-align:center;color:var(--mute);font-size:.78rem;padding:10px 14px 30
    <path d="M14 70q6-5 13 0t13 0 13 0 13 0" stroke="#D4AF37" fill="none" stroke-width="2.2"/><path d="M18 77q6-4 11 0t11 0 11 0 11 0" stroke="#D4AF37" fill="none" stroke-width="1.6" opacity=".7"/></svg>
   <div><div class="brand" data-brand="orgName">NavaSetu</div><div class="sub" data-brand="tagline">Every Journey Needs a Setu</div></div>
   <a href="/welcome.html" class="demo" style="text-decoration:none;margin-left:auto" id="homeLink">&#8962; Home</a>
+  <a href="#" class="demo" style="text-decoration:none;margin-left:8px;display:none" id="logoutLink">Log out</a>
 </header>
 <main id="app"></main>
 <footer><span data-brand="orgName">NavaSetu</span> Initiatives · <span data-brand="site">www.navasetu.online</span> · <span data-brand="email">navasetuinitiatives@gmail.com</span></footer>
@@ -148,6 +149,7 @@ function render() {
   else if (S.step === 'stream') app.innerHTML = viewStream();
   else if (S.step === 'quiz') app.innerHTML = viewQuiz();
   else app.innerHTML = viewResult();
+  const lo = $('#logoutLink'); if (lo) lo.style.display = (S.authed && !S.review && S.mode !== 'school') ? '' : 'none';
   window.scrollTo(0, 0);
 }
 
@@ -182,7 +184,7 @@ function viewIntro() {
     ${consent}
     <div class="err" id="err">${esc(S.err)}</div>
     <div class="actions"><button class="btn" id="go">${S.authed ? 'Start the assessment' : 'Register and start'}</button></div>` : `
-    <label for="lemail">Login ID (email)</label><input id="lemail" type="email" maxlength="100" autocomplete="username" value="${esc(S.loginEmail || '')}">
+    <label for="lemail">Registered email or mobile number</label><input id="lemail" type="text" maxlength="100" autocomplete="username" value="${esc(S.loginEmail || '')}">
     <label for="lpw">Password</label><input id="lpw" type="password" maxlength="100" autocomplete="current-password">
     <div class="err" id="err">${esc(S.err)}</div>
     <div class="actions"><button class="btn" id="dologin">Log in and view my report</button></div>`}
@@ -516,9 +518,9 @@ async function startQuiz() {
 
 async function doLogin() {
   const em = $('#lemail').value.trim().toLowerCase(), pw = $('#lpw').value; S.loginEmail = em;
-  if (!em || !pw) return fail('Please enter your login ID and password.');
+  if (!em || !pw) return fail('Please enter your registered email or mobile number, and your password.');
   try {
-    const j = await authCall('login', { email: em, password: pw });
+    const j = await authCall('../career/login', { id: em, password: pw });
     try { localStorage.setItem(TOK, j.accessToken); } catch (e) {}
     S.authed = true; S.loginEmail = em; S.err = '';
     await loadMine(j.accessToken, j.user && j.user.fullName);
@@ -544,6 +546,7 @@ function sendLead() {
 }
 
 document.addEventListener('click', e => {
+  if (e.target.closest('#logoutLink')) { e.preventDefault(); try { localStorage.removeItem(TOK); } catch (x) {} Object.assign(S, { authed: false, auth: 'login', step: 'intro', page: 0, ans: {}, name: '', school: '', cls: '', parent: '', phone: '', email: '', consent: false, consentAt: null, stream: '', err: '', loginEmail: '' }); return render(); }
   const t = e.target.closest('button,.chip'); if (!t) return;
   if (t.dataset.q) { // answer
     const v = isNaN(t.dataset.v) ? t.dataset.v : Number(t.dataset.v);

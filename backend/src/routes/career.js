@@ -2,6 +2,8 @@
 // Mounted at /api/career. Built as a factory so it can be tested against an in-memory Postgres.
 import express from 'express';
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import E from '../utils/careerEngine.js'; // same file the browser loads, so client and server scoring are identical
 import { requireAuth, requireAdmin, requireStaff, optionalAuth } from '../middleware/auth.js';
 import { buildReport } from '../utils/careerReport.js';
@@ -222,6 +224,27 @@ export function createCareerRouter(pool) {
 
   /* ----- Leads: admins see all; counsellors see only leads assigned to them (same rule as the main CRM) ----- */
   const isCouns = req => req.user.role === 'counsellor';
+  // Student login: the registered email OR the registered mobile number, plus password
+  router.post('/login', wrap(async (req, res) => {
+    const b = req.body || {}, id = s(b.id, 120).trim().toLowerCase(), pw = s(b.password, 100);
+    if (hit('slogin:' + req.ip, 60, 600e3) || hit('slogin:' + id, 10, 600e3)) return fail(res, 429, 'Too many attempts. Please wait a few minutes and try again.');
+    if (!id || !pw) return fail(res, 400, 'Please enter your registered email or mobile number, and your password.');
+    let rows;
+    if (id.includes('@')) rows = (await pool.query("SELECT * FROM users WHERE email = $1 AND role = 'individual'", [id])).rows;
+    else {
+      const m = id.replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '').replace(/^0(?=\d{10}$)/, '');
+      if (!MOBILE.test(m)) return fail(res, 400, 'Please enter a valid registered email or 10-digit mobile number.');
+      rows = (await pool.query("SELECT * FROM users WHERE role = 'individual' AND phone_number LIKE $1", ['%' + m])).rows;
+    }
+    for (const u of rows) {
+      if (!u.password_hash || !(await bcrypt.compare(pw, u.password_hash))) continue;
+      if (u.status === 'inactive') return fail(res, 403, 'This account has been blocked. Please contact NavaSetu support.');
+      const accessToken = jwt.sign({ userId: u.id, email: u.email, role: u.role }, process.env.JWT_SECRET || 'test-secret', { expiresIn: process.env.JWT_EXPIRY || '24h' });
+      return res.json({ success: true, user: { id: u.id, email: u.email, fullName: u.full_name, role: u.role }, accessToken });
+    }
+    fail(res, 401, 'Invalid login or password.');
+  }));
+
   // A signed-in student gets their own saved result back (login id + password, same as the other two apps)
   router.get('/me', requireAuth, wrap(async (req, res) => {
     const r = (await pool.query('SELECT * FROM cd_leads WHERE user_id=$1 ORDER BY id DESC LIMIT 1', [req.user.userId])).rows[0];
@@ -229,15 +252,26 @@ export function createCareerRouter(pool) {
     res.json({ lead: { studentName: r.student_name || '', classLabel: r.class_label || '', stream: r.stream || '', schoolName: r.school_name || '', parentName: r.contact_name || '', mobile: r.mobile || '', answers: r.answers || null } });
   }));
 
+  // Staff set a new temporary password for a student's account; shown once, the student changes nothing else
+  router.post('/admin/leads/:id/reset-password', staff, wrap(async (req, res) => {
+    const l = (await pool.query('SELECT * FROM cd_leads WHERE id=$1', [Number(req.params.id)])).rows[0];
+    if (!l || (isCouns(req) && l.assigned_to !== req.user.userId)) return fail(res, 404, 'Not found');
+    if (!l.user_id) return fail(res, 400, 'This lead has no student login to reset.');
+    const pw = newCode(8), u = (await pool.query('UPDATE users SET password_hash=$1 WHERE id=$2 RETURNING email', [await bcrypt.hash(pw, 10), l.user_id])).rows[0];
+    if (!u) return fail(res, 404, 'The student account no longer exists.');
+    try { await pool.query("INSERT INTO audit_logs (actor_user_id, action, entity_type, entity_id) VALUES ($1,'student_password_reset','cd_lead',$2)", [req.user.userId, String(l.id)]); } catch (e) { /* audit is best effort */ }
+    res.json({ ok: true, loginEmail: u.email, mobile: l.mobile, password: pw });
+  }));
+
   const leadOut = r => ({ id: String(r.id), createdAt: r.created_at, source: r.source, schoolId: r.school_id, schoolName: r.school_label || null, contactName: r.contact_name, mobile: r.mobile, email: r.email || '',
-    studentName: r.student_name || '', classLabel: r.class_label || '', stream: r.stream || '', topAreas: r.top_areas || [], status: r.status, note: r.note || '', assignedTo: r.assigned_to, assignedName: r.assigned_name || null, hasAnswers: !!r.answers });
+    studentName: r.student_name || '', classLabel: r.class_label || '', stream: r.stream || '', topAreas: r.top_areas || [], status: r.status, note: r.note || '', assignedTo: r.assigned_to, assignedName: r.assigned_name || null, hasAnswers: !!r.answers, hasAccount: !!r.user_id, loginEmail: r.login_email || '' });
   const leadRows = async (q, req) => {
     const args = [], w = [];
     if (isCouns(req)) { args.push(req.user.userId); w.push('l.assigned_to=$' + args.length); }
     if (q.source) { args.push(s(q.source, 10)); w.push('l.source=$' + args.length); }
     if (q.status) { args.push(s(q.status, 20)); w.push('l.status=$' + args.length); }
     if (q.schoolId) { args.push(Number(q.schoolId)); w.push('l.school_id=$' + args.length); }
-    let rows = (await pool.query(`SELECT l.*, COALESCE(sc.name, l.school_name) AS school_label, u.full_name AS assigned_name FROM cd_leads l LEFT JOIN cd_schools sc ON sc.id = l.school_id LEFT JOIN users u ON u.id = l.assigned_to ${w.length ? 'WHERE ' + w.join(' AND ') : ''} ORDER BY l.id DESC LIMIT 5000`, args)).rows;
+    let rows = (await pool.query(`SELECT l.*, COALESCE(sc.name, l.school_name) AS school_label, lu.email AS login_email, u.full_name AS assigned_name FROM cd_leads l LEFT JOIN cd_schools sc ON sc.id = l.school_id LEFT JOIN users u ON u.id = l.assigned_to LEFT JOIN users lu ON lu.id = l.user_id ${w.length ? 'WHERE ' + w.join(' AND ') : ''} ORDER BY l.id DESC LIMIT 5000`, args)).rows;
     const t = s(q.q, 60).toLowerCase().trim();
     if (t) rows = rows.filter(r => [r.contact_name, r.mobile, r.email, r.student_name].some(x => String(x || '').toLowerCase().includes(t)));
     return rows;
