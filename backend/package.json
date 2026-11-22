@@ -1,16 +1,42 @@
 {
-  "name": "navasetu-assessment-platform",
+  "name": "navasetu-assessment-backend",
   "version": "1.0.0",
-  "description": "NavaSetu Teacher Assessment Platform - Full Stack",
-  "private": true,
+  "description": "NavaSetu Teacher Assessment Platform Backend API",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "migrate": "node src/migrations/run.js",
+    "test:career": "node test/career.test.js"
+  },
+  "keywords": [
+    "assessment",
+    "navasetu",
+    "education"
+  ],
+  "author": "NavaSetu Initiatives",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "pg": "^8.10.0",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "dotenv": "^16.3.1",
+    "cors": "^2.8.5",
+    "express-rate-limit": "^7.0.0",
+    "uuid": "^9.0.0",
+    "nodemailer": "^6.9.6",
+    "xlsx": "^0.18.5",
+    "exceljs": "^4.4.0"
+  },
+  "optionalDependencies": {},
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "pg-mem": "^3.0.5",
+    "jsdom": "^25.0.0"
+  },
   "engines": {
     "node": "18.x || 20.x"
-  },
-  "scripts": {
-    "install-all": "npm install && cd backend && npm install",
-    "postinstall": "cd backend && npm install",
-    "start": "node backend/src/server.js",
-    "migrate": "node backend/src/migrations/run.js",
-    "dev:backend": "cd backend && npm run dev"
   }
 }
