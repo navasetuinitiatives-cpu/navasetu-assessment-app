@@ -69,6 +69,7 @@
 <header>
   <img src="/api/settings/logo" onerror="this.style.display='none'" alt="">
   <h1>NavaSetu — SSB OLQ Readiness</h1>
+  <a class="home" id="headerHomeLink" href="/welcome.html" style="margin-left:auto">🏠 Home</a>
   <a class="home hidden" id="headerLogoutLink" href="#" onclick="ssbLogout(); return false;">🚪 Logout</a>
 </header>
 
@@ -172,7 +173,7 @@ async function api(path, options = {}) {
   const res = await fetch(`${API}${path}`, Object.assign({}, options, { headers }));
   let data = null;
   try { data = await res.json(); } catch (e) {}
-  if (!res.ok) throw new Error((data && data.error) || `Request failed (${res.status})`);
+  if (!res.ok) { const er = new Error((data && data.error) || `Request failed (${res.status})`); er.status = res.status; throw er; }
   return data;
 }
 
@@ -614,7 +615,7 @@ async function submitAndRenderReport(container) {
       body: JSON.stringify({ planType: selectedPlanType })
     });
     if (result.report.locked) {
-      container.innerHTML = `<div class="card"><h2>Payment Pending</h2><p class="muted">Your ${result.report.planType} report has been generated and is waiting on payment confirmation. NavaSetu will release it to you shortly — contact us if you've already paid.</p></div>`;
+      container.innerHTML = ssbHoldHtml();
       return;
     }
     renderReport(container, result.report.htmlContent);
@@ -669,7 +670,7 @@ async function upgradeSsbPlan(newPlanType) {
       ? document.getElementById('reportViewBody')
       : document.getElementById('stepContainer');
     if (result.report.locked) {
-      container.innerHTML = `<div class="card"><h2>Payment Pending</h2><p class="muted">Your ${result.report.planType} report has been generated and is waiting on payment confirmation.</p></div>`;
+      container.innerHTML = ssbHoldHtml();
       return;
     }
     renderReport(container, result.report.htmlContent);
@@ -717,7 +718,7 @@ async function renderSsbDashboard(submittedAttempts) {
     const tierCells = tierOrder.map((t) => {
       const r = byTier[t];
       if (!r) return `<td style="text-align:center; color:#9CA3AF; padding:0.6rem 0.4rem;">—</td>`;
-      return `<td style="text-align:center; padding:0.6rem 0.4rem;"><button class="btn secondary" style="margin-top:0; font-size:0.8rem; padding:0.4rem 0.7rem;" onclick="viewSsbReport('${r.id}')" ${r.payment_status === 'pending' ? 'disabled' : ''}>👁️ View</button></td>`;
+      return `<td style="text-align:center; padding:0.6rem 0.4rem;"><button class="btn secondary" style="margin-top:0; font-size:0.8rem; padding:0.4rem 0.7rem;" onclick="viewSsbReport('${r.id}')">${r.payment_status === 'pending' ? '🔒 Contact us' : '👁️ View'}</button></td>`;
     }).join('');
     const typeBadge = a.is_test
       ? `<span style="background:#DC2626; color:#fff; font-size:0.68rem; font-weight:700; padding:0.15rem 0.5rem; border-radius:999px; white-space:nowrap;">TEST</span>`
@@ -857,8 +858,29 @@ async function viewSsbReport(reportId) {
         <button class="btn secondary" onclick="window.print()">🖨️ Print / Save as PDF</button>
       </div>`;
   } catch (e) {
+    if (e.status === 402 || /payment|unlock|locked/i.test(e.message || '')) {
+      document.getElementById('dashboardScreen').classList.add('hidden');
+      document.getElementById('reportViewScreen').classList.remove('hidden');
+      document.getElementById('reportViewBody').innerHTML = ssbHoldHtml() + '<button class="btn secondary" onclick="backToSsbDashboard()">⬅️ Back to My Reports</button>';
+      return;
+    }
     alert('Could not open this report: ' + e.message);
   }
+}
+
+function ssbHoldHtml() {
+  const wa = encodeURIComponent('Hello NavaSetu, I would like to unlock my SSB report.');
+  return `<div class="card" style="text-align:center; border-color:#D4AF37;">
+    <div style="font-size:2rem">🔒</div>
+    <h2>Your detailed report is ready for you</h2>
+    <p class="muted">This is a paid, counsellor-supported report. Your responses are safely saved. To receive it, please reach out to NavaSetu by call or WhatsApp and we will unlock it for you.</p>
+    <p style="font-size:1.2rem; font-weight:700; margin:0.8rem 0;">📞 8556840001</p>
+    <div style="display:flex; gap:0.6rem; flex-wrap:wrap; justify-content:center;">
+      <a class="btn" style="text-decoration:none; display:inline-block;" href="tel:+918556840001">📞 Call us</a>
+      <a class="btn secondary" style="text-decoration:none; display:inline-block;" target="_blank" rel="noopener" href="https://wa.me/918556840001?text=${wa}">💬 WhatsApp us</a>
+    </div>
+    <p class="muted" style="margin-top:0.8rem; font-size:0.85rem;">Once we confirm, open <strong>My Reports</strong> and tap View.</p>
+  </div>`;
 }
 
 function ssbPromoHtml() {
@@ -867,6 +889,7 @@ function ssbPromoHtml() {
     <p style="text-transform:uppercase; letter-spacing:0.08em; font-size:0.75rem; margin:0; color:#5B21B6; font-weight:700;">NavaSetu career guidance</p>
     <h2 style="margin-top:0.25rem;">Get your own AI-enabled personalised career dashboard</h2>
     <p class="muted">Taking the assessment is the first step. The dashboard turns your result into a plan, with a counsellor beside you. Reach out to us and we will set you up.</p>
+    <img src="/ns-dashboard-2.jpg" onerror="this.remove()" alt="NavaSetu student dashboard on desktop" style="width:100%; height:auto; border-radius:10px; border:1px solid #DDD6FE; margin-bottom:0.75rem;">
     <img src="/ns-dashboard.jpg" alt="NavaSetu AI-powered student dashboard showing career profiling, counsellor connect and AI assistant" style="width:100%; height:auto; border-radius:10px; border:1px solid #E5E7EB; margin:0.5rem 0 0.75rem;" loading="lazy">
     <ul style="margin:0 0 0.75rem; padding-left:1.2rem;"><li>A personalised AI career report of 30+ pages, built from your assessment</li><li>Your own counsellor, on WhatsApp, call or review, from the dashboard</li><li>An AI career assistant for instant answers to any career question</li><li>10,000+ Indian colleges and 8,000+ universities abroad, with admission prediction and shortlisting</li><li>1,400+ entrance exams and a library of 3,300+ careers</li><li>Scholarships, free virtual internships, online courses and your own personal website</li></ul>
     <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">

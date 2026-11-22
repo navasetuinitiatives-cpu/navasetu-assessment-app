@@ -315,3 +315,5 @@ CREATE TABLE IF NOT EXISTS cd_leads (
 
 -- Career Discovery: keep the student's answers with the lead so staff can open the report
 ALTER TABLE cd_leads ADD COLUMN IF NOT EXISTS answers JSONB;
+
+ALTER TABLE cd_leads ADD COLUMN IF NOT EXISTS school_name TEXT;

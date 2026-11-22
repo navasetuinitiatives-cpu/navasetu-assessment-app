@@ -1262,7 +1262,7 @@
                         const tierCells = tierOrder.map(t => {
                             const r = byTier[t];
                             if (!r) return `<td style="text-align:center; color:var(--text-light); padding:0.6rem 0.4rem;">—</td>`;
-                            return `<td style="text-align:center; padding:0.6rem 0.4rem;"><button class="btn btn-secondary btn-small" onclick="app.openStoredReport('${r.id}')" ${r.payment_status === 'pending' ? 'disabled' : ''}>👁️ View</button></td>`;
+                            return `<td style="text-align:center; padding:0.6rem 0.4rem;"><button class="btn btn-secondary btn-small" onclick="app.openStoredReport('${r.id}')" >${r.payment_status === 'pending' ? '🔒 Contact us' : '👁️ View'}</button></td>`;
                         }).join('');
                         const typeBadge = a.is_test
                             ? `<span style="background:#DC2626; color:#fff; font-size:0.68rem; font-weight:700; padding:0.15rem 0.5rem; border-radius:999px; white-space:nowrap;">TEST</span>`
@@ -1349,7 +1349,14 @@
 
             async openStoredReport(reportId) {
                 try {
-                    const report = await apiFetch(`/reports/${reportId}`);
+                    let report;
+                    try { report = await apiFetch(`/reports/${reportId}`); }
+                    catch (err) {
+                        if (/payment|unlock|locked|402/i.test(err.message || '') || err.status === 402) {
+                            document.getElementById('reportContainer').innerHTML = this.paidHoldHtml(null); this.showPage('report'); return;
+                        }
+                        throw err;
+                    }
                     document.getElementById('reportContainer').innerHTML = report.html_content || '<p>This report has no saved content.</p>';
                     this.selectedPlan = report.plan_type;
                     this.currentReportId = report.id;
@@ -1826,9 +1833,25 @@
                 this.generateReport();
             }
 
+            paidHoldHtml(plan) {
+                const label = plan === 'navigate' ? 'Navigate' : plan === 'explore' ? 'Explore' : 'detailed';
+                return `<div style="max-width:640px;margin:2rem auto;padding:2rem;border:2px solid #D4AF37;border-radius:14px;background:#fff;text-align:center;">
+                    <div style="font-size:2.2rem">🔒</div>
+                    <h2 style="margin:.4rem 0">Your ${label} report is ready for you</h2>
+                    <p style="color:#444;line-height:1.6">The ${label} report is a paid, counsellor-supported report. Your responses are safely saved. To receive it, please reach out to NavaSetu by call or WhatsApp and we will unlock it for you.</p>
+                    <p style="font-size:1.25rem;font-weight:700;margin:1rem 0">📞 8556840001</p>
+                    <div style="display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap">
+                        <a class="btn btn-primary" href="tel:+918556840001" style="text-decoration:none">📞 Call us</a>
+                        <a class="btn btn-secondary" href="https://wa.me/918556840001?text=${encodeURIComponent('Hello NavaSetu, I would like to unlock my ' + label + ' report.')}" target="_blank" rel="noopener" style="text-decoration:none">💬 WhatsApp us</a>
+                    </div>
+                    <p style="margin-top:1rem;font-size:.85rem;color:#777">Once we confirm, open <strong>My Reports</strong> on your Home page and tap View.</p>
+                </div>`;
+            }
+
             async generateReport() {
                 this.renderReport();
                 this.showPage('report');
+                const paid = this.selectedPlan === 'explore' || this.selectedPlan === 'navigate';
 
                 // Persist the generated report server-side so NavaSetu admins and the
                 // teacher can reopen it later, and so the payment gate (if PILOT_FREE_ACCESS
@@ -1846,6 +1869,8 @@
                     });
                     this.currentReportId = saved.report.id;
                 } catch (e) { /* non-fatal */ }
+                // Paid tiers are never shown on screen — they are unlocked by NavaSetu after payment.
+                if (paid) { const c = document.getElementById('reportContainer'); if (c) c.innerHTML = this.paidHoldHtml(this.selectedPlan); }
             }
 
             getColorForScore(score) {
@@ -2958,7 +2983,7 @@
                         <div style="display:flex; justify-content:space-between; padding:0.4rem 0; border-bottom:1px solid rgba(255,255,255,0.2);"><span>Current Plan</span><strong>₹${currentPlanPrice[this.selectedPlan]}</strong></div>
                         <div style="display:flex; justify-content:space-between; padding:0.4rem 0; border-bottom:1px solid rgba(255,255,255,0.2);"><span>New Plan (${planLabel})</span><strong>₹${upgrade.cost}</strong></div>
                         <div style="display:flex; justify-content:space-between; padding:0.6rem 0 0.2rem 0; font-size:1.05rem;"><span>Amount Due</span><strong style="color: var(--primary-light);">₹${upgrade.differential}</strong></div>
-                        <p style="margin-top:1rem; font-size:0.85rem; opacity:0.85;">Payment isn't wired up yet for this pilot — your ${planLabel} report will unlock immediately.</p>
+                        <p style="margin-top:1rem; font-size:0.9rem;">To unlock your ${planLabel} report, please call or WhatsApp NavaSetu on <strong>8556840001</strong>. We will unlock it for you once payment is confirmed.</p>
                     `;
 
                     showModal(message, 'pricing', `Upgrade to ${planLabel} Plan`);

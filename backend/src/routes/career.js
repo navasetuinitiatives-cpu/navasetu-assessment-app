@@ -82,8 +82,8 @@ export function createCareerRouter(pool) {
   }));
 
   /* ---------- PUBLIC: lead capture (name, mobile, email) ---------- */
-  const insertLead = l => pool.query(`INSERT INTO cd_leads (source,school_id,contact_name,mobile,email,student_name,class_label,stream,top_areas,consent_at,assigned_to,answers)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`, [l.source, l.schoolId || null, l.contactName, l.mobile, l.email || null, l.studentName || null, l.classLabel || null, l.stream || null, JSON.stringify(l.topAreas || []), l.consentAt || null, l.assignedTo || null, l.answers ? JSON.stringify(l.answers) : null]);
+  const insertLead = l => pool.query(`INSERT INTO cd_leads (source,school_id,contact_name,mobile,email,student_name,class_label,stream,top_areas,consent_at,assigned_to,answers,school_name)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`, [l.source, l.schoolId || null, l.contactName, l.mobile, l.email || null, l.studentName || null, l.classLabel || null, l.stream || null, JSON.stringify(l.topAreas || []), l.consentAt || null, l.assignedTo || null, l.answers ? JSON.stringify(l.answers) : null, l.schoolName || null]);
 
   const demoAnswers = b => { // keep the demo student's answers so staff can open their report; only if they are a complete, valid set
     try { const cls = s(b.classLabel, 5), st = E.bandOf(cls) === '1112' ? s(b.stream, 6) : ''; return E.CLASSES.includes(cls) && E.validAnswers(b.answers, E.bandOf(cls), st) ? b.answers : null; } catch (e) { return null; }
@@ -91,9 +91,9 @@ export function createCareerRouter(pool) {
   router.post('/lead', wrap(async (req, res) => { // public demo: parent details up front, with consent
     if (hit('lead:' + req.ip, 200, 3600e3)) return fail(res, 429, 'Too many requests.');
     const b = req.body || {};
-    if (!b.consentAt || !MOBILE.test(s(b.parentPhone, 10)) || s(b.parentName, 80).trim().length < 2 || s(b.studentName, 80).trim().length < 2) return fail(res, 400, 'consent, the student name, a parent name and a valid mobile are required');
+    if (!b.consentAt || !MOBILE.test(s(b.parentPhone, 10)) || s(b.parentName, 80).trim().length < 2 || s(b.studentName, 80).trim().length < 2 || s(b.schoolName, 100).trim().length < 3) return fail(res, 400, 'consent, the student name, the school, a parent name and a valid mobile are required');
     const email = s(b.parentEmail, 120).trim();
-    await insertLead({ source: 'demo', contactName: s(b.parentName, 80).trim(), mobile: s(b.parentPhone, 10), email: EMAIL.test(email) ? email : '', studentName: s(b.studentName, 80), classLabel: s(b.classLabel, 20),
+    await insertLead({ source: 'demo', contactName: s(b.parentName, 80).trim(), mobile: s(b.parentPhone, 10), email: EMAIL.test(email) ? email : '', studentName: s(b.studentName, 80), schoolName: s(b.schoolName, 100).trim(), classLabel: s(b.classLabel, 20),
       stream: s(b.stream, 40), topAreas: (Array.isArray(b.topAreas) ? b.topAreas : []).slice(0, 3).map(a => ({ name: s(a.area || a.name, 60), score: Number(a.score) || 0 })), consentAt: new Date(b.consentAt), answers: demoAnswers(b) });
     res.json({ ok: true });
   }));
@@ -218,7 +218,7 @@ export function createCareerRouter(pool) {
 
   /* ----- Leads: admins see all; counsellors see only leads assigned to them (same rule as the main CRM) ----- */
   const isCouns = req => req.user.role === 'counsellor';
-  const leadOut = r => ({ id: String(r.id), createdAt: r.created_at, source: r.source, schoolId: r.school_id, schoolName: r.school_name || null, contactName: r.contact_name, mobile: r.mobile, email: r.email || '',
+  const leadOut = r => ({ id: String(r.id), createdAt: r.created_at, source: r.source, schoolId: r.school_id, schoolName: r.school_label || null, contactName: r.contact_name, mobile: r.mobile, email: r.email || '',
     studentName: r.student_name || '', classLabel: r.class_label || '', stream: r.stream || '', topAreas: r.top_areas || [], status: r.status, note: r.note || '', assignedTo: r.assigned_to, assignedName: r.assigned_name || null, hasAnswers: !!r.answers });
   const leadRows = async (q, req) => {
     const args = [], w = [];
@@ -226,7 +226,7 @@ export function createCareerRouter(pool) {
     if (q.source) { args.push(s(q.source, 10)); w.push('l.source=$' + args.length); }
     if (q.status) { args.push(s(q.status, 20)); w.push('l.status=$' + args.length); }
     if (q.schoolId) { args.push(Number(q.schoolId)); w.push('l.school_id=$' + args.length); }
-    let rows = (await pool.query(`SELECT l.*, sc.name AS school_name, u.full_name AS assigned_name FROM cd_leads l LEFT JOIN cd_schools sc ON sc.id = l.school_id LEFT JOIN users u ON u.id = l.assigned_to ${w.length ? 'WHERE ' + w.join(' AND ') : ''} ORDER BY l.id DESC LIMIT 5000`, args)).rows;
+    let rows = (await pool.query(`SELECT l.*, COALESCE(sc.name, l.school_name) AS school_label, u.full_name AS assigned_name FROM cd_leads l LEFT JOIN cd_schools sc ON sc.id = l.school_id LEFT JOIN users u ON u.id = l.assigned_to ${w.length ? 'WHERE ' + w.join(' AND ') : ''} ORDER BY l.id DESC LIMIT 5000`, args)).rows;
     const t = s(q.q, 60).toLowerCase().trim();
     if (t) rows = rows.filter(r => [r.contact_name, r.mobile, r.email, r.student_name].some(x => String(x || '').toLowerCase().includes(t)));
     return rows;
@@ -240,7 +240,7 @@ export function createCareerRouter(pool) {
   router.get('/admin/leads.csv', staff, wrap(async (req, res) => {
     const rows = await leadRows(req.query, req);
     res.type('text/csv').attachment('career-leads.csv').send(toCsv(['Date', 'Source', 'School', 'Contact name', 'Mobile', 'Email', 'Student', 'Class', 'Stream', 'Status', 'Assigned to', 'Note', 'Top areas'],
-      rows.map(r => [new Date(r.created_at).toISOString().slice(0, 10), r.source, r.school_name || '', r.contact_name, r.mobile, r.email || '', r.student_name || '', r.class_label || '', r.stream || '', r.status, r.assigned_name || '', r.note || '', (r.top_areas || []).map(a => a.name).join('; ')])));
+      rows.map(r => [new Date(r.created_at).toISOString().slice(0, 10), r.source, r.school_label || '', r.contact_name, r.mobile, r.email || '', r.student_name || '', r.class_label || '', r.stream || '', r.status, r.assigned_name || '', r.note || '', (r.top_areas || []).map(a => a.name).join('; ')])));
   }));
   router.post('/admin/leads', staff, wrap(async (req, res) => { // staff add a lead from a call, event or walk-in
     const b = req.body || {}, name = s(b.contactName, 80).trim(), mobile = s(b.mobile, 10).replace(/\D/g, ''), email = s(b.email, 120).trim();

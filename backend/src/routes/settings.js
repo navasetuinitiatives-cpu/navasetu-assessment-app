@@ -213,7 +213,7 @@ router.post('/backup/restore', requireAuth, requireAdmin, async (req, res) => {
       const cd = data.careerDiscovery, json = (rows) => (rows || []).map((r) => ({ ...r, headcount: r.headcount ? JSON.stringify(r.headcount) : r.headcount, answers: r.answers ? JSON.stringify(r.answers) : r.answers, scores: r.scores ? JSON.stringify(r.scores) : r.scores, top_areas: r.top_areas ? JSON.stringify(r.top_areas) : r.top_areas, flags: r.flags ? JSON.stringify(r.flags) : r.flags }));
       await insertRows('cd_schools', ['id', 'code', 'name', 'city', 'headcount', 'is_open', 'consent_by', 'consent_at', 'consent_note', 'created_at'], json(cd.schools));
       await insertRows('cd_submissions', ['id', 'school_id', 'name', 'class_label', 'section', 'roll_no', 'stream', 'result_code', 'status', 'released_at', 'answers', 'scores', 'top_areas', 'flags', 'duration_sec', 'created_at'], json(cd.submissions));
-      await insertRows('cd_leads', ['id', 'created_at', 'updated_at', 'source', 'school_id', 'contact_name', 'mobile', 'email', 'student_name', 'class_label', 'stream', 'top_areas', 'consent_at', 'status', 'note', 'assigned_to', 'answers'], json(cd.leads));
+      await insertRows('cd_leads', ['id', 'created_at', 'updated_at', 'source', 'school_id', 'contact_name', 'mobile', 'email', 'student_name', 'class_label', 'stream', 'top_areas', 'consent_at', 'status', 'note', 'assigned_to', 'answers', 'school_name', 'user_id'], json(cd.leads));
       for (const tb of ['cd_schools', 'cd_submissions', 'cd_leads']) await client.query(`SELECT setval('${tb}_id_seq', COALESCE((SELECT MAX(id) FROM ${tb}), 1))`);
     }
 
