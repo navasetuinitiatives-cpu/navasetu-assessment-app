@@ -249,3 +249,66 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO users (email, password_hash, full_name, role, client_type, status)
 VALUES ('navasetuinitiatives@gmail.com', '$2a$10$P0suKczb13U9qOUMRjeocu6yt3m0j6cNPL.isC2pZQRJIWekxZgZC', 'NavaSetu Admin', 'platform_admin', 'b2c', 'active')
 ON CONFLICT (email) DO NOTHING;
+
+-- =========================================================================
+-- CAREER DISCOVERY (free Class VIII-XII student activity). Fully separate
+-- cd_* tables: nothing here touches the teacher-wellness or SSB tables.
+-- School activity: students enter with school code + class/section/roll,
+-- results are held until staff approve them, schools only ever receive an
+-- anonymous aggregate report. Parent contacts land in cd_leads (never shown
+-- to the school); counsellors see only leads assigned to them.
+-- =========================================================================
+CREATE TABLE IF NOT EXISTS cd_schools (
+  id SERIAL PRIMARY KEY,
+  code TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  city TEXT,
+  headcount JSONB NOT NULL DEFAULT '{}',
+  is_open BOOLEAN NOT NULL DEFAULT false,
+  consent_by TEXT,
+  consent_at TIMESTAMP,
+  consent_note TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS cd_submissions (
+  id BIGSERIAL PRIMARY KEY,
+  school_id INTEGER NOT NULL REFERENCES cd_schools(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  class_label TEXT NOT NULL,
+  section TEXT NOT NULL,
+  roll_no TEXT NOT NULL,
+  stream TEXT NOT NULL DEFAULT '',
+  result_code TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  released_at TIMESTAMP,
+  answers JSONB NOT NULL,
+  scores JSONB NOT NULL,
+  top_areas JSONB NOT NULL,
+  flags JSONB NOT NULL DEFAULT '[]',
+  duration_sec INTEGER,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (school_id, class_label, section, roll_no),
+  UNIQUE (school_id, result_code)
+);
+
+CREATE INDEX IF NOT EXISTS idx_cd_submissions_school ON cd_submissions (school_id, status);
+
+CREATE TABLE IF NOT EXISTS cd_leads (
+  id BIGSERIAL PRIMARY KEY,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  source TEXT NOT NULL,
+  school_id INTEGER,
+  contact_name TEXT NOT NULL,
+  mobile TEXT NOT NULL,
+  email TEXT,
+  student_name TEXT,
+  class_label TEXT,
+  stream TEXT,
+  top_areas JSONB NOT NULL DEFAULT '[]',
+  consent_at TIMESTAMP,
+  status TEXT NOT NULL DEFAULT 'new',
+  note TEXT,
+  assigned_to UUID REFERENCES users(id) ON DELETE SET NULL
+);
