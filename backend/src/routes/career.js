@@ -3,7 +3,7 @@
 import express from 'express';
 import crypto from 'crypto';
 import E from '../utils/careerEngine.js'; // same file the browser loads, so client and server scoring are identical
-import { requireAuth, requireAdmin, requireStaff } from '../middleware/auth.js';
+import { requireAuth, requireAdmin, requireStaff, optionalAuth } from '../middleware/auth.js';
 import { buildReport } from '../utils/careerReport.js';
 import { reportToXlsx } from '../utils/careerXlsx.js';
 
@@ -82,19 +82,23 @@ export function createCareerRouter(pool) {
   }));
 
   /* ---------- PUBLIC: lead capture (name, mobile, email) ---------- */
-  const insertLead = l => pool.query(`INSERT INTO cd_leads (source,school_id,contact_name,mobile,email,student_name,class_label,stream,top_areas,consent_at,assigned_to,answers,school_name)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`, [l.source, l.schoolId || null, l.contactName, l.mobile, l.email || null, l.studentName || null, l.classLabel || null, l.stream || null, JSON.stringify(l.topAreas || []), l.consentAt || null, l.assignedTo || null, l.answers ? JSON.stringify(l.answers) : null, l.schoolName || null]);
+  const insertLead = l => pool.query(`INSERT INTO cd_leads (source,school_id,contact_name,mobile,email,student_name,class_label,stream,top_areas,consent_at,assigned_to,answers,school_name,user_id)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id`, [l.source, l.schoolId || null, l.contactName, l.mobile, l.email || null, l.studentName || null, l.classLabel || null, l.stream || null, JSON.stringify(l.topAreas || []), l.consentAt || null, l.assignedTo || null, l.answers ? JSON.stringify(l.answers) : null, l.schoolName || null, l.userId || null]);
 
   const demoAnswers = b => { // keep the demo student's answers so staff can open their report; only if they are a complete, valid set
     try { const cls = s(b.classLabel, 5), st = E.bandOf(cls) === '1112' ? s(b.stream, 6) : ''; return E.CLASSES.includes(cls) && E.validAnswers(b.answers, E.bandOf(cls), st) ? b.answers : null; } catch (e) { return null; }
   };
-  router.post('/lead', wrap(async (req, res) => { // public demo: parent details up front, with consent
+  router.post('/lead', optionalAuth, wrap(async (req, res) => { // public demo: parent details up front, with consent
     if (hit('lead:' + req.ip, 200, 3600e3)) return fail(res, 429, 'Too many requests.');
     const b = req.body || {};
     if (!b.consentAt || !MOBILE.test(s(b.parentPhone, 10)) || s(b.parentName, 80).trim().length < 2 || s(b.studentName, 80).trim().length < 2 || s(b.schoolName, 100).trim().length < 3) return fail(res, 400, 'consent, the student name, the school, a parent name and a valid mobile are required');
     const email = s(b.parentEmail, 120).trim();
-    await insertLead({ source: 'demo', contactName: s(b.parentName, 80).trim(), mobile: s(b.parentPhone, 10), email: EMAIL.test(email) ? email : '', studentName: s(b.studentName, 80), schoolName: s(b.schoolName, 100).trim(), classLabel: s(b.classLabel, 20),
-      stream: s(b.stream, 40), topAreas: (Array.isArray(b.topAreas) ? b.topAreas : []).slice(0, 3).map(a => ({ name: s(a.area || a.name, 60), score: Number(a.score) || 0 })), consentAt: new Date(b.consentAt), answers: demoAnswers(b) });
+    const uid = req.user && UUID.test(String(req.user.userId)) ? req.user.userId : null;
+    const lead = { source: 'demo', contactName: s(b.parentName, 80).trim(), mobile: s(b.parentPhone, 10), email: EMAIL.test(email) ? email : '', studentName: s(b.studentName, 80), schoolName: s(b.schoolName, 100).trim(), classLabel: s(b.classLabel, 20),
+      stream: s(b.stream, 40), topAreas: (Array.isArray(b.topAreas) ? b.topAreas : []).slice(0, 3).map(a => ({ name: s(a.area || a.name, 60), score: Number(a.score) || 0 })), consentAt: new Date(b.consentAt), answers: demoAnswers(b), userId: uid };
+    const prev = uid ? (await pool.query('SELECT id FROM cd_leads WHERE user_id=$1 ORDER BY id DESC LIMIT 1', [uid])).rows[0] : null;
+    if (prev) await pool.query('UPDATE cd_leads SET contact_name=$1,mobile=$2,email=$3,student_name=$4,class_label=$5,stream=$6,top_areas=$7,answers=$8,school_name=$9,updated_at=CURRENT_TIMESTAMP WHERE id=$10', [lead.contactName, lead.mobile, lead.email || null, lead.studentName, lead.classLabel || null, lead.stream || null, JSON.stringify(lead.topAreas), lead.answers ? JSON.stringify(lead.answers) : null, lead.schoolName || null, prev.id]);
+    else await insertLead(lead);
     res.json({ ok: true });
   }));
 
@@ -218,6 +222,13 @@ export function createCareerRouter(pool) {
 
   /* ----- Leads: admins see all; counsellors see only leads assigned to them (same rule as the main CRM) ----- */
   const isCouns = req => req.user.role === 'counsellor';
+  // A signed-in student gets their own saved result back (login id + password, same as the other two apps)
+  router.get('/me', requireAuth, wrap(async (req, res) => {
+    const r = (await pool.query('SELECT * FROM cd_leads WHERE user_id=$1 ORDER BY id DESC LIMIT 1', [req.user.userId])).rows[0];
+    if (!r) return res.json({ lead: null });
+    res.json({ lead: { studentName: r.student_name || '', classLabel: r.class_label || '', stream: r.stream || '', schoolName: r.school_name || '', parentName: r.contact_name || '', mobile: r.mobile || '', answers: r.answers || null } });
+  }));
+
   const leadOut = r => ({ id: String(r.id), createdAt: r.created_at, source: r.source, schoolId: r.school_id, schoolName: r.school_label || null, contactName: r.contact_name, mobile: r.mobile, email: r.email || '',
     studentName: r.student_name || '', classLabel: r.class_label || '', stream: r.stream || '', topAreas: r.top_areas || [], status: r.status, note: r.note || '', assignedTo: r.assigned_to, assignedName: r.assigned_name || null, hasAnswers: !!r.answers });
   const leadRows = async (q, req) => {

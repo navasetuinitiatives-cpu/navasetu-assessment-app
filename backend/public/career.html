@@ -152,35 +152,40 @@ function render() {
 }
 
 function viewIntro() {
-  const sends = !!CONFIG.LEAD_ENDPOINT;
+  const sends = !!CONFIG.LEAD_ENDPOINT, reg = S.auth !== 'login';
+  const consent = `<label class="check"><input id="consent" type="checkbox"${S.consent ? ' checked' : ''}>
+      <span>I am the parent or guardian, or a parent or guardian is with the student and agrees to this. ${sends
+        ? 'I understand NavaSetu will receive the student\'s name, school, class, stream, our contact details and the result summary, so a counsellor can follow up if we ask. It is used for nothing else.'
+        : 'I understand all answers stay on this device and are not sent anywhere.'}</span></label>`;
   return `
   <div class="card hero">
     <h1>Career Discovery <span class="gold">for Class VIII–XII</span></h1>
     <p style="margin-top:8px">A free, 10–12 minute snapshot of your interests, motivators, learning style and the career areas that fit you. No right or wrong answers, and nothing is marked.</p>
   </div>
   <div class="card">
-    <h2>Let's begin</h2>
+    <div class="actions" style="margin-bottom:10px"><button class="btn${reg ? '' : ' ghost'}" id="tabreg">New student: register</button><button class="btn${reg ? ' ghost' : ''}" id="tablogin">Already registered: log in</button></div>
+    ${S.authed ? `<p class="small">Signed in as <b>${esc(S.loginEmail || '')}</b>. Please confirm the details below to begin.</p>` : ''}
+    ${reg || S.authed ? `
     <div class="row">
       <div><label for="name">Student's name</label><input id="name" type="text" maxlength="60" autocomplete="off" value="${esc(S.name)}"></div>
-      <div><label for="school">School name</label><input id="school" type="text" maxlength="100" autocomplete="off" value="${esc(S.school||'')}"></div>
+      <div><label for="school">School name</label><input id="school" type="text" maxlength="100" autocomplete="off" value="${esc(S.school || '')}"></div>
     </div>
     <div class="row">
       <div><label for="cls">Current class</label><select id="cls"><option value="">Select…</option>${CLASSES.map(c => `<option${S.cls === c ? ' selected' : ''}>${c}</option>`).join('')}</select></div>
-    </div>
-    <hr class="gold">
-    <h3>Parent / guardian details</h3>
-    <p class="small muted">Students are under 18, so a parent or guardian needs to agree before we begin.</p>
-    <div class="row">
       <div><label for="parent">Parent / guardian name</label><input id="parent" type="text" maxlength="60" value="${esc(S.parent)}"></div>
-      <div><label for="phone">Parent mobile (India, 10 digits)</label><input id="phone" type="tel" inputmode="numeric" maxlength="10" value="${esc(S.phone)}"></div>
     </div>
-    <label for="email">Parent email <span class="muted">(optional)</span></label><input id="email" type="email" maxlength="100" value="${esc(S.email)}">
-    <label class="check"><input id="consent" type="checkbox"${S.consent ? ' checked' : ''}>
-      <span>I am the parent or guardian, or a parent or guardian is with the student and agrees to this. ${sends
-        ? 'I understand NavaSetu will receive the student\'s name, class, stream, our contact details and the result summary, so a counsellor can follow up if we ask. It is used for nothing else.'
-        : 'I understand all answers stay on this device and are not sent anywhere.'}</span></label>
+    <div class="row">
+      <div><label for="phone">Parent mobile (India, 10 digits)</label><input id="phone" type="tel" inputmode="numeric" maxlength="10" value="${esc(S.phone)}"></div>
+      ${S.authed ? '' : `<div><label for="email">Login ID (email)</label><input id="email" type="email" maxlength="100" autocomplete="username" value="${esc(S.email)}"></div>`}
+    </div>
+    ${S.authed ? '' : `<label for="pw">Choose a password <span class="muted">(at least 8 characters)</span></label><input id="pw" type="password" maxlength="100" autocomplete="new-password">`}
+    ${consent}
     <div class="err" id="err">${esc(S.err)}</div>
-    <div class="actions"><button class="btn" id="go">Start the assessment</button></div>
+    <div class="actions"><button class="btn" id="go">${S.authed ? 'Start the assessment' : 'Register and start'}</button></div>` : `
+    <label for="lemail">Login ID (email)</label><input id="lemail" type="email" maxlength="100" autocomplete="username" value="${esc(S.loginEmail || '')}">
+    <label for="lpw">Password</label><input id="lpw" type="password" maxlength="100" autocomplete="current-password">
+    <div class="err" id="err">${esc(S.err)}</div>
+    <div class="actions"><button class="btn" id="dologin">Log in and view my report</button></div>`}
   </div>
   <p class="small muted" style="text-align:center">This is a free demo snapshot. It guides exploration; it does not decide anyone's future.</p>`;
 }
@@ -435,7 +440,7 @@ function viewResult() {
 function fail(m) { S.err = m; const e = $('#err'); if (e) e.textContent = m; }
 
 function startQuizSchool() {
-  S.name = $('#name').value.trim(); S.school = ($('#school') ? $('#school').value.trim() : ''); S.cls = $('#cls').value; S.section = $('#section').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  S.name = $('#name').value.trim(); S.cls = $('#cls').value; S.section = $('#section').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
   S.roll = $('#roll').value.trim().replace(/[^A-Za-z0-9\-\/]/g, ''); S.consent = $('#consent').checked;
   if (S.name.length < 2) return fail('Please enter your full name.');
   if (!S.cls) return fail('Please select your class.');
@@ -475,20 +480,58 @@ async function checkResult() {
   } catch (e) { S.busy = false; render(); fail('No internet connection. Please try again.'); }
 }
 
-function startQuiz() {
+const TOK = 'ns_career_token';
+async function authCall(path, body) {
+  const r = await fetch('/api/auth/' + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'Something went wrong. Please try again.'); return j;
+}
+async function startQuiz() {
   if (S.mode === 'school') return startQuizSchool();
-  S.name = $('#name').value.trim(); S.cls = $('#cls').value; S.parent = $('#parent').value.trim();
-  S.phone = $('#phone').value.replace(/\D/g, ''); S.email = $('#email').value.trim(); S.consent = $('#consent').checked;
+  S.name = $('#name').value.trim(); S.cls = $('#cls').value; S.parent = $('#parent').value.trim(); S.school = $('#school').value.trim();
+  S.phone = $('#phone').value.replace(/\D/g, ''); S.consent = $('#consent').checked;
+  if ($('#email')) S.email = $('#email').value.trim().toLowerCase();
+  const pw = $('#pw') ? $('#pw').value : null;
   if (S.name.length < 2) return fail("Please enter the student's name.");
-  if (!S.cls) return fail('Please select the current class.');
   if (S.school.length < 3) return fail("Please enter the student's school name.");
+  if (!S.cls) return fail('Please select the current class.');
   if (S.parent.length < 2) return fail("Please enter the parent or guardian's name.");
   if (!/^[6-9]\d{9}$/.test(S.phone)) return fail('Please enter a valid 10-digit Indian mobile number.');
-  if (S.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(S.email)) return fail('That email address does not look right.');
+  if (!S.authed) {
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(S.email)) return fail('Please enter a valid email as your login ID.');
+    if (!pw || pw.length < 8) return fail('Please choose a password of at least 8 characters.');
+  }
   if (!S.consent) return fail('A parent or guardian needs to tick the consent box to continue.');
+  if (!S.authed) {
+    try {
+      const j = await authCall('register', { email: S.email, password: pw, fullName: S.name, phoneNumber: S.phone });
+      try { localStorage.setItem(TOK, j.accessToken); } catch (e) {}
+      S.authed = true; S.loginEmail = S.email;
+      try { await fetch('/api/auth/demographics', { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + j.accessToken }, body: JSON.stringify({ institution: S.school, institutionType: 'School' }) }); } catch (e) {}
+    } catch (e) { return fail(/already registered/i.test(e.message) ? 'This email is already registered. Please use "Already registered: log in".' : e.message); }
+  }
   S.err = ''; S.consentAt = S.consentAt || new Date().toISOString(); S.page = 0;
   S.step = band() === '1112' ? 'stream' : 'quiz';
   render();
+}
+
+async function doLogin() {
+  const em = $('#lemail').value.trim().toLowerCase(), pw = $('#lpw').value; S.loginEmail = em;
+  if (!em || !pw) return fail('Please enter your login ID and password.');
+  try {
+    const j = await authCall('login', { email: em, password: pw });
+    try { localStorage.setItem(TOK, j.accessToken); } catch (e) {}
+    S.authed = true; S.loginEmail = em; S.err = '';
+    await loadMine(j.accessToken, j.user && j.user.fullName);
+  } catch (e) { fail(e.message); }
+}
+async function loadMine(tok, fullName) {
+  const r = await fetch('/api/career/me', { headers: { Authorization: 'Bearer ' + tok } }); const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(r.status === 401 ? 'Please log in again.' : (j.error || 'Could not load your report.'));
+  const l = j.lead;
+  if (l && l.answers) { Object.assign(S, { name: l.studentName, school: l.schoolName, cls: String(l.classLabel).split('-')[0], stream: l.stream || '', ans: l.answers, step: 'result' }); return render(); }
+  if (l) Object.assign(S, { name: l.studentName, school: l.schoolName, cls: String(l.classLabel).split('-')[0], parent: l.parentName, phone: l.mobile });
+  else S.name = fullName || '';
+  S.auth = 'register'; render();
 }
 
 function sendLead() {
@@ -497,7 +540,7 @@ function sendLead() {
   const body = { studentName: S.name, schoolName: S.school, classLabel: S.cls, stream: band() === '1112' ? S.stream : '', parentName: S.parent, parentPhone: S.phone, parentEmail: S.email, consentAt: S.consentAt,
     topAreas: R.rows.filter(r => r.open).slice(0, 3).map(r => ({ area: r.a.name, score: r.score })),
     scores: { themes: R.theme, motivators: R.mot, strengths: R.str, learning: R.lc }, answers: S.ans };
-  try { fetch(CONFIG.LEAD_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).catch(() => {}); } catch (e) { /* ignore */ }
+  try { fetch(CONFIG.LEAD_ENDPOINT, { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, (function () { try { const k = localStorage.getItem(TOK); return k ? { Authorization: 'Bearer ' + k } : {}; } catch (e) { return {}; } })()), body: JSON.stringify(body) }).catch(() => {}); } catch (e) { /* ignore */ }
 }
 
 document.addEventListener('click', e => {
@@ -526,6 +569,9 @@ document.addEventListener('click', e => {
   if (t.id === 'backintro') { S.err = ''; S.info = ''; S.step = 'intro'; return render(); }
   if (t.id === 'docheck') return checkResult();
   if (t.id === 'sendlead') return sendSchoolLead();
+  if (t.id === 'tabreg') { S.auth = 'register'; S.err = ''; return render(); }
+  if (t.id === 'tablogin') { S.auth = 'login'; S.err = ''; return render(); }
+  if (t.id === 'dologin') return doLogin();
   if (t.id === 'print') return window.print();
   if (t.id === 'restart') { Object.assign(S, { step: 'intro', page: 0, ans: {}, name: '', cls: '', parent: '', phone: '', email: '', consent: false, consentAt: null, stream: '', err: '', section: '', roll: '', startedAt: null, resultCode: '', info: '', busy: false, contactSent: false, lname: '', lmob: '', lemail: '' }); render(); }
 });
@@ -546,7 +592,7 @@ document.addEventListener('click', e => {
     } catch (e) { S.step = 'bad'; S.err = e.message; return render(); }
   }
   const code = (new URLSearchParams(location.search).get('school') || '').trim().toUpperCase();
-  if (!code) return render();
+  if (!code) { let tk = null; try { tk = localStorage.getItem(TOK); } catch (e) {} if (tk) { try { S.authed = true; return await loadMine(tk); } catch (e) { S.authed = false; try { localStorage.removeItem(TOK); } catch (x) {} } } return render(); }
   S.mode = 'school'; S.schoolCode = code; S.step = 'loading'; const bd = document.querySelector('header.top .demo'); if (bd) bd.textContent = 'School activity'; render();
   try {
     const r = await fetch('/api/career/school/' + encodeURIComponent(code)); const j = await r.json().catch(() => ({}));

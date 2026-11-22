@@ -203,8 +203,8 @@ router.post('/backup/restore', requireAuth, requireAdmin, async (req, res) => {
     await insertRows('user_demographics', ['user_id', 'age', 'location', 'institution', 'institution_type', 'experience_years', 'subject', 'updated_at'], data.userDemographics);
     await insertRows('schools', ['id', 'name', 'district', 'state', 'country', 'school_type', 'contact_name', 'contact_email', 'contact_phone', 'contact_designation', 'created_by', 'school_code', 'status', 'archived_at', 'archive_path', 'created_at', 'updated_at'], data.schools);
     await insertRows('school_teachers', ['id', 'school_id', 'user_id', 'full_name', 'email', 'designation', 'subject', 'invited_at', 'matched_at', 'retake_enabled', 'status', 'created_at', 'employee_id', 'phone_number'], data.schoolTeachers);
-    await insertRows('assessments', ['id', 'user_id', 'school_id', 'school_teacher_id', 'client_type', 'status', 'responses', 'scores', 'submitted', 'submitted_at', 'retake_of', 'created_at', 'updated_at'], data.assessments);
-    await insertRows('reports', ['id', 'assessment_id', 'user_id', 'plan_type', 'html_content', 'payment_status', 'released_at', 'created_at'], data.reports);
+    await insertRows('assessments', ['id', 'user_id', 'school_id', 'school_teacher_id', 'client_type', 'status', 'responses', 'scores', 'submitted', 'submitted_at', 'retake_of', 'created_at', 'updated_at', 'is_test'], data.assessments);
+    await insertRows('reports', ['id', 'assessment_id', 'user_id', 'plan_type', 'html_content', 'payment_status', 'released_at', 'created_at', 'is_test'], data.reports);
     await insertRows('orders', ['id', 'user_id', 'report_id', 'razorpay_order_id', 'razorpay_payment_id', 'amount', 'currency', 'plan_type', 'status', 'payment_method', 'marked_paid_by', 'notes', 'created_at', 'updated_at'], data.orders);
     await insertRows('consultation_requests', ['id', 'user_id', 'report_id', 'consultant_id', 'preferred_slot', 'scheduled_at', 'status', 'notes', 'consultant_name', 'created_by', 'created_at', 'updated_at'], data.appointments);
     await insertRows('lead_activity', ['id', 'user_id', 'recipient_email', 'type', 'subject', 'body', 'created_by', 'created_at'], data.leadActivity);
@@ -256,6 +256,9 @@ router.post('/clear-trial-data', requireAuth, requireAdmin, async (req, res) => 
     await client.query('DELETE FROM school_analytics');
     await client.query('DELETE FROM schools');
     await client.query(`DELETE FROM user_demographics WHERE user_id IN (SELECT id FROM users WHERE ${LEAD_ROLE_FILTER})`);
+    await client.query('DELETE FROM cd_leads');
+    await client.query('DELETE FROM cd_submissions');
+    await client.query('DELETE FROM cd_schools');
     const deleted = await client.query(`DELETE FROM users WHERE ${LEAD_ROLE_FILTER} RETURNING id`);
     await client.query('COMMIT');
 
@@ -267,6 +270,26 @@ router.post('/clear-trial-data', requireAuth, requireAdmin, async (req, res) => 
   } finally {
     client.release();
   }
+});
+
+// Admin: delete only the TEST attempts (the "Fill Sample" runs) and their reports, leaving real
+// participants, schools and student results alone.
+router.post('/clear-test-data', requireAuth, requireAdmin, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    if ((req.body || {}).confirm !== 'DELETE TEST DATA') return res.status(400).json({ error: 'Send { confirm: "DELETE TEST DATA" } to acknowledge' });
+    await client.query('BEGIN');
+    await client.query('DELETE FROM orders WHERE report_id IN (SELECT id FROM reports WHERE is_test = true)');
+    await client.query('DELETE FROM consultation_requests WHERE report_id IN (SELECT id FROM reports WHERE is_test = true)');
+    const r = await client.query('DELETE FROM reports WHERE is_test = true RETURNING id');
+    const a = await client.query('DELETE FROM assessments WHERE is_test = true RETURNING id');
+    await client.query('COMMIT');
+    res.json({ success: true, reportsDeleted: r.rows.length, attemptsDeleted: a.rows.length });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Clear test data error:', error);
+    res.status(500).json({ error: 'Failed and was rolled back — no data was changed' });
+  } finally { client.release(); }
 });
 
 // Public: serves the actual logo image bytes, used by <img src="/api/settings/logo">

@@ -332,8 +332,17 @@
         </div>
 
         <div class="dangerZone">
+          <h3>Delete test data only</h3>
+          <p>Removes the "Fill Sample" test attempts and their reports. Real participants, schools and student results are kept. A backup is downloaded first.</p>
+          <label>Type <code>DELETE TEST DATA</code> to confirm</label>
+          <input id="clearTestConfirm" placeholder="DELETE TEST DATA">
+          <button class="btn danger" onclick="clearTestOnly()">Delete Test Data</button>
+          <p class="muted" id="clearTestResult"></p>
+        </div>
+
+        <div class="dangerZone">
           <h3>Danger Zone</h3>
-          <p>Permanently erase all leads, schools, assessments, reports, orders and appointments. Staff accounts and org settings are kept. This cannot be undone — download a backup first.</p>
+          <p>Permanently erase ALL leads, schools, student results, assessments, reports, orders and appointments (real ones too). A backup is downloaded first. Staff accounts and org settings are kept. This cannot be undone — download a backup first.</p>
           <label>Type <code>DELETE ALL DATA</code> to confirm</label>
           <input id="clearDataConfirm" placeholder="DELETE ALL DATA">
           <button class="btn danger" onclick="clearTrialData()">Clear Trial Data</button>
@@ -677,7 +686,7 @@ async function deleteLeadPrompt(userId) {
   try {
     await api(`/admin/leads/${userId}/delete`, { method: 'POST', body: JSON.stringify({ reason: reason.trim() }) });
     refreshAfterLeadChange(userId);
-  } catch (e) { alert(e.message); }
+  } catch (e) { alert(e.message); throw e; }
 }
 
 async function restoreLead(userId) {
@@ -1196,7 +1205,7 @@ async function downloadRosterTemplate() {
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-  } catch (e) { alert(e.message); }
+  } catch (e) { alert(e.message); throw e; }
 }
 
 async function emailRosterTemplate() {
@@ -1435,6 +1444,18 @@ async function restoreBackup() {
   } catch (e) { resultEl.textContent = e.message; }
 }
 
+async function clearTestOnly() {
+  const el = document.getElementById('clearTestResult'), c = document.getElementById('clearTestConfirm').value; el.textContent = '';
+  if (c !== 'DELETE TEST DATA') return el.textContent = 'Type DELETE TEST DATA exactly to confirm.';
+  if (!confirm('Delete all test attempts and their reports? Real data is kept.')) return;
+  try {
+    await downloadBackup();
+    const r = await api('/settings/clear-test-data', { method: 'POST', body: JSON.stringify({ confirm: c }) });
+    el.textContent = `Done: ${r.attemptsDeleted} test attempt(s) and ${r.reportsDeleted} report(s) removed.`;
+    document.getElementById('clearTestConfirm').value = '';
+  } catch (e) { el.textContent = e.message; }
+}
+
 async function clearTrialData() {
   const confirmText = document.getElementById('clearDataConfirm').value;
   const resultEl = document.getElementById('clearDataResult');
@@ -1442,6 +1463,7 @@ async function clearTrialData() {
   if (confirmText !== 'DELETE ALL DATA') return resultEl.textContent = 'Type DELETE ALL DATA exactly to confirm.';
   if (!confirm('This permanently erases all leads, schools, assessments, reports, orders and appointments. Staff accounts and org settings are kept. This cannot be undone. Continue?')) return;
   try {
+    await downloadBackup();
     const result = await api('/settings/clear-trial-data', { method: 'POST', body: JSON.stringify({ confirm: confirmText }) });
     resultEl.textContent = `Done — ${result.leadsDeleted} lead(s) removed.`;
     document.getElementById('clearDataConfirm').value = '';
