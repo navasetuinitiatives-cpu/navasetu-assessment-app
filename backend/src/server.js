@@ -15,6 +15,7 @@ import schoolRoutes from './routes/schools.js';
 import adminRoutes from './routes/admin.js';
 import settingsRoutes from './routes/settings.js';
 import ssbRoutes from './routes/ssb.js';
+import { createCareerRouter } from './routes/career.js';
 // NOTE: routes/wellness.js is retired dead code from an earlier attempt at
 // this app (parallel scoring flow against tables that were never migrated).
 // It's intentionally not mounted below. Safe to delete the file entirely.
@@ -61,7 +62,9 @@ const limiter = rateLimit({
   max: 100, // limit each IP to 100 requests per windowMs
   message: 'Too many requests from this IP, please try again later.'
 });
-app.use('/api/', limiter);
+// The Career Discovery school activity has ~2,000 students sharing ONE school IP, so it
+// is exempt from this 100-per-15-min limit; routes/career.js has its own, much higher, guards.
+app.use('/api/', (req, res, next) => (req.path.startsWith('/career/') ? next() : limiter(req, res, next)));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -100,6 +103,7 @@ app.use('/api/schools', schoolRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/ssb', ssbRoutes);
+app.use('/api/career', createCareerRouter(pool));
 
 // 404 handler
 app.use((req, res) => {
